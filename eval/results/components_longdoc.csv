@@ -1,0 +1,19 @@
+step,setup,chunking,embedder,search,hit,recall,mrr,chunks,index_s,ms_per_question
+1 chunking,fixed-100,fixed-100,minilm,dense,0.987,0.981,0.915,204,1.9,12.3
+1 chunking,fixed-200,fixed-200,minilm,dense,0.974,0.962,0.847,102,0.9,8.0
+1 chunking,fixed-400,fixed-400,minilm,dense,0.936,0.929,0.743,52,0.7,15.6
+1 chunking,recursive-100,recursive-100,minilm,dense,0.974,0.968,0.854,208,1.6,10.2
+1 chunking,recursive-200,recursive-200,minilm,dense,0.936,0.929,0.842,104,1.1,8.0
+1 chunking,recursive-400,recursive-400,minilm,dense,0.923,0.91,0.766,55,0.7,8.9
+1 chunking,semantic-100,semantic-100,minilm,dense,0.962,0.955,0.879,243,3.6,12.2
+1 chunking,semantic-200,semantic-200,minilm,dense,0.962,0.955,0.848,136,2.7,7.7
+1 chunking,semantic-400,semantic-400,minilm,dense,0.949,0.942,0.786,80,2.5,8.0
+2 embedding,minilm,fixed-100,minilm,dense,0.987,0.981,0.915,204,1.7,10.6
+2 embedding,gemma,fixed-100,gemma,dense,0.987,0.981,0.958,204,20.0,44.9
+2 embedding,qwen3,fixed-100,qwen3,dense,1.0,0.994,0.916,204,66.1,149.7
+3 search,dense,fixed-100,qwen3,dense,1.0,0.994,0.916,204,72.5,96.6
+3 search,bm25,fixed-100,qwen3,bm25,0.987,0.981,0.924,204,0.0,0.4
+3 search,hybrid,fixed-100,qwen3,hybrid,1.0,1.0,0.951,204,71.5,137.7
+3 search,hybrid_rerank,fixed-100,qwen3,hybrid_rerank,1.0,0.994,0.958,204,70.5,260.9
+final,baseline,fixed-200,minilm,dense,0.974,0.962,0.847,102,1.7,7.6
+final,best,fixed-100,qwen3,hybrid,1.0,1.0,0.951,204,74.9,102.9
