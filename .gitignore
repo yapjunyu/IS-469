@@ -1,0 +1,14 @@
+# Per-student notebooks, indexes and memory: personal data, never committed
+data/
+
+# API keys
+.env
+
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+
+# Office lock files and macOS clutter
+~$*
+.DS_Store
