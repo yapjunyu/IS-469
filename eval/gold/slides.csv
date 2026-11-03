@@ -1,0 +1,41 @@
+id,file,question,gold_slides,type
+t8-01,Topic8_AgenticRAG_MITB.pptx,What two components does retrieval-augmented generation combine?,6;53,factual
+t8-02,Topic8_AgenticRAG_MITB.pptx,"Why might pasting a whole document into the prompt work better than retrieval, and what is the catch with a paid API?",10,conceptual
+t8-03,Topic8_AgenticRAG_MITB.pptx,Where in a very long prompt is the model least likely to use a key passage?,11,factual
+t8-04,Topic8_AgenticRAG_MITB.pptx,When should I pick RAG over just using a long-context prompt?,12;53,conceptual
+t8-05,Topic8_AgenticRAG_MITB.pptx,Do the document chunks and the user's question have to be encoded with the same embedding model?,13,factual
+t8-06,Topic8_AgenticRAG_MITB.pptx,What goes wrong when a document is cut so that the answer ends up spread over two pieces?,19;20,conceptual
+t8-07,Topic8_AgenticRAG_MITB.pptx,How should the size of each chunk be chosen?,21,conceptual
+t8-08,Topic8_AgenticRAG_MITB.pptx,Why are BLEU and ROUGE poor measures of whether a generated answer is correct?,25,conceptual
+t8-09,Topic8_AgenticRAG_MITB.pptx,Describe the two stages of retrieval when a re-ranker is added.,28;30,conceptual
+t8-10,Topic8_AgenticRAG_MITB.pptx,Why does a cross-encoder produce a better ranking than cosine similarity over stored embeddings?,31;32,conceptual
+t8-11,Topic8_AgenticRAG_MITB.pptx,Which version of the Cohere reranker has been deprecated?,33,factual
+t8-12,Topic8_AgenticRAG_MITB.pptx,Why can keyword search find an exact error code that embeddings miss?,35,conceptual
+t8-13,Topic8_AgenticRAG_MITB.pptx,How does contextual RAG help a chunk that loses its meaning once it is taken out of the document?,36;37,conceptual
+t8-14,Topic8_AgenticRAG_MITB.pptx,What is HyDE?,39,factual
+t8-15,Topic8_AgenticRAG_MITB.pptx,How can retrieval cope with figures and tables that text extraction loses?,40,conceptual
+t8-16,Topic8_AgenticRAG_MITB.pptx,What changes about control flow when the agent is the one deciding when to retrieve?,44;46,conceptual
+t8-17,Topic8_AgenticRAG_MITB.pptx,How can an agent use retrieval as its long-term memory?,45,conceptual
+t8-18,Topic8_AgenticRAG_MITB.pptx,Which agentic retrieval pattern handles a question that spans several documents?,49;48,factual
+t8-19,Topic8_AgenticRAG_MITB.pptx,Why is text pulled in by retrieval a security risk for an agent that can use tools?,52,conceptual
+t8-20,Topic8_AgenticRAG_MITB.pptx,"How do a fixed RAG pipeline and agentic RAG differ, and how should agentic RAG be evaluated?",46;44|51,multi-part
+t7-01,Topic7_Agentic_IS469.pdf,"According to the lecture, what is an AI agent made up of?",3;4;64,factual
+t7-02,Topic7_Agentic_IS469.pdf,"Does the language model run the tool code itself? If not, what does?",7;8,conceptual
+t7-03,Topic7_Agentic_IS469.pdf,What information goes into a tool's schema?,7,factual
+t7-04,Topic7_Agentic_IS469.pdf,What makes a tool interface easy for an LLM to use correctly?,9,conceptual
+t7-05,Topic7_Agentic_IS469.pdf,What details should be recorded every time the agent calls a tool?,10;57,factual
+t7-06,Topic7_Agentic_IS469.pdf,Why is a code interpreter the riskiest tool to give an agent?,11,conceptual
+t7-07,Topic7_Agentic_IS469.pdf,What are the four stages of the basic agent loop?,13;15,factual
+t7-08,Topic7_Agentic_IS469.pdf,What jobs does the harness handle around the language model?,14,factual
+t7-09,Topic7_Agentic_IS469.pdf,What does ReAct interleave in its trace?,18;19,factual
+t7-10,Topic7_Agentic_IS469.pdf,What integration problem does the Model Context Protocol solve?,22,conceptual
+t7-11,Topic7_Agentic_IS469.pdf,What three kinds of capability can an MCP server expose?,23;25,factual
+t7-12,Topic7_Agentic_IS469.pdf,Over which transports do MCP clients and servers communicate?,26;25,factual
+t7-13,Topic7_Agentic_IS469.pdf,Why do stateless MCP servers scale better than stateful ones?,28;27;29,conceptual
+t7-14,Topic7_Agentic_IS469.pdf,What is meant by test-time compute in reasoning models?,33,factual
+t7-15,Topic7_Agentic_IS469.pdf,How does ReAct differ from plan-and-execute?,36,conceptual
+t7-16,Topic7_Agentic_IS469.pdf,What is Reflexion?,37,factual
+t7-17,Topic7_Agentic_IS469.pdf,What are the three tiers of memory an agent can have?,44;45,factual
+t7-18,Topic7_Agentic_IS469.pdf,When is it a mistake to use an agent instead of ordinary code?,49,conceptual
+t7-19,Topic7_Agentic_IS469.pdf,What does progressive disclosure mean for Agent Skills?,52,factual
+t7-20,Topic7_Agentic_IS469.pdf,"What belongs on an agent evaluation scorecard, and which controls make an agent safe to run?",56;55|60,multi-part
