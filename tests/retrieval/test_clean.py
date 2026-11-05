@@ -46,3 +46,10 @@ def test_slide_lines_are_not_joined():
 def test_unicode_is_normalised_and_empty_pages_dropped():
     cleaned = clean_pages([page(1, "eﬃcient search​"), page(2, "  \n\n 7 ")])
     assert [(p.page, p.text) for p in cleaned] == [(1, "efficient search")]
+
+
+def test_page_with_only_an_image_is_kept():
+    chart_only = PageRecord("notes.pdf", 2, "", "page", image_paths=("chart.png",))
+    kept = clean_pages([page(1, "Some text."), chart_only, page(3, "")])
+    assert [p.page for p in kept] == [1, 2]  # the empty page with no image is dropped
+    assert kept[1].image_paths == ("chart.png",)

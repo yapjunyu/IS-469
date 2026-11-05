@@ -1,19 +1,15 @@
 """Compare the retrieval components one stage at a time, in pipeline order.
 
-    Step 1  chunking   vary the chunking setup   (embedder: minilm, search: dense)
+    Step 1  chunking   vary the chunking setup   (embedder: the default, search: dense)
     Step 2  embedding  vary the embedding model  (chunking: step 1's winner, search: dense)
     Step 3  search     vary the search method    (chunking + embedder: the winners so far)
-    Final   the course-lab baseline vs the best combination
+    Final   the baseline vs the best combination
 
 Each step holds everything else fixed, so any difference comes from that stage alone.
 Winners are picked by Recall@k, then MRR to break ties.
 
-Semantic chunking uses an embedder to decide where to cut. So that step 2 changes only
-the embedder, chunks are always cut by step 1's model (CHUNKING_EMBEDDER); the model
-being tested then embeds those same chunks for search.
-
     .venv/bin/python eval/compare_components.py
-    .venv/bin/python eval/compare_components.py --models minilm qwen3   # skip a model
+    .venv/bin/python eval/compare_components.py --models gemma2   # skip a model
 """
 import argparse
 import sys
@@ -26,13 +22,12 @@ sys.path[:0] = [str(ROOT / "src"), str(ROOT / "eval")]
 import eval_retrieval as ev  # noqa: E402  (shares setups, load_gold, score, mean, write_csv)
 from tutor.retrieval.chunk import chunk_pages  # noqa: E402
 from tutor.retrieval.clean import clean_pages  # noqa: E402
-from tutor.retrieval.embed import MODELS, Embedder  # noqa: E402
+from tutor.retrieval.embed import DEFAULT_MODEL, MODELS, Embedder  # noqa: E402
 from tutor.retrieval.extract import extract, file_sha256  # noqa: E402
 from tutor.retrieval.search import SEARCH_MODES, make_index  # noqa: E402
 
-# The course lab's setup (Lab B): fixed word windows, MiniLM, plain cosine search.
-BASELINE = dict(chunking="fixed-200", embedder="minilm", search="dense")
-CHUNKING_EMBEDDER = "minilm"  # cuts semantic chunks in every step, so chunks never change with the search model
+# The simplest setup: fixed word windows, the default embedder, plain cosine search.
+BASELINE = dict(chunking="fixed-200", embedder=DEFAULT_MODEL, search="dense")
 
 
 def main():
@@ -62,8 +57,7 @@ def main():
         embed = embedder(embed_key)
         start = time.perf_counter()
         chunks = [c for name, p in pages.items()
-                  for c in chunk_pages(p, hashes[name], embed=embedder(CHUNKING_EMBEDDER),
-                                       **chunking[chunk_setup])]
+                  for c in chunk_pages(p, hashes[name], **chunking[chunk_setup])]
         index = make_index(search_mode, chunks, embed)
         index_s = time.perf_counter() - start
         start = time.perf_counter()
@@ -92,8 +86,8 @@ def main():
 
     summary, per_question = [], []
 
-    print("Step 1 · chunking   (embedder minilm, search dense)")
-    step1 = [run("1 chunking", name, name, "minilm", "dense") for name in chunking]
+    print(f"Step 1 · chunking   (embedder {DEFAULT_MODEL}, search dense)")
+    step1 = [run("1 chunking", name, name, DEFAULT_MODEL, "dense") for name in chunking]
     best_chunking = winner(step1)["chunking"]
     summary += step1
 
@@ -112,7 +106,7 @@ def main():
     best_search = winner(step3)["search"]
     summary += step3
 
-    print("Final · course-lab baseline vs best combination")
+    print("Final · baseline vs best combination")
     summary.append(run("final", "baseline", BASELINE["chunking"], BASELINE["embedder"], BASELINE["search"]))
     summary.append(run("final", "best", best_chunking, best_embedder, best_search))
 

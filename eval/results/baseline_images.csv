@@ -1,0 +1,8 @@
+run,group,questions,chunking,embedder,search,images,chunks,index_s,ev3_recall,ev3_precision,ev3_f1,ev5_recall,ev5_precision,ev5_f1,ev_mrr,dev_ev3_recall,dev_ev_mrr,test_ev3_recall,test_ev_mrr,page3_recall,page3_precision,page3_f1,page5_recall,page5_precision,page5_f1,page_mrr,dev_page3_recall,dev_page_mrr,test_page3_recall,test_page_mrr
+baseline+images,all,206,fixed-200,gemma2,dense,True,766,972.2,0.898,0.395,0.533,0.951,0.258,0.396,0.851,0.904,0.892,0.895,0.831,0.777,0.359,0.475,0.88,0.253,0.382,0.655,0.716,0.59,0.807,0.686
+baseline+images,slides,144,fixed-200,gemma2,dense,True,766,972.2,0.894,0.38,0.519,0.939,0.246,0.381,0.853,0.9,0.888,0.89,0.834,0.701,0.317,0.423,0.837,0.237,0.359,0.559,0.623,0.489,0.742,0.596
+baseline+images,documents,62,fixed-200,gemma2,dense,True,766,972.2,0.909,0.43,0.565,0.978,0.287,0.431,0.848,0.917,0.903,0.905,0.826,0.954,0.457,0.596,0.978,0.29,0.433,0.876,0.972,0.87,0.947,0.879
+baseline+images,text_q,161,fixed-200,gemma2,dense,True,766,972.2,0.907,0.418,0.555,0.956,0.273,0.414,0.878,0.915,0.917,0.903,0.858,0.74,0.371,0.477,0.871,0.271,0.4,0.622,0.673,0.531,0.772,0.667
+baseline+images,image_q,45,fixed-200,gemma2,dense,True,766,972.2,0.867,0.311,0.453,0.933,0.204,0.332,0.757,0.867,0.806,0.867,0.733,0.911,0.319,0.469,0.911,0.191,0.314,0.77,0.867,0.8,0.933,0.756
+baseline+images,single_part,130,fixed-200,gemma2,dense,True,766,972.2,0.908,0.326,0.475,0.946,0.206,0.336,0.808,0.925,0.883,0.9,0.774,0.838,0.295,0.432,0.908,0.192,0.315,0.662,0.775,0.602,0.867,0.688
+baseline+images,multi_part,76,fixed-200,gemma2,dense,True,766,972.2,0.882,0.513,0.632,0.959,0.347,0.5,0.925,0.875,0.905,0.885,0.938,0.672,0.469,0.549,0.832,0.358,0.495,0.642,0.631,0.573,0.696,0.682

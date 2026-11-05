@@ -1,0 +1,1110 @@
+{
+ "setup": {
+  "chunking": "slide",
+  "embedder": "gemma2",
+  "search": "hybrid",
+  "k": 5
+ },
+ "rows": [
+  {
+   "id": "t1-01",
+   "type": "factual",
+   "gold_slides": "11",
+   "user_input": "What is the difference between lemmatization and stemming?",
+   "retrieved_contexts": [
+    "§1 · PUNCTUATION & LEMMAS\nNormalization, punctuation & lemmatization\n▸Punctuation removal, before: \"the cat chased the dog. i have two dogs.\"\n· after: \"the cat chased the dog i have two dogs\"\n▸Modern practice: keep punctuation, it carries sentiment and marks sentence boundaries\n▸Lemmatization maps a word to its dictionary base form (lemma) using morphology & part-of-\nspeech\n· \"meetings\" → \"meeting\"; \"better\" → \"good\"; \"was\" → \"be\"\n▸Stemming is cruder: it just chops suffixes, so the result need not be a real word\n· \"normalization\" → \"normal\"; \"studies\" → \"studi\"\nroot form",
+    "§1 · OVERVIEW\nMain tasks in early text processing\n▸Text normalization: lowercasing, punctuation handling, whitespace stripping, stopword\nremoval, lemmatization\n▸Tokenization: split text into units, word-level, subword-level (BPE, WordPiece), or character-\nlevel\n▸Out-of-vocabulary (OOV): at run time a word appears that was never seen in training\n▸Normalization mattered most when models and compute were far less powerful than today\ngiving text more structure\nlemmatization: converting word to root form\nstopword removal: removing words of not much meaning",
+    "INTUITION\nPerplexity, the model's own uncertainty\n▸PPL, first introduced 1977 by IBM researchers on speech recognition\n▸Quantifies the average uncertainty of the model's next-token predictions\n▸Entropy (Shannon, 1950): how unpredictable the next word is given context\n▸Lower entropy = more predictable language; LLM output is a distribution, so entropy is easy to\ncompute\n▸PPL ≈ the average number of options the model finds plausible per token, lower is more\nconfident\nmeasures avg uncertainty of gen model\npredicting the next word.\nit is a measure of entropy (e.g how predictable\nnext word is given the context)\ndifference between cross entropy and entropy?\n-cross entropy is comparing 2 probability distribution\n(ground truth & the model output)\n-entropy is looking at one distribution on its own\n(output distribution sharp —> entropy is low) ; (Output\ndistribution flat —> entropy is high)",
+    "§6 · ANALOGY\nVector arithmetic captures meaning\n▸Similar contexts → nearby vectors\n▸Relationships become directions in the space\n· gender, royalty, tense each become a direction\n▸So analogies turn into arithmetic:\n· king − man + woman ≈ queen\nThe man→king and woman→queen arrows are\nparallel.\nstill uses cosine similarity\nunderstanding rs between words",
+    "§2 · HARNESS ANATOMY\nWhat the harness is responsible for\n▸The LLM only chooses the next step, the harness does everything around it:\n· Context / prompt assembly and output parsing\n· Tool dispatch and result handling\n· Memory, scratchpad, running history, long-term store\n· Error handling, retries and self-correction\n· Step- and token-budgets, and the stop condition\n· Permissions and sandboxing (what the agent is allowed to do)\n▸Same LLM + a better harness = a large capability difference (see: coding agents)"
+   ],
+   "response": "Lemmatization converts a word to its dictionary base (its lemma) by using morphological analysis and part‑of‑speech information, so the result is a real word (e.g., “meetings” → “meeting”, “better” → “good”, “was” → “be”)【1】.  \n\nStemming is a cruder process that simply chops off suffixes without regard to morphology, often producing strings that are not valid words (e.g., “normalization” → “normal”, “studies” → “studi”)【1】.  \n\nThus, lemmatization yields proper lemmas using linguistic knowledge, whereas stemming just truncates word endings and may not produce actual words【2】.",
+   "reference": "Lemmatization maps a word to its dictionary base form (lemma) using morphology and part-of-speech, e.g. 'better' to 'good' and 'was' to 'be'. Stemming is cruder: it just chops suffixes, so the result need not be a real word, e.g. 'studies' to 'studi'.",
+   "retrieved": [
+    "Topic1_TextProcessing_IS469.pdf, slide 11",
+    "Topic1_TextProcessing_IS469.pdf, slide 7",
+    "Topic6_Evaluation.pdf, slide 49",
+    "Topic1_TextProcessing_IS469.pdf, slide 45",
+    "Topic7_Agentic_IS469.pdf, slide 14"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t1-02",
+   "type": "conceptual",
+   "gold_slides": "13",
+   "user_input": "How do subword tokens help with out-of-vocabulary words?",
+   "retrieved_contexts": [
+    "§1 · OOV\nOut-of-vocabulary words & subwords\n▸Simplest fix: map any unseen word to a single OOV / UNK token, but this throws away\ninformation\n▸Better: let the model read new words by breaking them into subwords\n▸Before: \"I love using my new smartwatch.\"\n▸After: \"I love using my new sm ##art ##watch\" (## = attach to previous piece)\n▸Still core today: subword tokenization splits rare words into pieces likely seen elsewhere",
+    "§1 · OVERVIEW\nMain tasks in early text processing\n▸Text normalization: lowercasing, punctuation handling, whitespace stripping, stopword\nremoval, lemmatization\n▸Tokenization: split text into units, word-level, subword-level (BPE, WordPiece), or character-\nlevel\n▸Out-of-vocabulary (OOV): at run time a word appears that was never seen in training\n▸Normalization mattered most when models and compute were far less powerful than today\ngiving text more structure\nlemmatization: converting word to root form\nstopword removal: removing words of not much meaning",
+    "§6 · ARCHITECTURE\nThe Word2Vec network (skip-gram)\nOne-hot input word → a small projection layer (the learned embedding, N ≪V) → softmax over the vocabulary\npredicting context words. The hidden layer IS the word vector.\ninput layer - same like BOW one hot\nencoding\nnumber of nodes = number of\nwords in vocab\nembedding is the weight,\nnumber of nodes in hidden layer\nis a decision choice in reality\noutput is the number of size of\nthe vocab\nno bias term in hidden layer of\nword2vec (wx). x is just 0s and a\nsingle 1s.\neach row in weight matrix\ncorrespond to single vocab.\n[ 0 0 0 0 1] x w will kick out all\nthe non 0 and return me the\nembedding for the word we\npump in",
+    "§7 · EMBEDDING LAYER\nBERT's embedding layer\n▸BERT sums three embeddings per token: (1) token, (2) position, (3) token-type (segment)\n▸Contrast with RoPE in recent decoders, where position is applied inside attention, not added up\nfront\n▸Special tokens: [CLS] at the front, [SEP] between/after segments\n▸\"hello, world!\" → IDs 101 7592 1010 2088 999 102 ([CLS] ... [SEP])\n▸Token embeddings are learned over BERT's 30,522-word vocabulary\nmark beginning",
+    "§3 · BUILDING THE INPUT\nFrom text to the first layer\nPrompt\nraw text\nTokenise\nwords / sub-words\nEmbed\nlookup per token ID\n+ Positional\ninject word order\nPositional info: sinusoidal (original transformer), learned (BERT), or RoPE (modern decoders), see §4.\nwe get initial embedding for each of those tokens"
+   ],
+   "response": "Subword tokenization lets the model handle words that never appeared in training by breaking them into smaller pieces that are likely already known. Instead of mapping an unseen word to a single generic UNK token and losing information, the word is segmented into sub‑words (e.g., “smartwatch” → “sm ##art ##watch”), each of which can be processed because its pieces have been seen elsewhere [1]. This approach is a core technique for dealing with out‑of‑vocabulary words in modern text processing pipelines [2].",
+   "reference": "Mapping every unseen word to a single OOV/UNK token throws away information. Subword tokenization instead breaks a new or rare word into pieces that were likely seen elsewhere (e.g. 'smartwatch' becomes 'sm ##art ##watch'), so the model can still read it.",
+   "retrieved": [
+    "Topic1_TextProcessing_IS469.pdf, slide 13",
+    "Topic1_TextProcessing_IS469.pdf, slide 7",
+    "Topic1_TextProcessing_IS469.pdf, slide 47",
+    "Topic2_Transformers_IS469.pdf, slide 41",
+    "Topic2_Transformers_IS469.pdf, slide 21"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t1-03",
+   "type": "conceptual",
+   "gold_slides": "27;28",
+   "user_input": "Why does TF-IDF work better than raw bag-of-words counts?",
+   "retrieved_contexts": [
+    "§4 · IN CLASS\nCorpus-building activity\n\"We'll build a small corpus together, encode it with BOW,\nwatch frequent words dominate, then watch TF-IDF down-\nweight them.\"\nIn-class activity · reinforces why raw counts mislead and IDF helps",
+    "§4 · TF-IDF\nFrom raw counts to TF-IDF\n▸Plain BOW counts are dominated by the most common words, which carry little information\n▸TF-IDF = term frequency × inverse document frequency, same vector length, reweighted values\n▸IDF down-weights a term by how many documents it appears in, common terms count for less\n▸Especially useful in information retrieval (search) and text mining\nTerm Frequency ( BOW)\nInverse Document Frequency ( downweight\nmost frequent words)\ne.g any documents/page may have I, not , like .\nif every page have I then we give it a lower\nscore",
+    "§4 · TF-IDF MATH\nTF-IDF, precisely\n▸Term frequency: TF(i, d) = count(i, d) / (total words in d) [share of word i in document d]\n▸Inverse document frequency: IDF(i, D) = log( NumDocs / |{d : i ∈d}| )\n▸Combine: TF-IDF(i, d) = TF(i, d) · IDF(i, D)\n▸A word frequent in one document but rare across the corpus scores highest\n▸Result: distinctive terms rise, boilerplate words sink, better retrieval signal",
+    "§6 · VS COUNTS\nWord2Vec vs. BOW / TF-IDF\nBOW / TF-IDF\n• Sparse, one slot per vocabulary word\n• Dimension = |V| (can be 10,000+)\n• No notion of relatedness between words\n• Built from counts\nWord2Vec\n• Dense, low-dimensional (e.g. 300)\n• Similar contexts → nearby vectors\n• Captures relations\n(king−man+woman≈queen)\n• Learned by a neural network",
+    "LAB 1\nHands-on Lab 1, BOW / TF-IDF / cosine\n▸Topic1.ipynb: build BOW and TF-IDF with scikit-learn, then rank documents by cosine similarity\n▸See highly frequent words dominate raw counts, and watch TF-IDF down-weight them\n▸This lab practises exactly what we just covered (§3, §4), do it now before moving on"
+   ],
+   "response": "TF‑IDF improves on raw bag‑of‑words counts because it reduces the influence of very common words that carry little meaning. Plain BOW counts are dominated by the most frequent terms, which provide little information, whereas TF‑IDF multiplies the term frequency by an inverse‑document‑frequency factor that down‑weights words appearing in many documents — so common “boiler‑plate” words count for less and distinctive terms receive higher scores, giving a better retrieval signal【2†L1-L4】【3†L2-L5】.",
+   "reference": "Raw bag-of-words counts are dominated by the most common words, which carry little information. TF-IDF multiplies term frequency by inverse document frequency, which down-weights terms that appear in many documents. A word that is frequent in one document but rare across the corpus scores highest, so distinctive terms rise and boilerplate words sink.",
+   "retrieved": [
+    "Topic1_TextProcessing_IS469.pdf, slide 34",
+    "Topic1_TextProcessing_IS469.pdf, slide 27",
+    "Topic1_TextProcessing_IS469.pdf, slide 28",
+    "Topic1_TextProcessing_IS469.pdf, slide 48",
+    "Topic1_TextProcessing_IS469.pdf, slide 35"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 0.5
+  },
+  {
+   "id": "t1-04",
+   "type": "conceptual",
+   "gold_slides": "30;31",
+   "user_input": "Why is cosine similarity used instead of the plain dot product to compare vectors?",
+   "retrieved_contexts": [
+    "§4 · SIMILARITY\nCosine similarity\n▸We often want the document most similar to a user's query (a search engine's core task)\n▸Two vectors are similar when they have a large dot (scalar) product\n▸But the dot product grows with vector length, longer counts inflate the score\n▸Cosine similarity is the normalized dot product: it measures the angle, not the magnitude\nwe want to do computations on the embedding\ncomparison between the two vectors",
+    "§4 · COSINE MATH\nCosine similarity, worked\n▸Dot product: a · b = |a| |b| cos θ\n▸So cos θ = (a · b) / (|a| |b|) = Σi viwi / ( √(Σi vi2) · √(Σi wi2) )\n▸Range 0–1 for non-negative count/TF-IDF vectors; 1 = same direction, 0 = no shared terms\n▸Example: query \"green eggs\" vs each page, rank pages by cosine score, highest first\n▸Length normalization is why a short query can still match a long relevant document\ncomputation between vector of query and each page\ndot product scaled by length of a and b ( normalised dot product)",
+    "§2 · VECTOR SEARCH\nWhat 'retrieve top-k by cosine' actually means\nIllustrative: query and document chunks are points in embedding space; retrieval returns the vectors whose angle to the query is smallest (highest\ncosine similarity).",
+    "§5 · WHY IT HELPS\nWhy re-ranking beats plain cosine\n▸The vector DB embedded each chunk when it was loaded, before any query existed\n▸Those chunk embeddings do not take the user query into account, no Attention over the pair\n▸A re-ranker feeds the chunk AND the query to a transformer together\n▸It computes a joint, context-dependent similarity score, a far more relevant ranking",
+    "§4 · GEOMETRY\nCosine similarity is the angle, not the length\nTwo documents are similar when the angle between their vectors is small, regardless of length."
+   ],
+   "response": "Cosine similarity normalizes the dot product by the lengths of the two vectors, so it measures the angle between them rather than their raw magnitude. This prevents longer vectors (e.g., documents with higher term counts) from inflating the score, allowing a short query to still match a long relevant document. In contrast, the plain dot product grows with vector length and does not account for this length bias【1†L3-L5】【2†L2-L4】【5†L1-L3】",
+   "reference": "The dot product grows with vector length, so longer count vectors inflate the score. Cosine similarity is the normalized dot product: it measures the angle between the vectors, not their magnitude. This is why a short query can still match a long relevant document.",
+   "retrieved": [
+    "Topic1_TextProcessing_IS469.pdf, slide 30",
+    "Topic1_TextProcessing_IS469.pdf, slide 31",
+    "Topic8_AgenticRAG_MITB.pdf, slide 15",
+    "Topic8_AgenticRAG_MITB.pdf, slide 31",
+    "Topic1_TextProcessing_IS469.pdf, slide 32"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t1-05",
+   "type": "factual",
+   "gold_slides": "46",
+   "user_input": "What are the two ways to train Word2Vec and how do they differ?",
+   "retrieved_contexts": [
+    "§6 · TRAINING\nTwo ways to train Word2Vec\nCBOW\n• Predicts the middle word from its context\n• \"SMU is the ? university in Singapore!\"\n• Word order has no effect\n• Faster; good for frequent words\nSkip-gram\n• Predicts the surrounding words from the\nmiddle one\n• \"? ? ? best ? ? ?\"\n• Uses a window before and after the current\nword\n• Better for rare words and larger corpora\ncontinuous\npump text in NN and train it to\npredict the missing word\nsize of emeddingis length of number of hidden (middle nodes)\nu set that and value is the weight",
+    "LAB 2\nHands-on Lab 2, Word2Vec\n▸Topic1-w2v.ipynb: train Word2Vec with gensim on the 20-newsgroups corpus\n▸Explore the vector space: nearest neighbors and king − man + woman ≈ queen\n▸Come away able to explain, compute and use each representation, the foundation for the\nwhole course",
+    "§6 · IDEA\nWord2Vec: learn embeddings, don't count\n▸A completely new idea when introduced in 2013\n▸Train a classifier to predict a word from (or against) its context\n▸Use a shallow 2-layer NN: input layer, one hidden layer, output\n▸The learned hidden-layer weights become the embedding vector for each word\n▸Vector arithmetic works: vec(king) − vec(man) + vec(woman) ≈ vec(queen)\nusing weights on Neural network as our embedding vector\nwhen train NN we are computing w & b , we train by pumping text through\nthe neural network and ask it to predict something ( means it is looking at\nword order)",
+    "§2 · WORKED EXAMPLE\nAttention with scalars: how Wk shifts focus\n▸We attend from the token “bank”. Only the key weight WK changes sign between the two cases — Q and V\nare identical.\ncalculation happen at the first hidden layer. The input layer\nare the embedding of the tokens (x) but no longer one hot\nencoding like word2vec\nK is everything we have seen so far\nnormally embeddings are\nvectors here just using scalar\n2x2=4\n4x2=8\ndimension is 1\n12\nconvert raw scores into\nweights that sums to 1\nVriver\nnew embedding vector was 4 now it is\n1.99 as it captures some information\nfrom river. modify embedding as a\nfunction of all the other words in the\ninput\nnew embedding for bank is 1.01\ndepending on words and weight,\nembedding is different. But for word2vec\nthe matrix is fix , does not change with\ndifferent words nor weights\nembedding value changes. it\npropagates through model and\nchanges as a function of other\nwords in the input and weight\nmatrix.\nembeddings changes as it propagates through the model\nw only change when we are training the model,\nnot when we\nare running the model, weights would have\nalready been set to the optimal value\nhow much attention should bank pay to river compared to itself?\nembedding of bank and\nriver will change. This\nwill go to next\ntransformer block and it\nwill change again\n4 ( input vector of word acting\non) x WQ\nscore every token against the query\nbank should pay 1% attention\nto the rvier and 99% attention\nto itself\nbank embedding becomes\ndominated by river’s value",
+    "FRAMING\nWhere we are\n▸T1: text processing, tokenisation, TF-IDF and word2vec embeddings\n▸T2: the transformer, attention (Q, K, V), encoders (BERT), the output head\n▸Today (T3): how the weights get made, pre-training, fine-tuning, RL post-training\n▸The through-line: one machinery, data in batches, a loss, gradient descent\n▸We build from a single training step up to how frontier models are aligned\n▸Next (T4): efficient fine-tuning, built directly on today's training loop"
+   ],
+   "response": "The two ways to train Word2Vec are **CBOW (Continuous‑Bag‑of‑Words)** and **Skip‑gram**.  \n\n* **CBOW** predicts the middle word from its surrounding context. It ignores word order, runs faster, and works well for frequent words【1】.  \n* **Skip‑gram** does the opposite: it predicts the surrounding words from the middle word, uses a window before and after the target, and performs better on rare words and on larger corpora【1】.",
+   "reference": "CBOW predicts the middle word from its surrounding context; word order has no effect, it is faster and good for frequent words. Skip-gram predicts the surrounding words from the middle word, using a window before and after; it is better for rare words and larger corpora.",
+   "retrieved": [
+    "Topic1_TextProcessing_IS469.pdf, slide 46",
+    "Topic1_TextProcessing_IS469.pdf, slide 54",
+    "Topic1_TextProcessing_IS469.pdf, slide 43",
+    "Topic2_Transformers_IS469.pdf, slide 14",
+    "Topic3_Training_IS469.pdf, slide 3"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t1-06",
+   "type": "factual",
+   "gold_slides": "49",
+   "user_input": "What are the limitations of Word2Vec?",
+   "retrieved_contexts": [
+    "§6 · LIMITS\nLimitations of Word2Vec\n▸One fixed vector per word, no context sensitivity (\"bank\" river vs. money)\n▸Unknown words get no meaningful vector (often a random one)\n▸No sub-word sharing, so morphologically related words are independent\n▸Hard to scale across languages, no parameter sharing for cross-lingual use",
+    "§6 · ARCHITECTURE\nThe Word2Vec network (skip-gram)\nOne-hot input word → a small projection layer (the learned embedding, N ≪V) → softmax over the vocabulary\npredicting context words. The hidden layer IS the word vector.\ninput layer - same like BOW one hot\nencoding\nnumber of nodes = number of\nwords in vocab\nembedding is the weight,\nnumber of nodes in hidden layer\nis a decision choice in reality\noutput is the number of size of\nthe vocab\nno bias term in hidden layer of\nword2vec (wx). x is just 0s and a\nsingle 1s.\neach row in weight matrix\ncorrespond to single vocab.\n[ 0 0 0 0 1] x w will kick out all\nthe non 0 and return me the\nembedding for the word we\npump in",
+    "Key takeaways\n01\nText → vectors\nNormalize and tokenize, then represent text as vectors ML can work with.\n02\nCounts have limits\nn-grams and BOW/TF-IDF are simple and interpretable but sparse, order-blind, and no sense of\nmeaning.\n03\nCosine similarity\nThe normalized dot product measures the angle between vectors, the core of retrieval.\n04\nLearned embeddings\nWord2Vec learns dense vectors that capture relations; modern models make them contextual and\npower RAG.",
+    "LAB 2\nHands-on Lab 2, Word2Vec\n▸Topic1-w2v.ipynb: train Word2Vec with gensim on the 20-newsgroups corpus\n▸Explore the vector space: nearest neighbors and king − man + woman ≈ queen\n▸Come away able to explain, compute and use each representation, the foundation for the\nwhole course",
+    "§6 · VECTOR SPACE\nLearned embeddings cluster similar words\nA schematic 2D projection of Word2Vec-style embeddings: words with similar meaning land near one another, so\ndistance measures similarity, exactly what BOW cannot do."
+   ],
+   "response": "Word2Vec has several notable drawbacks: it assigns a single fixed vector to each word, so it cannot distinguish different senses of a word in different contexts (e.g., “bank” as a river side versus a financial institution); it provides no meaningful vectors for words that were not seen during training, often resorting to random vectors; it does not share sub‑word information, meaning morphologically related words are treated as completely independent; and it is difficult to scale across languages because it lacks parameter sharing for cross‑lingual use【1】.",
+   "reference": "It gives one fixed vector per word with no context sensitivity (e.g. 'bank' as a river bank versus a money bank). Unknown words get no meaningful vector. There is no sub-word sharing, so morphologically related words are independent. It is also hard to scale across languages, with no parameter sharing for cross-lingual use.",
+   "retrieved": [
+    "Topic1_TextProcessing_IS469.pdf, slide 49",
+    "Topic1_TextProcessing_IS469.pdf, slide 47",
+    "Topic1_TextProcessing_IS469.pdf, slide 53",
+    "Topic1_TextProcessing_IS469.pdf, slide 54",
+    "Topic1_TextProcessing_IS469.pdf, slide 44"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t2-01",
+   "type": "conceptual",
+   "gold_slides": "6",
+   "user_input": "How does a transformer differ from an RNN or LSTM in how it processes a sequence?",
+   "retrieved_contexts": [
+    "§1 · OLD VS NEW\nRNN / LSTM vs. the transformer\nRNN / LSTM (sequential)\n• Process a sequence one token at a time\n• Current token + previous hidden state →\nnext state\n• LSTM gates control what information flows\nforward\n• Limited parallelism, slow to train, hard to\nscale\n• Still forget context from early in a long\nsequence\nTransformer (parallel)\n• Look at the whole sequence at once\n• All tokens processed together, in parallel\n• Connect every token to every other token\n• Fast to train → scales to huge models &\ndatasets\n• Weighted sum focuses on the most relevant\ntokens\nNO NEED\nFOCUS FOR\nQUIZ\ndoes not mean\nparallel\nprocessing",
+    "§1 · RNN\nAn RNN processes a sequence step by step\nEach step consumes the current token and the previous hidden state, left to right, so it cannot be parallelised. The\ntransformer removes this bottleneck by attending to all tokens at once.\nAll the RNN cell is the same network\nbut overtime\npump each word one by one",
+    "FRAMING\nLearning outcomes\n▸Explain the transformer architecture and how it powers today's LLMs\n▸Explain why transformers beat earlier sequence models (RNN, LSTM)\n▸Describe the attention mechanism and the query / key / value projections\n▸Understand what a transformer outputs when run on text\n▸Understand and use encoder models such as the BERT family",
+    "§6 · OUTPUT\nFrom embedding to the next-token distribution\nFinal linear\n→ logit per token\nSoftmax\n→ probabilities\nPick a token\ndecoding, Topic 5\nFeed back\nappend & repeat\nThe transformer outputs a probability distribution over the vocabulary. HOW you pick from it, greedy vs sampling,\ntemperature, top-k, top-p, is a decode-time choice, covered in Topic 5 (Inference).",
+    "TWO PHASES\nPrefill and decode\n▸Prefill has three steps:\n· Load model weights onto the GPU\n· Tokenise the prompt on CPU, transfer the tensor to the GPU\n· Run the whole prompt through one forward pass to generate the first token\n▸Decode: append the just-generated token to the sequence and forward it to produce the next\ntoken, repeat\n▸Prefill processes all prompt tokens in parallel; decode is strictly one token at a time"
+   ],
+   "response": "A transformer processes an entire sequence all at once, attending to every token in parallel, whereas an RNN/LSTM handles the sequence step‑by‑step, consuming one token at a time together with the previous hidden state and thus cannot be parallelised【1†L1-L7】【2†L1-L4】.",
+   "reference": "RNNs and LSTMs process a sequence one token at a time, combining the current token with the previous hidden state, so parallelism is limited, training is slow and they forget early context in long sequences. A transformer looks at the whole sequence at once, processes all tokens in parallel and connects every token to every other token, so it trains fast and scales to huge models.",
+   "retrieved": [
+    "Topic2_Transformers_IS469.pdf, slide 6",
+    "Topic2_Transformers_IS469.pdf, slide 7",
+    "Topic2_Transformers_IS469.pdf, slide 3",
+    "Topic2_Transformers_IS469.pdf, slide 34",
+    "Topic6_Evaluation.pdf, slide 13"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t2-02",
+   "type": "factual",
+   "gold_slides": "11",
+   "user_input": "What do the query, key and value vectors represent in self-attention?",
+   "retrieved_contexts": [
+    "§2 · Q / K / V\nEvery token is three vectors\n▸Attention computes a weighted sum of the value vectors of other tokens, weighted by the\ncurrent token\n▸Each token embedding is projected three ways, using matrices learned during training:\n· Query q = xWQ, the current element doing the comparing (like a search \"query\")\n· Key k = xWK, what each other token offers to be matched against (a key-value store)\n· Value v = xWV, the content that gets weighted and summed (the data behind the key)\n▸WQ, WK, WV are learned projections that reshape each input token into query / key / value\nquery is word u are acting on now (e.g it)\nx is input embedding\nQKV are input embeddings modified by\nthe weight matrix\neverytime u use a transformer, the\ninput is modifying the embedding,\ntaking into account all the words in\ninput @ this point of time",
+    "The Attention Mechanism\nQuery, key, value, and the scaled dot-product at the heart of it.",
+    "§2 · MECHANISM\nHow self-attention builds a context-aware token\nThe query for \"it\" is scored against every key; the softmax weights (highest on \"chicken\") blend the value vectors\ninto a new, context-aware \"it\".\nit receives weight from all the\nother words seem before it\nif word is chicken, the weight of\nchicken is the highest",
+    "§2 · SELF-ATTENTION\nSelf-attention, end to end\nQ, K, V\nproject each token\nScores\nqi · kj / √dk\nSoftmax\n→ attention weights\nWeighted sum\nΣj aij · vj\nEach output token is a softmax-weighted blend of every value vector, Attention(Q,K,V) = softmax(QKT/√dk)V.\nthis becomes new embedding value after\npassing through embedding layer",
+    "WORKED EXAMPLE\nWhy we cache K and V\n▸Prompt \"What color is the sky?\", already generated \"The sky is\", now compute the vector for\n\"is\"\n▸Need Query for \"is\", plus Key & Value for every earlier token to compute attention\n▸But K and V for all earlier tokens were already computed on the previous step, recomputing is\nwaste\n▸Idea: cache K and V from past tokens; each step only compute Q, K, V for the one new token\n▸Fetch cached K, V, concatenate the new token's K, V, then attention scores → output vector for\n\"is\""
+   ],
+   "response": "In self‑attention each token is turned into three learned vectors:\n\n* **Query ( q )** – the vector that represents the current token acting as a “search query” that will be compared to other tokens [1].  \n* **Key ( k )** – the vector that represents what each other token offers to be matched against the query, i.e., the entry in the key‑value store [1].  \n* **Value ( v )** – the vector that holds the actual content of the token; after the query‑key scores are turned into attention weights, these value vectors are weighted and summed to produce the new token representation [1].",
+   "reference": "Each token embedding is projected three ways using matrices learned in training. The query is the current element doing the comparing (like a search query). The key is what each other token offers to be matched against. The value is the content that gets weighted and summed.",
+   "retrieved": [
+    "Topic2_Transformers_IS469.pdf, slide 11",
+    "Topic2_Transformers_IS469.pdf, slide 10",
+    "Topic2_Transformers_IS469.pdf, slide 12",
+    "Topic2_Transformers_IS469.pdf, slide 15",
+    "Topic6_Evaluation.pdf, slide 16"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t2-03",
+   "type": "factual",
+   "gold_slides": "8",
+   "user_input": "How does the cost of attention grow with sequence length, and why?",
+   "retrieved_contexts": [
+    "§1 · THE TRADE-OFF\nWhat attention costs, and why it wins\n▸Attention lets the model connect each token to every other token, regardless of position\n▸At each step it computes a weighted sum of the sequence, focusing on the most relevant parts\n▸Because it operates on all pairs of tokens, cost grows quadratically with sequence length\n▸RNNs are linear in length but strictly sequential, attention is far faster in practice on modern\nhardware\n▸That quadratic cost is what modern efficiency tricks attack: sliding-window attention here in\n§5, and the inference-time KV-cache and batching in Topic 5",
+    "§5 · OVERVIEW\nWhy efficiency matters, the big picture\n▸Plain attention compares every token with every other, so work grows with the square of the\nsequence length\n▸That quadratic cost is what limits how long a context a model can handle\n▸This section covers the architectural answers that stretch context and capacity without blowing\nup compute:\n· Attend locally instead of to everything (sliding-window), and rescale positions to reach far past the\ntraining length (RoPE scaling)\n· Grow total capacity while keeping compute per token roughly flat (Mixture-of-Experts FFNs)\n▸Inference-time savings, the KV-cache, grouped-query attention and batching, come later in\nTopic 5 (Inference)",
+    "CACHE GROWTH\nThe KV cache is linear in sequence length\nPer-token KV memory is fixed, so total cache scales linearly with context length, and with batch size.",
+    "Modern Efficient Attention & FFN\nHow 2026 models tame the quadratic cost and stretch context to millions of tokens.",
+    "PREFILL VS DECODE\nTwo phases, two latency profiles\nPrefill runs full attention over the whole prompt in one pass, so its cost grows quadratically with prompt length; per-token decode latency stays\nroughly flat. Illustrative."
+   ],
+   "response": "The cost of attention increases **quadratically** with the length of the sequence because the mechanism must compare every token to every other token, creating a pairwise computation for the whole sequence — so the amount of work grows with the square of the sequence length【1†L1-L4】. This quadratic scaling is the main reason attention is computationally expensive and motivates the efficiency tricks that aim to reduce it【2†L1-L3】.",
+   "reference": "Because attention operates on all pairs of tokens, its cost grows quadratically with sequence length. RNNs are linear in length but strictly sequential, whereas attention is far faster in practice on modern hardware.",
+   "retrieved": [
+    "Topic2_Transformers_IS469.pdf, slide 8",
+    "Topic2_Transformers_IS469.pdf, slide 32",
+    "Topic6_Evaluation.pdf, slide 19",
+    "Topic2_Transformers_IS469.pdf, slide 31",
+    "Topic6_Evaluation.pdf, slide 15"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t2-04",
+   "type": "conceptual",
+   "gold_slides": "27;28",
+   "user_input": "Why does a transformer need positional encoding?",
+   "retrieved_contexts": [
+    "Positional Encoding & Normalization\nTwo supporting mechanisms that make deep transformers trainable and order-aware.",
+    "§4 · POSITIONAL ENCODING\nSinusoidal encoding → RoPE\n▸Attention alone is order-blind, positional encoding tells the model where each token sits\n▸Classic sinusoidal: a unique vector per position from sine/cosine in [−1, 1], added to the\nembedding\n· Bounded and the same size as the embedding, smoother than raw integer positions 1, 2, 3...\n▸RoPE (rotary positional encoding) rotates query/key vectors by an angle set by position\n· Encodes relative position, generalises to longer sequences, and is the default in modern decoders\nAttention calculate scores for all words unlike RNN @ same time\nhence it loses the order",
+    "§3 · BUILDING THE INPUT\nFrom text to the first layer\nPrompt\nraw text\nTokenise\nwords / sub-words\nEmbed\nlookup per token ID\n+ Positional\ninject word order\nPositional info: sinusoidal (original transformer), learned (BERT), or RoPE (modern decoders), see §4.\nwe get initial embedding for each of those tokens",
+    "§4 · POSITIONAL ENCODING\nThe idea: stamp each word with its position\nEvery word's embedding gets its position added in, so order-blind attention knows the sequence. \"the\" at 0 and at\n4 become different vectors.\neach token gets its own embedding\nand also a vector that represents its\nposition\nembedding for the also has an\nembedding that represents its\nposition",
+    "§3 · BOW\nA bag of words: order thrown away\nBOW keeps only which words appear and how often, not their order. \"I do not like them\" and \"them like not do I\"\ngive exactly the same bag.\nneed one hot\nencoding"
+   ],
+   "response": "Transformers process all tokens in parallel, so the attention mechanism itself has no notion of sequence order. Positional encoding injects information about each token’s position into its embedding, allowing the model to distinguish “the” at position 0 from “the” at position 4 and to be order‑aware. Without this added position information, attention would be completely order‑blind. 【2†L1-L4】【4†L1-L3】",
+   "reference": "Attention alone is order-blind, because it computes scores for all words at the same time. Positional encoding tells the model where each token sits, for example by adding a sinusoidal position vector to the embedding, or with RoPE, which rotates the query and key vectors by an angle set by position and encodes relative position.",
+   "retrieved": [
+    "Topic2_Transformers_IS469.pdf, slide 26",
+    "Topic2_Transformers_IS469.pdf, slide 27",
+    "Topic2_Transformers_IS469.pdf, slide 21",
+    "Topic2_Transformers_IS469.pdf, slide 28",
+    "Topic1_TextProcessing_IS469.pdf, slide 23"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 0.5
+  },
+  {
+   "id": "t2-05",
+   "type": "conceptual",
+   "gold_slides": "19",
+   "user_input": "What is the difference between an encoder and a decoder in a transformer, and which one do today's LLMs use?",
+   "retrieved_contexts": [
+    "§3 · ENCODER VS DECODER\nEncoder and decoder, same block, different job\n▸The original \"vanilla\" transformer (built for machine translation) has an encoder and a decoder\n▸The blocks look almost identical, the differences are the inputs/outputs and the training loss\n▸Encoder: sees the full input, trained with masked-language-model (fill-in-the-blank) loss\n▸Decoder: can't see the future, trained with causal (next-token) loss\n▸Today's main LLMs are decoder-only, no encoder",
+    "FRAMING\nTransformers, in one slide\n▸A transformer is a type of neural-network architecture, introduced in 2017 in \"Attention is All\nYou Need\" (Google)\n▸The original paper had both an encoder and a decoder; today most LLMs use the decoder only\n▸Attention fixes a core limit of static embeddings (e.g. word2vec): a word's meaning changes\nwith its context\n▸Context is inferred from the surrounding words, attention computes that context-dependence\nefficiently\n▸This one idea scales: Llama-4, Qwen3, Gemma-3, GPT-5-class and Claude 4/5-class models are\nall transformers\nTransformer is type of NN\nunderlying all GENAI",
+    "FRAMING\nLearning outcomes\n▸Explain the transformer architecture and how it powers today's LLMs\n▸Explain why transformers beat earlier sequence models (RNN, LSTM)\n▸Describe the attention mechanism and the query / key / value projections\n▸Understand what a transformer outputs when run on text\n▸Understand and use encoder models such as the BERT family",
+    "§3 · ENCODER VS DECODER\nOne block, two attention masks\nBERT's encoder attends in every direction to fill a [MASK]; GPT's decoder masks the future (×) and predicts the\nnext token left-to-right.",
+    "§8 · MULTIMODAL\nEncoders + decoders for images and text\n▸From Llama 3.2 onward, and now Llama-4 / Gemma-3 / GPT-5-class, LLMs are natively\nmultimodal\n▸Prompt with an image plus text, \"How many dogs are in this image?\", and get text (or images)\nback\n▸An encoder turns the image into embeddings; a decoder consumes the combined image+text\ninput\n▸So the encoder/decoder pieces from §3 recombine, encoders didn't disappear, they moved into\nthe vision path"
+   ],
+   "response": "The transformer’s encoder and decoder are built from the same basic block but serve different roles.  \n* The **encoder** can attend to the entire input sequence at once and is trained with a masked‑language‑model (fill‑in‑the‑blank) loss, allowing it to see all tokens when predicting the masked ones【1†L3-L6】.  \n* The **decoder** is restricted from looking ahead; it uses a causal (next‑token) loss and masks future positions so it predicts tokens strictly left‑to‑right【1†L6-L7】.  \n\nIn modern large language models, only the decoder architecture is used; today’s LLMs are “decoder‑only” models【1†L7-L8】【2†L3-L4】.",
+   "reference": "The encoder sees the full input and is trained with a masked-language-model (fill-in-the-blank) loss. The decoder cannot see the future and is trained with a causal (next-token) loss. Today's main LLMs are decoder-only, with no encoder.",
+   "retrieved": [
+    "Topic2_Transformers_IS469.pdf, slide 19",
+    "Topic2_Transformers_IS469.pdf, slide 4",
+    "Topic2_Transformers_IS469.pdf, slide 3",
+    "Topic2_Transformers_IS469.pdf, slide 20",
+    "Topic2_Transformers_IS469.pdf, slide 45"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t2-06",
+   "type": "factual",
+   "gold_slides": "38;40",
+   "user_input": "How is BERT trained and what is it still used for?",
+   "retrieved_contexts": [
+    "§7 · TRAINING & SIZES\nHow BERT is trained\n▸Trained with masked-language modeling (MLM): predict missing words from within a sentence\n▸Like word2vec's CBOW in spirit, but with a full transformer, not a 2-layer network\n▸BERT-base: 12 layers × 12 heads, 110M params (≈ GPT-1's 117M, also 2018)\n▸BERT-large: 24 layers × 16 heads, 340M params\n▸Encoder-only → built to understand input sequences, not to generate long text\nencoder- masking some text and predicting the text\ncurrent classification task we still use today: email filter,\ntopic classification ( processing review in the company)",
+    "§3 · LIBRARIES\nMain libraries for LLM training\n▸Hugging Face, the default high-level training stack (we used it last time for BERT)\n▸PyTorch FSDP (Fully Sharded Data Parallel), distributed training across many GPUs\n▸DeepSpeed (Microsoft), distributed training + inference; still actively maintained and widely\nused\n▸In practice you compose these, HF on top, FSDP or DeepSpeed underneath for scale",
+    "BERT, Bidirectional Encoder Models\nThe encoder side of the family, still the workhorse for classification & embeddings.",
+    "§7 · USES TODAY\nWhy BERT still matters in 2026\n▸An early model, but far smaller and cheaper than frontier decoders, and it doesn't need to\ngenerate\n▸Text classification via a fine-tuning dataset, sentiment, topic, intent, spam, moderation...\n▸Embedding generation, feed the vectors into clustering, search or downstream ML\n▸The pattern lives on: modern sentence-embedding models are encoder descendants of BERT",
+    "§4 · AT A GLANCE\nNormalization & position, what and where\nMechanism\nWhat it does\nWhere used\nLayerNorm\nCenter & scale across features\nOriginal transformer, BERT\nRMSNorm\nScale by RMS only (no mean)\nLlama, Qwen, Gemma\nSinusoidal PE\nFixed sine/cosine, added up front\nOriginal transformer\nLearned PE\nLearned position vectors, added\nBERT\nRoPE\nRotate Q/K by position (relative)\nModern decoders\nTwo supporting mechanisms: keep activations stable, and make an order-blind model order-aware.\nfyi, not in quiz"
+   ],
+   "response": "BERT is trained with a masked‑language modeling (MLM) objective, where the model predicts missing words inside a sentence—similar in spirit to word2vec’s CBOW but using a full transformer architecture [1].  \n\nToday BERT remains useful for tasks such as text classification (e.g., sentiment, topic, intent, spam, moderation) and for generating embeddings that can be fed into clustering, search, or other downstream machine‑learning pipelines [4].",
+   "reference": "BERT is trained with masked-language modelling: it predicts missing words from within a sentence using both left and right context. It is an encoder-only model, built to understand input sequences, not to generate long text. It is still used for text classification (sentiment, topic, intent, spam, moderation) and for generating embeddings.",
+   "retrieved": [
+    "Topic2_Transformers_IS469.pdf, slide 38",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 13",
+    "Topic2_Transformers_IS469.pdf, slide 36",
+    "Topic2_Transformers_IS469.pdf, slide 40",
+    "Topic2_Transformers_IS469.pdf, slide 30"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t3-01",
+   "type": "factual",
+   "gold_slides": "7;8",
+   "user_input": "What is the pre-training objective of a decoder LLM, and does it need labelled data?",
+   "retrieved_contexts": [
+    "§1 · GOAL\nWhat pre-training teaches\n▸Pre-training feeds the model tens of trillions of tokens\n▸(1) Language: grammar, sentence structure, word meaning, and contextual relationships\n▸(2) Facts & skills: e.g. how to write a formal letter vs. an email vs. a social post\n▸Pre-training a transformer is self-supervised, the data need not be labelled\n▸The 'label' is part of the input itself, masked during training (e.g. the next word)\npump text into model to learn weights (majority of\nweights in multi attention & feed forward layer), these\nweights are given value during pre training\nobjective of training transformer model is to\npredict the next word\npump massive amount of data into model to\npredict the next word",
+    "§1 · OBJECTIVES\nPre-training objective: MLM vs. CLM\nMasked LM (MLM), encoders\n• Used by BERT-style encoder models\n• Mask tokens in the input, predict them\n• Model sees both left and right context\n• Great for understanding / classification\nCausal LM (CLM), decoders\n• Used by decoder (generative) models\n• Predict the next token, left-to-right\n• \"The weather forecast for today is\" →\n\"rain.\"\n• The objective behind text generation\nmodel only see\nwords on the left",
+    "§1 · SCALE & DATA\nScale, data & self-supervision\n▸Trillions of tokens, and climbing: Llama 3 (2024) ~15T → Llama 4 (2025) >30T\n▸Chinchilla: ~20 tokens per parameter minimises the TRAINING RUN cost only\n▸Training is paid once, inference on every query, and tracks model size\n▸So labs over-train: a SMALLER model on far MORE tokens (8B ≈ 90× Chinchilla)\n▸You are unlikely to pre-train a decoder LLM from scratch\n▸You might pre-train an encoder for specialised, non-language tasks\n▸'Customising' = further training a pre-trained model, i.e. fine-tuning",
+    "§3 · ENCODER VS DECODER\nEncoder and decoder, same block, different job\n▸The original \"vanilla\" transformer (built for machine translation) has an encoder and a decoder\n▸The blocks look almost identical, the differences are the inputs/outputs and the training loss\n▸Encoder: sees the full input, trained with masked-language-model (fill-in-the-blank) loss\n▸Decoder: can't see the future, trained with causal (next-token) loss\n▸Today's main LLMs are decoder-only, no encoder",
+    "§6 · PIPELINE\nWhere RL fits: the post-training pipeline\nPre-training builds broad ability, SFT teaches instruction-following, and RL post-training (RLHF / RLVR) aligns the model to preference and\ncorrectness.\nwe have question and answer.\nprovide pairs of examples, train\nmodel to predict answer\ntrain model to be chatbot\nonly req gathering\ndocuments & batching\nthem into size to fit into\nmemory\ninput: is all the text of the\ninternet\npre training objective:\npredict the next word\nall ground truth already\nthere we dont have to label\nbecause it is just the next\nword\ntrain model to output respond in\ncertain style"
+   ],
+   "response": "The pre‑training objective for a decoder‑only LLM is a causal language‑model task: the model is trained to predict the next token (or word) in a left‑to‑right fashion — i.e., “predict the next word” [2][5]. This training is self‑supervised: the “label” is simply the next token that already appears in the raw text, so no external labelled data are required [1][2].",
+   "reference": "The objective is next-token prediction. Pre-training is self-supervised, so the data need not be labelled: the 'label' is part of the input itself, the next word, which is masked during training.",
+   "retrieved": [
+    "Topic3_Training_IS469.pdf, slide 7",
+    "Topic3_Training_IS469.pdf, slide 12",
+    "Topic3_Training_IS469.pdf, slide 9",
+    "Topic2_Transformers_IS469.pdf, slide 19",
+    "Topic3_Training_IS469.pdf, slide 36"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t3-02",
+   "type": "conceptual",
+   "gold_slides": "14",
+   "user_input": "How does supervised fine-tuning differ from extended pre-training?",
+   "retrieved_contexts": [
+    "§2 · TWO ROUTES\nExtended pre-training vs. supervised fine-tuning\nExtended pre-training\n• Keep the self-supervised causal loss\n• Continue on domain-specific text\n• Adds new knowledge / skills to the model\n• No labels needed, same objective as pre-\ntrain\nSupervised fine-tuning (SFT)\n• Loss now uses labels (supervised)\n• Each example has a correct answer\n• Teaches format, style, task behaviour\n• The basis for instruction & chatbot tuning",
+    "The Customisation Spectrum\nSame pre-trained weights, different objectives: extended pre-training, SFT, and instruction tuning.",
+    "§2 · SPECTRUM\nFour training regimes at a glance\nRegime\nObjective\nLabels?\nPurpose\nPre-training\nNext-token (CLM / MLM)\nNo, self-sup.\nLanguage, facts, skills\nExtended pre-training\nSame causal loss\nNo, self-sup.\nAdd domain knowledge\nSupervised fine-tuning\nSupervised loss\nYes\nTask, format, behaviour\nInstruction tuning\nSupervised loss\nYes, Q&A pairs\nFollow instructions, chat\nSame machinery throughout, only the objective and the data change.",
+    "FRAMING\nLearning objectives\n▸Distinguish pre-training vs. extended pre-training vs. fine-tuning\n▸Understand loss functions, and why cross-entropy\n▸Use the main training library: Hugging Face Transformers\n▸Understand the forward and backward passes of training\n▸Understand and be able to tune the key hyper-parameters\n▸Get a high-level grasp of RL post-training of an LLM",
+    "ROADMAP\nWhat we'll cover\n01\nThe 2026 customisation landscape, a ladder, not\na default\n02\nKnowledge gap vs behaviour gap, when fine-\ntuning still wins\n03\nTraining libraries & the HF stack\n04\nSupervised fine-tuning (SFT)\n05\nBeyond SFT: preference & reinforcement fine-\ntuning (DPO / GRPO / RFT)\n06\nStable training, distributed training\n07\nPEFT & LoRA · mixed precision · quantisation\n08\nQLoRA, distillation & what's next\n09\nHands-on lab (unsloth + TRL)"
+   ],
+   "response": "Supervised fine‑tuning (SFT) changes the training objective from the self‑supervised causal loss used in extended pre‑training to a supervised loss that requires labeled examples. In SFT each training example includes a correct answer, so the model learns the desired format, style and task behaviour. By contrast, extended pre‑training continues to use the same self‑supervised causal loss on domain‑specific text, adds new knowledge or skills, and does not require any labels【1†L2-L7】【3†L4-L9】.",
+   "reference": "Extended pre-training keeps the self-supervised causal loss and continues on domain-specific text to add new knowledge or skills, with no labels needed. Supervised fine-tuning uses a loss with labels, where each example has a correct answer, to teach format, style and task behaviour; it is the basis for instruction and chatbot tuning.",
+   "retrieved": [
+    "Topic3_Training_IS469.pdf, slide 14",
+    "Topic3_Training_IS469.pdf, slide 13",
+    "Topic3_Training_IS469.pdf, slide 15",
+    "Topic3_Training_IS469.pdf, slide 5",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 2"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t3-03",
+   "type": "conceptual",
+   "gold_slides": "21",
+   "user_input": "What happens in the backward pass and gradient descent step of training?",
+   "retrieved_contexts": [
+    "§3 · BACKWARD PASS\nThe backward pass & gradient descent\n▸We update weights and biases iteratively to reduce the\nloss\n▸Gradient descent: w(n+1) = w(n) − γ ∇L(n), γ is the\nlearning rate\n▸Work backward from the output node toward the\ninputs, the same network, the other direction\n▸Each gradient says how much a weight nudged the\nloss; step every weight against its gradient\n▸Then repeat: forward → loss → backward → update,\nbatch after batch\nGradients ∂L/∂w flow from the loss back through the same network\nto every weight and bias.\npurpose of backward pass is adjusting weights,\nnext time we do forward pass the\nloss will be smaller. Which of the weight was\nresponsible for that loss - adjust the weight. All\nweights responsible but to different degree\nfinding how much each of this weight is responsible\nfor the loss then adjust weights : Gradient Descent.\ndecreasing weight as function of\ngradient ( but it doesnt mean the\nnumber is always getting smaller)\nif classification output\nmay be just one output\nnumber (e.g 0 or 1)\nIF LLM and training on text, the output is\njust the next text. We always know the\ntarget output (y). So we can compute the\nloss.\nloss is like error telling the weight (‘ youre\nresponsible for this amount of error’) - we\nknow through gradient\ngradient descendant function: we trying to minimise this loss\nfunction\n(- )because we want to descent to the\nminimum but the actual function slope is\ninc\nhow big we gonna take ?\ngama the step size",
+    "§5 · BATCHES\nBatches, OOM & gradient accumulation\n▸Batch size shapes memory use, learning dynamics and throughput, for both, we want large\nbatches\n▸But large batches overflow GPU memory (OOM), capping how big you can go\n▸Gradient accumulation: split a big batch into subsets, accumulate gradients, update once at\nthe end\n▸Find the limit empirically: start at batch size 1, double, remeasure, until throughput drops or\nOOM\n▸Judge learning quality by validation loss on held-out data, not training loss\neverytime we send through one page, dont\nupdate weights yet because the model hasnt\nseen other pages.\ngathering info from each batch fwd pass, then\ncreate single backward pass from the info it\naccumulated",
+    "§6 · GRAD ACCUM\nGradient accumulation\nBatches 1...k\nforward + backward each\nAccumulate\nsum gradients, don't update yet\nOne update\nstep the optimiser once per k\nEffective batch = per-iter batch × accumulation steps × num procs. A bigger effective batch means a less noisy gradient, so the learning\nrate must be scaled up to match it.",
+    "Inside a Training Step\nStart from the network itself: what training actually changes, and how one step changes it.",
+    "§3 · RECAP\nRecap: the whole step as one loop\nEverything we just walked through, in one picture: forward to a prediction and a loss, gradients back to every weight, update , repeat every batch.\nTraining a transformer means\nrunning a forward pass on the\ntransformer but this is just using\nfor a LLM it is a ouput vector of\nprobability across vocab\n( FORWARD PASS), a different NN\nIN A TRANSFORMER (fwd pass):\nwhat is nice about singapore?\nInput x is what is nice about singapore\nthe output is the token the now need\nanother forward pass ( now input is what\nis nice about singapore the) now next\ntoken may be food\nwhat is a target output for the\nLLM,actual output to be produce\ninput is all of text we want to train\nmodel on. we hide next word but we\nknow the next word because is in the\ntext"
+   ],
+   "response": "In the backward pass the loss is propagated backward through the same network, producing a gradient ∂L/∂w for every weight and bias that tells how much that parameter contributed to the error. These gradients are then used in the gradient‑descent update, where each weight is moved opposite its gradient by a step‑size (the learning rate γ):  \n\n\\[\nw^{(n+1)} = w^{(n)} - \\gamma \\,\\nabla L^{(n)} .\n\\]\n\nThus the backward pass computes the responsibility of each weight for the loss, and the gradient‑descent step adjusts the weights (and biases) accordingly so that the loss will be smaller on the next forward pass【1】.",
+   "reference": "The backward pass works from the output back toward the inputs through the same network, computing a gradient that says how much each weight contributed to the loss. Gradient descent then steps every weight against its gradient: w(n+1) = w(n) - gamma * gradient of L, where gamma is the learning rate. The loop of forward pass, loss, backward pass and update repeats for every batch.",
+   "retrieved": [
+    "Topic3_Training_IS469.pdf, slide 21",
+    "Topic3_Training_IS469.pdf, slide 30",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 26",
+    "Topic3_Training_IS469.pdf, slide 17",
+    "Topic3_Training_IS469.pdf, slide 22"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t3-04",
+   "type": "conceptual",
+   "gold_slides": "24;26",
+   "user_input": "Why is cross-entropy used as the loss for LLMs, and how does it treat a confident wrong prediction?",
+   "retrieved_contexts": [
+    "§4 · EXAMPLE 1\nCross-entropy loss, example 1\n▸L = -Σk=1..K yk · log(pk)\n▸When yk = 1, the term -log(pk) decreases (gets better) as the predicted probability pk increases\n▸A wrong class has yk = 0 so it does not enter the loss directly, but because Σi pi = 1, raising a\nwrong class's probability forces the correct one down\n▸The log is more sensitive to changes in high than low values: raising p from 0.98 to 0.99 lowers\nthe loss less than raising it from 0.51 to 0.52\n▸So an \"I don't know\" prediction (all probabilities equal) gives a lower loss than a very confident\nbut wrong one\n· Source: Chris Hughes, \"A brief overview of cross-entropy loss\"\nsmall k here is the particular word in vector\nprobability of k token being the next word\ny is the ground truth\nhere - a vector with\nsingle 1 and all 0s\nK is how many tokens we have in vocab",
+    "§4 · WHY CE\nHow to compute the loss: cross-entropy\n▸Usually cross-entropy (CE) loss is used rather than MSE loss\n▸CE loss is the negative log-likelihood of the target token j (the true next token)\n▸CE loss is smooth and differentiable, hence well-suited to gradient-based optimisation\n▸The log in the CE loss is sensitive to changes in high-confidence predictions, so the model stays\ncautious when uncertain\n▸The more confident the model is on the correct outcome, the lower the loss; more confident\non a wrong outcome, the higher the loss\nwe don’t use y- y^ actually.we dont use MSE in genAI\nnegative log likelihood of the next token",
+    "§4 · EXAMPLE 2\nCross-entropy loss, example 2\n▸4-token vocabulary [the, man, eats, fish]; true next token is man, so the label is [0, 1, 0, 0]\n▸Only the true class contributes: L = -Σk yk · log(pk) = -log(pman)\n▸Probabilities below are in that order: the, man, eats, fish\n▸pred [0.01, 0.60, 0.09, 0.30] (60% on man): L = −log 0.60 = 0.22\n▸more confident [0.01, 0.80, 0.09, 0.10]: L = 0.097 (lower is better)\n▸wrong & confident [0.01, 0.15, 0.09, 0.84]: L = 0.82 (worst)\n▸\"doesn't know\" [0.25, 0.25, 0.25, 0.25]: L = −log 0.25 = 0.60 (still better)\nprobability is higher on the\ncorrect ouput then the loss\nis lower\nhigher loss ( worst)\nmodel high confident 0.84\nthat is fish but its wrong so\nthe lost is very high. Loss\nfunction penalises model\nwhen is confident but wrong\nbetter to say idk than wrong\n& confident\ny2=1 and all of the other ys\nare 0\nmore confident means higher probability\nequal probability == idk",
+    "Cross-Entropy Loss\nThe loss LLMs actually train on: negative log-likelihood of the true next token.",
+    "INTUITION\nPerplexity, the model's own uncertainty\n▸PPL, first introduced 1977 by IBM researchers on speech recognition\n▸Quantifies the average uncertainty of the model's next-token predictions\n▸Entropy (Shannon, 1950): how unpredictable the next word is given context\n▸Lower entropy = more predictable language; LLM output is a distribution, so entropy is easy to\ncompute\n▸PPL ≈ the average number of options the model finds plausible per token, lower is more\nconfident\nmeasures avg uncertainty of gen model\npredicting the next word.\nit is a measure of entropy (e.g how predictable\nnext word is given the context)\ndifference between cross entropy and entropy?\n-cross entropy is comparing 2 probability distribution\n(ground truth & the model output)\n-entropy is looking at one distribution on its own\n(output distribution sharp —> entropy is low) ; (Output\ndistribution flat —> entropy is high)"
+   ],
+   "response": "Cross‑entropy (CE) is chosen as the training loss for large language models because it is the negative log‑likelihood of the true next token, which is smooth and differentiable and therefore works well with gradient‑based optimisation [2].  CE directly rewards the model for assigning high probability to the correct token (lower loss) and penalises it when it assigns high probability to an incorrect token (higher loss) [2][1].\n\nWhen the model is very confident about a wrong token, the CE loss becomes large.  Since the loss is ‑log of the predicted probability of the true token, a low probability for the correct token (caused by a high probability given to a wrong token) yields a high loss value [1][3].  For example, a prediction that puts 0.84 on the wrong word “fish” gives a loss of ‑log 0.16 ≈ 0.82, which is much higher than a more uncertain “I don’t know” prediction that spreads probability evenly (loss ≈ 0.60) [3].  Thus CE heavily penalises confident but incorrect predictions.",
+   "reference": "Cross-entropy loss is the negative log-likelihood of the true next token. It is smooth and differentiable, so it suits gradient-based optimisation. The more confident the model is on the correct token, the lower the loss; a confident but wrong prediction is punished hardest (in the slide's example, 0.84 on the wrong token gives a loss of 0.82, worse than the 0.60 for an 'I don't know' uniform prediction).",
+   "retrieved": [
+    "Topic3_Training_IS469.pdf, slide 25",
+    "Topic3_Training_IS469.pdf, slide 24",
+    "Topic3_Training_IS469.pdf, slide 26",
+    "Topic3_Training_IS469.pdf, slide 23",
+    "Topic6_Evaluation.pdf, slide 49"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 0.5
+  },
+  {
+   "id": "t3-05",
+   "type": "conceptual",
+   "gold_slides": "28",
+   "user_input": "How can you tell a model is overfitting during fine-tuning, and which checkpoint should you pick?",
+   "retrieved_contexts": [
+    "§5 · CHECKPOINTS\nWatch validation loss, not training loss\n▸Train over many epochs and the LLM starts to\nmemorise the training data\n▸Training loss keeps trending down, that alone tells you\nnothing about generalisation\n▸When validation loss (on held-out data) turns back up,\nyou're overfitting\n▸Pick the checkpoint from just before that turn, the\ndashed line\n▸This train-vs-val gap is the single most important thing\nto watch during fine-tuning\nValidation loss bottoms out, then rises as the model overfits;\ncheckpoint at the minimum.",
+    "§8 · ADAPTERS\nFull fine-tuning vs. adapters, what actually trains\nFull fine-tuning updates every weight (a full checkpoint per task); LoRA freezes the base and trains only tiny adapters, on the order of 0.01% of\nparameters.",
+    "LAB\nHands-on lab: read the training curves\n▸Find where validation loss bottoms out and then turns back up, that is the onset of overfitting\n▸Select the checkpoint at the validation-loss minimum, not the final epoch\n▸Compare configurations: which learning rate and schedule generalise best, and why?\n▸Connect it back to the theory: dropout, weight decay and early checkpointing all move that\ncurve\n▸This fine-tune → evaluate loop is the foundation we formalise into proper evaluation in Topic 6",
+    "Key takeaways\n01\nIt's all one loop\nBatches → forward pass → loss → backward pass → update. Pre-training and fine-tuning share the\nsame machinery.\n02\nCross-entropy is the loss\nLogits → softmax → negative log-likelihood of the true token. Confidently wrong is punished hardest.\n03\nWatch validation, not training loss\nOverfitting is the enemy: dropout, weight decay, and checkpoint on the val curve.\n04\nAlignment is RL post-training\nRLHF learns a reward model; RLVR verifies correctness; DPO / GRPO make preference training lighter.",
+    "DIMENSIONS\nOne scorecard, many axes, no single winner\nThe same two models trade places across benchmarks: A leads on broad knowledge and code, B on expert science, chat quality an d agentic\ncoding. Which is 'better' depends on what you weight. Illustrative.\nwhen you finetune model you\nare changing the weights ->\nmust compare before & after\nfine tune by running standard\nbenchmarks"
+   ],
+   "response": "You can detect over‑fitting by watching the validation loss curve: during fine‑tuning the validation loss will keep falling at first, then reach a minimum and start to rise again. That rise signals that the model is beginning to overfit the training data【1】.  \n\nWhen this happens you should select the checkpoint taken at the point where the validation loss is at its lowest (the minimum), rather than the final epoch checkpoint【3】. This “early” checkpoint—just before the validation loss turns back up—is the one that gives the best generalisation.",
+   "reference": "Training loss keeps trending down, which alone says nothing about generalisation. When validation loss on held-out data turns back up, the model is overfitting. Pick the checkpoint from just before that turn, at the validation-loss minimum.",
+   "retrieved": [
+    "Topic3_Training_IS469.pdf, slide 28",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 37",
+    "Topic3_Training_IS469.pdf, slide 42",
+    "Topic3_Training_IS469.pdf, slide 40",
+    "Topic6_Evaluation.pdf, slide 54"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t3-06",
+   "type": "conceptual",
+   "gold_slides": "35;38",
+   "user_input": "What is the difference between RLHF and RLVR?",
+   "retrieved_contexts": [
+    "§6 · RLVR\nRL from Verifiable Rewards (RLVR)\n▸Used in DeepSeek post-training, like RLHF but with a binary reward: 1 = correct, 0 = incorrect\n▸A programmatic verifier sets the reward, no separate neural reward model to train\n▸Ideal for math and coding, where correctness can be checked automatically\n▸Won't work where outputs can't be programmatically verified\n▸The LLM's output is checked by the verifier; weights are updated toward correct outputs",
+    "Key takeaways\n01\nIt's all one loop\nBatches → forward pass → loss → backward pass → update. Pre-training and fine-tuning share the\nsame machinery.\n02\nCross-entropy is the loss\nLogits → softmax → negative log-likelihood of the true token. Confidently wrong is punished hardest.\n03\nWatch validation, not training loss\nOverfitting is the enemy: dropout, weight decay, and checkpoint on the val curve.\n04\nAlignment is RL post-training\nRLHF learns a reward model; RLVR verifies correctness; DPO / GRPO make preference training lighter.",
+    "§6 · PIPELINE\nWhere RL fits: the post-training pipeline\nPre-training builds broad ability, SFT teaches instruction-following, and RL post-training (RLHF / RLVR) aligns the model to preference and\ncorrectness.\nwe have question and answer.\nprovide pairs of examples, train\nmodel to predict answer\ntrain model to be chatbot\nonly req gathering\ndocuments & batching\nthem into size to fit into\nmemory\ninput: is all the text of the\ninternet\npre training objective:\npredict the next word\nall ground truth already\nthere we dont have to label\nbecause it is just the next\nword\ntrain model to output respond in\ncertain style",
+    "§6 · RLHF\nRL from Human Feedback (RLHF)\n▸A 3-step process for aligning LLMs to human preferences\n▸(1) Start from a model already post-trained with SFT\n▸(2) Reward model: humans rank multiple responses per prompt; train a separate NN to predict\nthose preferences\n▸(3) RL phase: adjust the LLM's weights to maximise the reward the reward model predicts,\nthen repeat\n▸Human feedback is distilled once into a reward model, which then guides fine-tuning at scale\nIn transformer training:\neach transformer model to predict next\ntoken is like learning the model language,\nfacts and scales , sentence strucutres, by\npredicting next token is predicting answer\nto qns",
+    "§5 · RFT / RLVR\nReinforcement fine-tuning with verifiable rewards\n▸RFT / RLVR = reinforcement fine-tuning where the reward is a checkable rule, not a learned\nmodel\n▸For math / code / structured extraction / tool-calls you can just check: is the answer correct?\n▸The model samples answers, correct ones are reinforced, it learns the behaviour, not one label\n▸GRPO (DeepSeekMath; popularised by DeepSeek-R1, early 2025) is the workhorse algorithm\n▸Payoff: a 7–13B model tuned this way can rival a 70B frontier model on its narrow task"
+   ],
+   "response": "RLHF aligns a model by first training a separate reward model on human‑generated preference rankings and then using reinforcement learning to maximize the reward predicted by that model [4]. In contrast, RLVR uses a programmatic verifier that can automatically check whether an output is correct, assigning a binary reward (1 = correct, 0 = incorrect) without training any reward model [1][5]. Thus, RLHF relies on human feedback distilled into a learned reward model, whereas RLVR relies on verifiable, rule‑based rewards that are checked automatically.",
+   "reference": "In RLHF, humans rank multiple responses per prompt and a separate neural reward model is trained to predict those preferences; RL then adjusts the LLM to maximise the predicted reward. In RLVR the reward is binary (1 correct, 0 incorrect) and is set by a programmatic verifier, so no separate reward model is needed. It suits math and coding but not outputs that cannot be verified programmatically.",
+   "retrieved": [
+    "Topic3_Training_IS469.pdf, slide 38",
+    "Topic3_Training_IS469.pdf, slide 40",
+    "Topic3_Training_IS469.pdf, slide 36",
+    "Topic3_Training_IS469.pdf, slide 35",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 24"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t4-01",
+   "type": "conceptual",
+   "gold_slides": "6",
+   "user_input": "How do you tell a knowledge gap from a behaviour gap, and which one does fine-tuning fix?",
+   "retrieved_contexts": [
+    "§1 · DIAGNOSE THE GAP\nKnowledge gap vs. behaviour gap\n▸First ask what is actually failing, the fix depends on the kind of gap:\n· Missing / stale / private facts → a KNOWLEDGE gap → fine-tuning is the wrong tool for it\n· Wrong format, tone, policy, or unreliable reasoning → a BEHAVIOUR gap → fine-tune\n▸Volatile knowledge (prices, regulations, docs) should never be fine-tuned in, it goes stale\n▸Fine-tuning teaches a model how to behave, far more than what to know\n▸Exception: a task with your OWN label set (classification, ranking) is neither, you train for it\ndirectly",
+    "§1 · THE LADDER\nThe customisation ladder\nEvals first\nmeasure before you\nchange anything\nPrompting &\ncontext\ninstructions,\nexamples, structure\nFine-tune\nwhen a behaviour gap\nremains\nFine-tune\nefficiently\nLoRA / QLoRA on one\nGPU, this topic\nClimb only as far as your evals force you to. Each rung costs more and is harder to reverse than the one below it.",
+    "§5 · WHY\nBeyond imitation\n▸Post-training pipelines now go: pre-train → SFT → preference / RL alignment\n▸Preference tuning learns from comparisons: answer A is better than answer B\n▸Reinforcement fine-tuning (RFT) rewards good behaviour and penalises bad, over many tries\n▸This is how frontier models are aligned, and increasingly how teams specialise open models\n▸All of it composes with LoRA / QLoRA, you rarely update the full model",
+    "DIMENSIONS\nOne scorecard, many axes, no single winner\nThe same two models trade places across benchmarks: A leads on broad knowledge and code, B on expert science, chat quality an d agentic\ncoding. Which is 'better' depends on what you weight. Illustrative.\nwhen you finetune model you\nare changing the weights ->\nmust compare before & after\nfine tune by running standard\nbenchmarks",
+    "ROADMAP\nWhat we'll cover\n01\nThe 2026 customisation landscape, a ladder, not\na default\n02\nKnowledge gap vs behaviour gap, when fine-\ntuning still wins\n03\nTraining libraries & the HF stack\n04\nSupervised fine-tuning (SFT)\n05\nBeyond SFT: preference & reinforcement fine-\ntuning (DPO / GRPO / RFT)\n06\nStable training, distributed training\n07\nPEFT & LoRA · mixed precision · quantisation\n08\nQLoRA, distillation & what's next\n09\nHands-on lab (unsloth + TRL)"
+   ],
+   "response": "To decide whether a problem is a knowledge gap or a behaviour gap, first identify what is actually failing:\n\n* **Knowledge gap** – the model is missing, has stale, or has private facts. This is a gap in what the model knows.  \n* **Behaviour gap** – the model’s output has the wrong format, tone, policy compliance, or unreliable reasoning. This is a gap in how the model behaves.\n\nFine‑tuning is intended to fix **behaviour gaps**, not knowledge gaps. Knowledge gaps should be addressed by updating the data source rather than fine‑tuning, because fine‑tuning mainly teaches the model *how* to behave rather than *what* to know【1†L1-L7】.",
+   "reference": "Missing, stale or private facts are a knowledge gap, and fine-tuning is the wrong tool for it. Wrong format, tone, policy or unreliable reasoning are a behaviour gap, and that is what you fine-tune. Volatile knowledge such as prices or regulations should never be fine-tuned in, because it goes stale: fine-tuning teaches how to behave far more than what to know.",
+   "retrieved": [
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 6",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 4",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 21",
+    "Topic6_Evaluation.pdf, slide 54",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 2"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t4-02",
+   "type": "factual",
+   "gold_slides": "33;34",
+   "user_input": "How does LoRA reduce the number of parameters that need to be trained?",
+   "retrieved_contexts": [
+    "§8 · LORA\nThe low-rank update, as matrices\nΔW is never formed at full rank: the thin B (d×r) and A (r×d) are the only trained tensors, here ~0.8% of W0's parameters. Illustrative.\nrather than training all of the weights,\ndefine two matrix which are much smaller\nthen train those. Multiply them and add to\noriginal weights\n#rank of the adaptor - r dictates how\nmany parameter u train with the lora\nmethod (bigger means longer)\nn.o step in epoch is n.o ex in dataset/\nbatch size",
+    "§8 · LORA\nThe low-rank adapter\nFrozen W0\nbase weights, not trained\n+ B·A\nlow-rank adapter, trainable, r ≪\nd\n(W0 + BA)x\nadapted layer output\nOnly A and B are trained (rank r ≪full dimension) → trainable params collapse to ~0.01%.\nBy traning smaller amount of parameters, enough to\nlearn vast information and we are not destroying the\nold knowledge\nReasons why this works:\n1. neural networks are over parameterized, by training\na small percentage of them still can get extremely\ngood results\n2. By not training all of the parameters, we are not\ndestroying the old knowledge",
+    "§8 · PEFT\nParameter-Efficient Fine-Tuning\n▸PEFT rests on the observation that LLMs are heavily over-parameterised\n▸LoRA, \"Low-Rank Adaptation of Large Language Models\" (Microsoft Research, 2021)\n▸Later methods have not displaced LoRA, except QLoRA (2023)\n▸DoRA (2024) applies LoRA to the direction of each weight, a refinement with modest uptake\n▸Instead of full fine-tuning (FFT), update only a small number of parameters\n▸The payoff: fine-tune much larger models on a single GPU",
+    "§8 · LORA MATH\nHow LoRA works\n▸Full fine-tuning computes (W0 + ΔW)x, with ΔW the same shape as W0\n▸LoRA factorises it: ΔW = BA, rank r ≪d, and trains only A and B\n▸The layer computes (W0 + BA)x; W0 frozen, folding them back is \"merging\"\n▸Why two small matrices rather than one dense ΔW?\n· Memory: only the d × r and r × d shapes, and their optimiser states, are stored\n· Hardware: Tensor Cores are built for dense matrix multiplication, which BA is\n· Expressiveness: ΔW is dense, so every one of its d × d entries can move, yet only within a low-rank\nsubspace, letting learning spread across the whole layer\ntrain B and A then multiply —>\ntrain a smaller number of\nparameters.\nbig alpha infront of BA if u think ur new\ntraining is important —> to put more\nemphasise—> alpha is bigger",
+    "§8 · ADAPTERS\nLoRA adapters in practice\n▸The base model's weights are frozen, never modified during LoRA training\n▸Only the A, B matrices are trained → the result is a small set of \"adapters\"\n▸Typically update ~0.01% of the original parameters (you choose which layers)\n▸Adapters are stored separately from base weights, pluggable and shareable\n▸In HF / unsloth the model is patched in place → reload the base each run, or adapters stack"
+   ],
+   "response": "LoRA avoids updating the full weight matrix \\(W_0\\) and instead represents the change as a product of two much smaller matrices \\(B\\) (size \\(d\\times r\\)) and \\(A\\) (size \\(r\\times d\\)) where the rank \\(r\\) is far smaller than the original dimension \\(d\\)【4†L1-L4】. Because only these two low‑rank matrices are trainable, the number of trainable parameters collapses to roughly 0.01 % of the original model’s parameters【2†L4-L7】. The base weights \\(W_0\\) remain frozen, so the training workload is limited to the tiny “adapter” matrices \\(A\\) and \\(B\\)【5†L1-L3】. This low‑rank factorisation dramatically reduces the total parameters that need to be learned.",
+   "reference": "LoRA freezes the pre-trained weights W0 and factorises the update as delta W = BA with rank r much smaller than d, training only the small matrices A and B. The layer computes (W0 + BA)x. Typically only about 0.01% of the original parameters are trained.",
+   "retrieved": [
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 35",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 34",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 32",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 33",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 36"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 0.5
+  },
+  {
+   "id": "t4-03",
+   "type": "factual",
+   "gold_slides": "38",
+   "user_input": "What are the main LoRA hyper-parameters and their typical values?",
+   "retrieved_contexts": [
+    "§8 · HYPERPARAMETERS\nLoRA hyper-parameters\nHyper-parameter\nMeaning\nTypical\nr\nRank of the update matrices, lower\nr = fewer trainable params\n16\ntarget_modules\nWhich layers get LoRA matrices\n(\"all-linear\" = every linear layer)\n\"all-linear\"\nlora_alpha\nScaling factor, update is (α /\nr)·(BA)x\nα = r\nThese three are the knobs you'll actually tune in the lab.",
+    "§5 · HYPER-PARAMS\nThe hyper-parameters you'll tune\nHyper-parameter\nWhat it controls\nTypical setting\nLearning rate + schedule\nStep size over training\nlinear / cosine decay\nWarmup ratio\nLR ramp-up at the start\n0.03, first 3% of steps\nBatch size\nSamples per update\nas large as memory allows\nGrad-accum steps\nSimulate a bigger batch\n2 – 16\nNumber of epochs\nPasses over the data\nfew, watch val loss\nA hyper-parameter is set before training; judge each choice by validation loss, not training loss.\ndifferent aspect of training to adjust",
+    "§8 · LORA MATH\nHow LoRA works\n▸Full fine-tuning computes (W0 + ΔW)x, with ΔW the same shape as W0\n▸LoRA factorises it: ΔW = BA, rank r ≪d, and trains only A and B\n▸The layer computes (W0 + BA)x; W0 frozen, folding them back is \"merging\"\n▸Why two small matrices rather than one dense ΔW?\n· Memory: only the d × r and r × d shapes, and their optimiser states, are stored\n· Hardware: Tensor Cores are built for dense matrix multiplication, which BA is\n· Expressiveness: ΔW is dense, so every one of its d × d entries can move, yet only within a low-rank\nsubspace, letting learning spread across the whole layer\ntrain B and A then multiply —>\ntrain a smaller number of\nparameters.\nbig alpha infront of BA if u think ur new\ntraining is important —> to put more\nemphasise—> alpha is bigger",
+    "§8 · LORA\nThe low-rank update, as matrices\nΔW is never formed at full rank: the thin B (d×r) and A (r×d) are the only trained tensors, here ~0.8% of W0's parameters. Illustrative.\nrather than training all of the weights,\ndefine two matrix which are much smaller\nthen train those. Multiply them and add to\noriginal weights\n#rank of the adaptor - r dictates how\nmany parameter u train with the lora\nmethod (bigger means longer)\nn.o step in epoch is n.o ex in dataset/\nbatch size",
+    "§8 · ADAPTERS\nFull fine-tuning vs. adapters, what actually trains\nFull fine-tuning updates every weight (a full checkpoint per task); LoRA freezes the base and trains only tiny adapters, on the order of 0.01% of\nparameters."
+   ],
+   "response": "The main LoRA hyper‑parameters are:\n\n| Hyper‑parameter | Meaning | Typical value |\n|----------------|---------|---------------|\n| **r** (rank) | Rank of the update matrices; a lower r means fewer trainable parameters | 16 |\n| **target_modules** | Which layers receive LoRA matrices (e.g., “all‑linear” means every linear layer) | “all‑linear” |\n| **lora_alpha** | Scaling factor applied to the low‑rank update (the update is \\((α/r)·(BA)x\\)); usually set equal to the rank | α = r |\n\nThese three knobs are the ones you actually tune in the lab【1】.",
+   "reference": "r is the rank of the update matrices (lower r means fewer trainable parameters), typically 16. target_modules sets which layers get LoRA matrices, typically 'all-linear'. lora_alpha is the scaling factor, where the update is (alpha / r)(BA)x, typically alpha = r.",
+   "retrieved": [
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 38",
+    "Topic3_Training_IS469.pdf, slide 32",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 33",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 35",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 37"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t4-04",
+   "type": "conceptual",
+   "gold_slides": "22;23",
+   "user_input": "How does DPO differ from RLHF with PPO?",
+   "retrieved_contexts": [
+    "§5 · THE METHODS\nSFT → DPO → GRPO at a glance\nMethod\nLearns from\nNeeds a reward model?\nSFT\nLabelled prompt → answer pairs\nNo\nDPO\nPreference pairs (chosen vs\nrejected)\nNo, closed-form update\nRLHF (PPO)\nReward model trained on\npreferences\nYes\nGRPO / RFT\nA reward signal per sampled\nanswer\nOften no, rule-based reward\nThe trend is away from a separate reward model, toward direct (DPO) or rule-based / verifiable (GRPO) rewards.",
+    "§5 · DPO\nDirect Preference Optimization (DPO)\n▸You collect pairs: for a prompt, a preferred (chosen) and a dis-preferred (rejected) answer\n▸DPO derives a closed-form loss straight from those pairs, no RL loop, no reward model\n▸Simpler and cheaper than RLHF; offline (no sampling during training)\n▸Used to post-train Llama 3 and many other open models\n▸In HF this is TRL's DPOTrainer, the default preference method",
+    "§6 · RLHF\nRLHF in four steps\nSFT model\ninstruction-tuned start\nCollect human\nrankings\nrank responses /\nprompt\nTrain reward\nmodel\npredict preferences\nRL fine-tune\n(PPO)\nmaximise reward\nHuman feedback is distilled once into a reward model, which then guides fine-tuning at scale. ⟳iterate.",
+    "Key takeaways\n01\nIt's all one loop\nBatches → forward pass → loss → backward pass → update. Pre-training and fine-tuning share the\nsame machinery.\n02\nCross-entropy is the loss\nLogits → softmax → negative log-likelihood of the true token. Confidently wrong is punished hardest.\n03\nWatch validation, not training loss\nOverfitting is the enemy: dropout, weight decay, and checkpoint on the val curve.\n04\nAlignment is RL post-training\nRLHF learns a reward model; RLVR verifies correctness; DPO / GRPO make preference training lighter.",
+    "§3 · HF ECOSYSTEM\nThe Hugging Face ecosystem\nLibrary\nWhat it does\nTransformers\nLoad & train models, the core library\nAccelerate\nThin layer for distributed / mixed-precision training\nPEFT\nParameter-efficient fine-tuning (LoRA and friends)\nTRL\nPost-training: SFT + preference (DPO) + reinforcement\n(GRPO)\nHub\nHosts most open-weight models (audio & vision too)\nTRL is now a full post-training library, one Trainer per method (SFT / DPO / GRPO), all on top of Trainer + Accelerate."
+   ],
+   "response": "Direct Preference Optimization (DPO) skips the whole reinforcement‑learning loop that RLHF uses. With DPO you simply collect “chosen” vs. “rejected” answer pairs and derive a closed‑form loss directly from those pairs, so no separate reward model is trained and no PPO‑style policy‑gradient updates are performed【2】. In contrast, RLHF first distills human rankings into a reward model and then fine‑tunes the policy with reinforcement learning (typically PPO) to maximise that learned reward【3】. Thus DPO is simpler, offline, and cheaper, while RLHF relies on a reward model and an RL (PPO) optimisation step【4】.",
+   "reference": "DPO learns from preference pairs (a chosen and a rejected answer for a prompt) and derives a closed-form loss straight from them, with no RL loop and no reward model. It is simpler, cheaper and offline. RLHF with PPO needs a reward model trained on the preferences.",
+   "retrieved": [
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 22",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 23",
+    "Topic3_Training_IS469.pdf, slide 37",
+    "Topic3_Training_IS469.pdf, slide 40",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 14"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t4-05",
+   "type": "conceptual",
+   "gold_slides": "53",
+   "user_input": "What is QLoRA and what trade-off does it make?",
+   "retrieved_contexts": [
+    "§11 · QLORA\nQLoRA = LoRA + quantisation\n▸QLoRA builds on LoRA for further memory savings via quantisation\n▸The frozen base model is held in 4-bit integers → large memory reduction vs. LoRA\n▸Trade-off: longer training and somewhat degraded quality\n▸Weights are de-quantised to BF16/FP32 for the forward/backward pass, then re-quantised to 4-\nbit\n▸Uses its own 4-bit type, nf4 (\"normal float\"), tuned for normally-distributed weights\n▸Newer 4-bit formats push further: MXFP4 (microscaling FP4) let gpt-oss run a 120B model on a\nsingle 80GB GPU, a block of 32 values shares one scale",
+    "QLoRA, Distillation & What's Next\nLoRA + quantisation, the recipe behind today's single-GPU fine-tuning, and where it goes.",
+    "QUANTISATION\nThe quantisation trade-off\nDropping FP16 → INT8 → INT4 shrinks the model and lifts throughput, traded against some quality loss. Illustrative.",
+    "§4 · AT A GLANCE\nNormalization & position, what and where\nMechanism\nWhat it does\nWhere used\nLayerNorm\nCenter & scale across features\nOriginal transformer, BERT\nRMSNorm\nScale by RMS only (no mean)\nLlama, Qwen, Gemma\nSinusoidal PE\nFixed sine/cosine, added up front\nOriginal transformer\nLearned PE\nLearned position vectors, added\nBERT\nRoPE\nRotate Q/K by position (relative)\nModern decoders\nTwo supporting mechanisms: keep activations stable, and make an order-blind model order-aware.\nfyi, not in quiz",
+    "§10 · IDEA\nWhat quantisation is\n▸Quantisation stores numbers in fewer bits → less memory and lower compute cost\n▸Represent weights (and activations) in low-precision types instead of FP32 / FP16:\n· int8 (8-bit integer), int4 (4-bit integer), fp8 (8-bit float)\n▸We focus on quantisation for training (e.g. QLoRA); inference formats come in Topic 5\n▸16-bit half precision is already a standard IEEE representation, sign · exponent · mantissa\nusing fewer bytes to rep all of the number —>\ntakes less space"
+   ],
+   "response": "QLoRA is a method that combines LoRA (Low‑Rank Adaptation) with weight quantisation. It keeps the frozen base model stored in 4‑bit integers, which gives a large memory reduction compared with standard LoRA, and during training the weights are de‑quantised to higher‑precision (BF16/FP32) for the forward and backward passes and then re‑quantised to 4‑bit [1].\n\nThe trade‑off of QLoRA is that, while it saves memory, it requires longer training time and can lead to a modest degradation in model quality [1].",
+   "reference": "QLoRA is LoRA plus quantisation: the frozen base model is held in 4-bit integers (using its own nf4 'normal float' type), giving a large memory reduction compared with LoRA. Weights are de-quantised to BF16/FP32 for the forward and backward pass, then re-quantised. The trade-off is longer training and somewhat degraded quality.",
+   "retrieved": [
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 53",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 52",
+    "Topic6_Evaluation.pdf, slide 25",
+    "Topic2_Transformers_IS469.pdf, slide 30",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 46"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t4-06",
+   "type": "conceptual",
+   "gold_slides": "43;44",
+   "user_input": "Why is BF16 often preferred over FP16 for mixed-precision training?",
+   "retrieved_contexts": [
+    "§9 · AMP\nAMP, FP16 vs. BF16\n▸AMP = automatic mixed precision, match each op to its best datatype\n▸Matrix multiplies are fine in low precision; norms and exp usually need high precision\n▸Dynamic loss scaling shifts gradients into the representable range (avoids over/underflow)\n▸BF16 has FP32's dynamic range with less precision (more exponent, fewer mantissa bits)\n▸→ fewer NaNs/Infs than FP16; BF16 is just the top 2 bytes of an FP32 number\nhow we represent all of\nthe numbers in the\ntransformer",
+    "§10 · FORMATS\nNumber formats at a glance\nFormat\nBits\nUse\nNote\nFP32\n32\nMaster weights / optimiser\nFull-precision baseline\nFP16\n16\nMixed-precision compute\nNarrow range → can over/underflow\nBF16\n16\nMixed-precision compute\nFP32 range, fewer mantissa bits\nint8\n8\nQuantised weights\nSymmetric or asymmetric scaling\nnf4\n4\nQLoRA frozen base\n\"Normal float\", tuned for weights\nMXFP4\n4\nMicroscaling FP4 (OCP)\nBlock of 32 shares one scale; E2M1\nNVFP4\n4\nBlackwell training\nNVIDIA 4-bit float format\nMore bits = more fidelity; fewer bits = less memory. Mixed precision & quantisation trade between them.",
+    "§9 · BIT LAYOUT\nWhat the bits actually hold: FP32, FP16, BF16\nSign, exponent, mantissa. BF16 keeps FP32's 8 exponent bits (same range, far fewer NaNs) and spends only 7 on the mantissa; FP16 has 5\nexponent bits, so more precision but a much narrower range. Source: moocaholic, \"FP64, FP32, FP16, BFloat16, TF32...\".",
+    "§9 · MOTIVATION\nMixed precision: the memory picture\n▸Industrial GPUs (A100) have 80 or 40 GB; consumer GPUs often only 24 GB\n▸GPT-2 XL (the largest GPT-2, 1.5B params) needs ~6 GB for weights in FP32, ~3 GB in FP16\n· By contrast GPT-2 \"small\" is only 124M params, weights ≈ 0.5 GB in FP32\n▸But training needs far more: optimiser states, gradients, activations and buffers\n▸AdamW alone stores momentum + variance of the gradients per parameter\n▸Mixed precision = combine FP32 and FP16 to cut memory while keeping quality\nhow we represent all of\nthe numbers in the\ntransformer",
+    "Mixed Precision\nStore and compute in fewer bits, without wrecking the training."
+   ],
+   "response": "BF16 is often chosen because it keeps the full FP32 dynamic range while using only 16 bits, so it is far less prone to overflow or underflow and produces far fewer NaNs or Infs than FP16. In contrast, FP16’s much narrower exponent (only 5 bits) can cause over‑/under‑flow in operations that need high precision such as norms or exponentials, requiring extra care like loss‑scaling. The wider range of BF16 therefore makes mixed‑precision training more stable while still saving memory. 【1†L1-L5】【3†L1-L4】",
+   "reference": "BF16 keeps FP32's dynamic range (8 exponent bits) and has less precision (7 mantissa bits), so it produces fewer NaNs and Infs. FP16 has only 5 exponent bits, so its range is much narrower and values can overflow or underflow.",
+   "retrieved": [
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 43",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 51",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 44",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 40",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 39"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t56-01",
+   "type": "factual",
+   "gold_slides": "8;9",
+   "user_input": "What does temperature do in decoding when it is above or below 1?",
+   "retrieved_contexts": [
+    "TEMPERATURE\nTemperature sharpens or flattens the curve\nThe same logits, three temperatures. T≈0 collapses onto the top token (greedy); T=1 is the model's own distribution; high T flattens it toward\nuniform, so unlikely tokens get sampled.",
+    "§6 · READING THE OUTPUT\nWhat the model actually outputs\n▸Run on text, a transformer produces one probability distribution over the vocabulary per\nposition\n▸\"Understanding the output\" means reading that distribution: what does the model think\ncomes next?\n▸Greedy / argmax just takes the top token; richer decoding shapes how much randomness you\nallow\n▸Those decoding controls (temperature, top-k, top-p) only apply at inference → we cover them\nin Topic 5, not here",
+    "TEMPERATURE\nTemperature, scaling the softmax\n▸Softmax: σ(z)i = exp(zi) / Σj exp(zj)\n▸Temperature T rescales the logits: σ(z, T)i = exp(zi / T) / Σj exp(zj / T)\n▸T > 1: flattens the distribution toward uniform, higher entropy, more creative / random output\n▸T < 1: sharpens it, the most confident predictions dominate, lower entropy, more predictable\noutput\n▸Temperature is used jointly with top-p (nucleus) sampling to shape the final distribution",
+    "§6 · OUTPUT\nFrom embedding to the next-token distribution\nFinal linear\n→ logit per token\nSoftmax\n→ probabilities\nPick a token\ndecoding, Topic 5\nFeed back\nappend & repeat\nThe transformer outputs a probability distribution over the vocabulary. HOW you pick from it, greedy vs sampling,\ntemperature, top-k, top-p, is a decode-time choice, covered in Topic 5 (Inference).",
+    "DECODING STRATEGIES\nChoosing the next token, four strategies\nStrategy\nWhat it does\nBest for\nGreedy\nAlways take the single highest-\nprobability token\nDeterministic, factual\nTop-k\nSample from the k most-likely\ntokens\nTunable creativity\nTop-p (nucleus)\nSample from the smallest set\nreaching cumulative p\nOpen-ended text\nBeam search\nKeep the k most promising whole\nsequences\nConstrained, single-best\nGreedy & beam are deterministic; top-k / top-p add controlled randomness, often with temperature."
+   ],
+   "response": "Temperature rescales the logits before the soft‑max. When the temperature T is greater than 1 it flattens the probability distribution toward a more uniform shape, increasing entropy and making the output more random or creative [3]. When T is less than 1 it sharpens the distribution, so the most confident predictions dominate, lowering entropy and yielding more predictable output [3][1].",
+   "reference": "Temperature rescales the logits before the softmax. T above 1 flattens the distribution toward uniform, giving higher entropy and more creative or random output. T below 1 sharpens it so the most confident predictions dominate, giving lower entropy and more predictable output. T near 0 collapses onto the top token, which is greedy decoding.",
+   "retrieved": [
+    "Topic6_Evaluation.pdf, slide 9",
+    "Topic2_Transformers_IS469.pdf, slide 35",
+    "Topic6_Evaluation.pdf, slide 8",
+    "Topic2_Transformers_IS469.pdf, slide 34",
+    "Topic6_Evaluation.pdf, slide 7"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t56-02",
+   "type": "factual",
+   "gold_slides": "5;6",
+   "user_input": "How does top-p (nucleus) sampling differ from top-k sampling?",
+   "retrieved_contexts": [
+    "TOKEN SELECTION\nSelecting the next token from the softmax\n▸Greedy: always take the highest-probability token, consistent, but repetitive and less creative\n▸Top-k sampling: sample from the k most-likely tokens, larger k = more creative, smaller k =\nmore consistent\n▸Top-p (nucleus): take the smallest set of top tokens whose cumulative probability reaches p\n(e.g. 0.9)\n▸Beam search: keep the k most promising sequences at each step (illustrated with beam width =\n2)\n▸Sampling (top-k / top-p) is the default for open-ended text; beam search for constrained,\nsingle-best outputs",
+    "LAB\nHands-on, temperature & sampling\n▸Topic5-Temperature.ipynb, distilGPT2: play with temperature, top-k and top-p sampling\n▸Watch how the settings change generation, and confirm temperature ≈ 0 collapses to greedy\n▸distilGPT2 is a small, pedagogical stand-in for the frontier models we deploy in practice",
+    "TOP-K / TOP-P\nWhat top-k and top-p actually cut\nSame distribution, two rules. Top-k always keeps a fixed number of tokens; top-p keeps however many are needed to reach probability mass p, so\nit widens on flat distributions and narrows on confident ones.",
+    "TEMPERATURE\nTemperature, scaling the softmax\n▸Softmax: σ(z)i = exp(zi) / Σj exp(zj)\n▸Temperature T rescales the logits: σ(z, T)i = exp(zi / T) / Σj exp(zj / T)\n▸T > 1: flattens the distribution toward uniform, higher entropy, more creative / random output\n▸T < 1: sharpens it, the most confident predictions dominate, lower entropy, more predictable\noutput\n▸Temperature is used jointly with top-p (nucleus) sampling to shape the final distribution",
+    "§6 · OUTPUT\nFrom embedding to the next-token distribution\nFinal linear\n→ logit per token\nSoftmax\n→ probabilities\nPick a token\ndecoding, Topic 5\nFeed back\nappend & repeat\nThe transformer outputs a probability distribution over the vocabulary. HOW you pick from it, greedy vs sampling,\ntemperature, top-k, top-p, is a decode-time choice, covered in Topic 5 (Inference)."
+   ],
+   "response": "Top‑p (nucleus) sampling selects the smallest set of tokens whose cumulative probability reaches a threshold p (e.g., 0.9), whereas top‑k sampling always keeps a fixed number k of the most‑likely tokens regardless of their probabilities. Consequently, top‑p adapts to the shape of the distribution—expanding on flat distributions and shrinking on confident ones—while top‑k uses the same size cut‑off for every step【3】. This contrast is also summarized in the token‑selection overview, which lists top‑p as “take the smallest set of top tokens whose cumulative probability reaches p” and top‑k as “sample from the k most‑likely tokens”【1】.",
+   "reference": "Top-k samples from a fixed number k of the most likely tokens. Top-p takes the smallest set of top tokens whose cumulative probability reaches p (e.g. 0.9), so it keeps more tokens when the distribution is flat and fewer when the model is confident.",
+   "retrieved": [
+    "Topic6_Evaluation.pdf, slide 5",
+    "Topic6_Evaluation.pdf, slide 10",
+    "Topic6_Evaluation.pdf, slide 6",
+    "Topic6_Evaluation.pdf, slide 8",
+    "Topic2_Transformers_IS469.pdf, slide 34"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t56-03",
+   "type": "conceptual",
+   "gold_slides": "16;18",
+   "user_input": "Why does an LLM cache keys and values during generation?",
+   "retrieved_contexts": [
+    "BATCHING\nBatching & continuous batching\n▸Decode is memory-bound: each step reads all the weights (and the KV cache) to produce a\nsingle token, so the GPU's compute sits idle\n▸Batching fixes this: one read of the weights serves many requests at once, so the same\nmemory traffic yields many tokens\n▸Larger batches use more of the GPU, but too large causes out-of-memory (OOM), the KV\ncaches of all requests must fit\n▸Batching is hard because outputs vary wildly in length; some requests finish long before others\n▸Continuous batching (vLLM): the batch grows and shrinks dynamically during generation\n▸Finished sequences are evicted mid-flight and new requests slotted in, no waiting for the\nslowest",
+    "§7 · OUR LABS\nAdding the \"G\": generation, and what it needs\n▸Everything so far produced a ranked list of chunks; the \"G\" turns the top ones into an answer\n▸Generation is one LLM call: system prompt with a grounding rule + the retrieved chunks + the\nquestion\n▸Grounding rule: answer only from the chunks, cite them by number, say \"not in the\ndocuments\" otherwise\n▸Both labs end with this step, and you change two dials: the grounding rule, and how many\nchunks go in\n▸Watch for the two failures: a wrong chunk answered confidently, and the LLM ignoring the rule\nand answering from memory",
+    "WORKED EXAMPLE\nWhy we cache K and V\n▸Prompt \"What color is the sky?\", already generated \"The sky is\", now compute the vector for\n\"is\"\n▸Need Query for \"is\", plus Key & Value for every earlier token to compute attention\n▸But K and V for all earlier tokens were already computed on the previous step, recomputing is\nwaste\n▸Idea: cache K and V from past tokens; each step only compute Q, K, V for the one new token\n▸Fetch cached K, V, concatenate the new token's K, V, then attention scores → output vector for\n\"is\"",
+    "STOPPING\nHow does generation stop?\n▸EOS (end-of-sequence) token: a special token that means \"stop generating\"\n▸During training every text ends with EOS, teaching the model where the natural stopping point\nis\n· Prompt \"What is the capital of China?\" → model learned to emit \"Beijing EOS\"\n▸Max token length: a hard cap on the response, regardless of EOS\n▸LLMs front-load the summary / most important content, then add detail up to the limit",
+    "CACHE GROWTH\nThe KV cache is linear in sequence length\nPer-token KV memory is fixed, so total cache scales linearly with context length, and with batch size."
+   ],
+   "response": "LLMs cache keys and values so they don’t have to recompute them for every token. After a token is generated, its K and V vectors are stored; on the next step the model only needs to compute Q (and the new token’s K and V) and can fetch the previously cached K and V, concatenate the new ones, and then compute attention. This avoids redundant computation for earlier tokens【3】.",
+   "reference": "To compute the next token, attention needs the Key and Value of every earlier token, but those were already computed on previous steps, so recomputing them is waste. The KV cache stores them, so each step only computes Q, K and V for the one new token. This turns quadratic recomputation into linear per-step work and is the single biggest decode speed-up.",
+   "retrieved": [
+    "Topic6_Evaluation.pdf, slide 21",
+    "Topic8_AgenticRAG_MITB.pdf, slide 42",
+    "Topic6_Evaluation.pdf, slide 16",
+    "Topic6_Evaluation.pdf, slide 4",
+    "Topic6_Evaluation.pdf, slide 19"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 0.3333333333333333
+  },
+  {
+   "id": "t56-04",
+   "type": "conceptual",
+   "gold_slides": "21",
+   "user_input": "What is continuous batching and why does it help?",
+   "retrieved_contexts": [
+    "BATCHING\nStatic vs. continuous batching\nStatic batching leaves slots idle until the slowest request finishes; continuous batching evicts finished sequences and slots new ones in mid-flight,\nkeeping the GPU full. Illustrative.",
+    "BATCHING\nBatching & continuous batching\n▸Decode is memory-bound: each step reads all the weights (and the KV cache) to produce a\nsingle token, so the GPU's compute sits idle\n▸Batching fixes this: one read of the weights serves many requests at once, so the same\nmemory traffic yields many tokens\n▸Larger batches use more of the GPU, but too large causes out-of-memory (OOM), the KV\ncaches of all requests must fit\n▸Batching is hard because outputs vary wildly in length; some requests finish long before others\n▸Continuous batching (vLLM): the batch grows and shrinks dynamically during generation\n▸Finished sequences are evicted mid-flight and new requests slotted in, no waiting for the\nslowest",
+    "§5 · OVERVIEW\nWhy efficiency matters, the big picture\n▸Plain attention compares every token with every other, so work grows with the square of the\nsequence length\n▸That quadratic cost is what limits how long a context a model can handle\n▸This section covers the architectural answers that stretch context and capacity without blowing\nup compute:\n· Attend locally instead of to everything (sliding-window), and rescale positions to reach far past the\ntraining length (RoPE scaling)\n· Grow total capacity while keeping compute per token roughly flat (Mixture-of-Experts FFNs)\n▸Inference-time savings, the KV-cache, grouped-query attention and batching, come later in\nTopic 5 (Inference)",
+    "§5 · BATCHES\nBatches, OOM & gradient accumulation\n▸Batch size shapes memory use, learning dynamics and throughput, for both, we want large\nbatches\n▸But large batches overflow GPU memory (OOM), capping how big you can go\n▸Gradient accumulation: split a big batch into subsets, accumulate gradients, update once at\nthe end\n▸Find the limit empirically: start at batch size 1, double, remeasure, until throughput drops or\nOOM\n▸Judge learning quality by validation loss on held-out data, not training loss\neverytime we send through one page, dont\nupdate weights yet because the model hasnt\nseen other pages.\ngathering info from each batch fwd pass, then\ncreate single backward pass from the info it\naccumulated",
+    "SERVING STACKS\nModel-serving engines\n▸vLLM: the de-facto open serving engine, continuous batching and efficient KV-cache memory\nmanagement\n▸TGI (Hugging Face): easy no-code loading of Hub models, but now largely superseded by vLLM\n▸SGLang: high-throughput serving with aggressive prefix caching and structured output\n▸TensorRT-LLM (NVIDIA) and LMDeploy: compiler-optimised engines squeezing peak GPU\nperformance\n▸Local devices: ollama and llama.cpp; compact model storage via GGUF"
+   ],
+   "response": "Continuous batching is a dynamic batching strategy in which the batch size can grow and shrink while generation is in progress. Finished sequences are removed (“evicted”) from the batch mid‑flight and new requests are slotted into the freed slots, so the GPU never has to wait for the slowest request to finish [1][2].  \n\nIt helps because decoding is memory‑bound and the GPU’s compute units would otherwise sit idle while waiting for the longest request; by continuously filling empty slots the GPU stays fully utilized, allowing a single read of the model weights to serve many requests at once and keeping the GPU “full” [2].",
+   "reference": "Decode is memory-bound, and batching lets one read of the weights serve many requests. In continuous batching (as in vLLM) the batch grows and shrinks dynamically during generation: finished sequences are evicted mid-flight and new requests are slotted in, so there is no waiting for the slowest request and the GPU stays full.",
+   "retrieved": [
+    "Topic6_Evaluation.pdf, slide 22",
+    "Topic6_Evaluation.pdf, slide 21",
+    "Topic2_Transformers_IS469.pdf, slide 32",
+    "Topic3_Training_IS469.pdf, slide 30",
+    "Topic6_Evaluation.pdf, slide 27"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 0.5
+  },
+  {
+   "id": "t56-05",
+   "type": "conceptual",
+   "gold_slides": "45",
+   "user_input": "Why should BLEU and ROUGE not be used to score LLM generation?",
+   "retrieved_contexts": [
+    "THE CATCH\nDo NOT score LLM generation with BLEU/ROUGE\n▸They only count exact string / n-gram overlap with a reference text\n▸A correct paraphrase in different words gets no credit, the metric cannot see meaning\n▸Open-ended generation has no single correct reference, so overlap with one is arbitrary\n▸Their scores correlate weakly with human judgment on LLM output\n▸Common project mistake: reporting BLEU / ROUGE as the quality metric for a chatbot loses\nmarks\nlooks for word overlap, not good for LLM as it does\nnot keep using the same words",
+    "Reference-Based Metrics\nBLEU, ROUGE and BERTScore: the classical toolkit, where it came from, and why it no longer fits.",
+    "§4 · CLASSIC METRICS\nRetrieval metrics with ground truth\n▸First gather test data with ground-truth answers (and the passages that should be retrieved)\n▸Score retrieval as a classic IR problem: Precision, Recall, F1 over the retrieved chunks\n▸Generation overlap can be checked with BLEU and ROUGE against reference answers\n▸Limitation: BLEU/ROUGE reward surface word overlap, not whether the answer is faithful or\ncorrect",
+    "Key takeaways\n01\nMatch deployment to the workload\nServerless vs managed cloud vs local/on-prem, trade cost, latency, control and privacy.\n02\nInference efficiency is engineering\nKV cache, continuous batching and quantisation drive cost & latency.\n03\nMeasure the right thing\nBLEU/ROUGE are inadequate for generation, prefer BERTScore, LLM-as-judge and task metrics.\n04\nBenchmarks age and leak\nUse current suites (MMLU-Pro, agentic + safety evals), watch contamination, build a task-specific set.",
+    "METRIC FAMILIES\nText-quality metrics at a glance\nMetric\nWhat it compares\nGood for / limitation\nBLEU\nn-gram precision vs reference\nMT; blind to paraphrase\nROUGE\nn-gram / LCS overlap\nsummarization; overlap-only\nBERTScore\nembedding similarity\ncredits correct paraphrase\nTask metrics\nexact match / unit tests\nverifiable tasks; needs a checker\nOverlap metrics (BLEU/ROUGE) are inadequate for open-ended generation; prefer semantic or task metrics, and the judges we meet later."
+   ],
+   "response": "BLEU and ROUGE rely only on exact word‑ or n‑gram overlap with a reference text, so they give credit only when the generated output uses the same surface wording. A correct paraphrase that uses different words receives no score, and for open‑ended generation there is rarely a single “gold” reference, making the overlap measure arbitrary. Consequently, their scores correlate only weakly with human judgments of LLM output quality and do not reflect whether an answer is faithful or correct【1】【5】.",
+   "reference": "They only count exact string or n-gram overlap with a reference, so a correct paraphrase in different words gets no credit and the metric cannot see meaning. Open-ended generation has no single correct reference, so overlap with one is arbitrary, and their scores correlate only weakly with human judgment on LLM output.",
+   "retrieved": [
+    "Topic6_Evaluation.pdf, slide 45",
+    "Topic6_Evaluation.pdf, slide 40",
+    "Topic8_AgenticRAG_MITB.pdf, slide 25",
+    "Topic6_Evaluation.pdf, slide 77",
+    "Topic6_Evaluation.pdf, slide 47"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t56-06",
+   "type": "factual",
+   "gold_slides": "49;50;51",
+   "user_input": "What does perplexity measure and how is it computed from the loss?",
+   "retrieved_contexts": [
+    "Perplexity, Entropy & Cross-Entropy\nThe intrinsic metric that falls straight out of the training loss.",
+    "IN PRACTICE\nComputing PPL, and its traps\n▸In PyTorch it's one line: perplexity = torch.exp(loss) on the cross-entropy loss\n▸Caution: PPL is confidence, not correctness, a model can be confidently wrong or correctly\nunsure\n▸Caution: not comparable across models, tokenization, vocab size, dataset and context length\nall shift it\n▸Best use: track PPL of one model on one dataset (e.g. before vs after fine-tuning)",
+    "§4 · EXAMPLE 1\nCross-entropy loss, example 1\n▸L = -Σk=1..K yk · log(pk)\n▸When yk = 1, the term -log(pk) decreases (gets better) as the predicted probability pk increases\n▸A wrong class has yk = 0 so it does not enter the loss directly, but because Σi pi = 1, raising a\nwrong class's probability forces the correct one down\n▸The log is more sensitive to changes in high than low values: raising p from 0.98 to 0.99 lowers\nthe loss less than raising it from 0.51 to 0.52\n▸So an \"I don't know\" prediction (all probabilities equal) gives a lower loss than a very confident\nbut wrong one\n· Source: Chris Hughes, \"A brief overview of cross-entropy loss\"\nsmall k here is the particular word in vector\nprobability of k token being the next word\ny is the ground truth\nhere - a vector with\nsingle 1 and all 0s\nK is how many tokens we have in vocab",
+    "WORKED EXAMPLE\nPerplexity, a worked example\n▸Take a 4-token sentence and look only at the probability each model gave the *true* next\ntoken\n▸Model A: 0.5 at every step. Mean cross-entropy = −ln 0.5 = ln 2, so PPL = exp(ln 2) = 2\n▸Model B: 0.25 at every step. Mean cross-entropy = ln 4, so PPL = exp(ln 4) = 4\n▸Read it as \"plausible options per token\": A is choosing between 2, B between 4\n▸Equal probabilities make it exact; with mixed probabilities PPL is their geometric mean\n▸Lower is better, and PPL = exp(cross-entropy loss), so it falls out of training for free\nmodel A is more certain than model B.\nModel A sharper distribution than B. but it does not tell u which model is the correct one as we dont have the ground truth.",
+    "INTUITION\nPerplexity, the model's own uncertainty\n▸PPL, first introduced 1977 by IBM researchers on speech recognition\n▸Quantifies the average uncertainty of the model's next-token predictions\n▸Entropy (Shannon, 1950): how unpredictable the next word is given context\n▸Lower entropy = more predictable language; LLM output is a distribution, so entropy is easy to\ncompute\n▸PPL ≈ the average number of options the model finds plausible per token, lower is more\nconfident\nmeasures avg uncertainty of gen model\npredicting the next word.\nit is a measure of entropy (e.g how predictable\nnext word is given the context)\ndifference between cross entropy and entropy?\n-cross entropy is comparing 2 probability distribution\n(ground truth & the model output)\n-entropy is looking at one distribution on its own\n(output distribution sharp —> entropy is low) ; (Output\ndistribution flat —> entropy is high)"
+   ],
+   "response": "Perplexity is a measure of a model’s own uncertainty about its next‑token predictions – it can be read as the average number of plausible options the model considers per token, with lower values indicating a more confident (less uncertain) model [5].  \n\nIt is obtained directly from the cross‑entropy loss: the loss (mean cross‑entropy) is exponentiated, i.e.  \n\n\\[\n\\text{PPL}= \\exp(\\text{cross‑entropy loss}),\n\\]\n\nso that a loss of \\(-\\ln p\\) for each token yields a perplexity of \\(\\exp(-\\ln p)=1/p\\). In practice this is often computed in one line as `perplexity = torch.exp(loss)` [2][4].",
+   "reference": "Perplexity quantifies the model's average uncertainty about its next-token predictions: roughly the average number of options the model finds plausible per token, where lower means more confident. It equals exp(cross-entropy loss), so it falls out of training for free. It measures confidence, not correctness, and is not comparable across models, tokenizers, datasets or context lengths.",
+   "retrieved": [
+    "Topic6_Evaluation.pdf, slide 48",
+    "Topic6_Evaluation.pdf, slide 51",
+    "Topic3_Training_IS469.pdf, slide 25",
+    "Topic6_Evaluation.pdf, slide 50",
+    "Topic6_Evaluation.pdf, slide 49"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 0.5
+  },
+  {
+   "id": "t56-07",
+   "type": "conceptual",
+   "gold_slides": "56",
+   "user_input": "What is benchmark data contamination and how can it be defended against?",
+   "retrieved_contexts": [
+    "CONTAMINATION\nBenchmarks also leak, data contamination\n▸Old public benchmarks end up in pre-training data, then the score measures memorisation, not\nability\n▸Symptom: suspiciously high scores that collapse on paraphrased or freshly-written variants of\nthe items\n▸Defences: rolling or held-out sets, canary strings in the data, contamination audits before\npublishing a score\n▸Prefer newer or private eval sets for headline claims; treat old public benchmarks with\nsuspicion\n▸This is why leaderboards keep moving, and why you should build a small private eval for your\nown task",
+    "SATURATION\nBenchmarks saturate, then get replaced\n▸Benchmarks have a shelf life: MMLU (2021, 57 subjects, 4-option MCQ) was hard at ~60%\n▸Frontier models now score above 90% on it, so it no longer separates them, everyone sits at\nthe ceiling\n▸Saturation forces a harder successor: MMLU → MMLU-Pro (10 options, harder items), GPQA\nDiamond → HLE\n▸The same fate awaits every public benchmark, the shelf life is a few years at most\n▸Rule: never evaluate a new model on an old benchmark; use the current suite and say which\nversion you ran\nolder benchmark easier as model quality\ngetting better\ndata leakage: benchmark themselves gets\ninto the training data",
+    "MATH\nMath, reasoning you can grade automatically\n▸Math questions are easy to source and grade, the answer is right or it isn't\n▸Tests reasoning / chain-of-thought: the method must be right, not just the final number\n▸Hendrycks MATH: 12,500 competition problems, the de-facto standard; MetaMath is another\ngood set\n▸AIME (2025/2026): the headline competition-math benchmark every frontier reasoning-model\nscorecard now quotes\n▸Caveat: many problems leaked into pre-training data, a real contamination risk (previous\nslides)",
+    "JUDGES\nJudging open-ended quality\n▸Response quality matters most but is exactly what accuracy benchmarks miss\n▸Human judges are the gold standard, but slow and expensive at scale\n▸LLM-as-judge: a strong model scores or compares outputs against a rubric, effective and cheap\n▸MT-Bench (2023) was the origin of automatic LLM-as-judge; Arena-Hard-Auto (v2) is the\ncurrent auto-benchmark\n▸Practical note: judging with closed models needs an API key to the judge",
+    "LANDSCAPE\nThe benchmark landscape\nBenchmark\nWhat it measures\nFormat / grading\nMMLU-Pro\nbroad knowledge & reasoning\n10-option MCQ\nGPQA Diamond\nexpert science reasoning\n'Google-proof' MCQ\nHumanEval\ncode generation\nunit tests (pass@k)\nArena-Hard-Auto\nopen-ended chat quality\nLLM-as-judge, auto\nSWE-bench Verified\nagentic bug-fixing\nrepo test suite\nNo single benchmark covers a model, a scorecard spans knowledge, reasoning, code, chat and agentic tasks."
+   ],
+   "response": "Benchmark data contamination occurs when items from public evaluation sets end up in a model’s pre‑training data. In that case the benchmark no longer measures true ability—it mainly measures memorisation, which shows up as unusually high scores that drop sharply on paraphrased or newly written versions of the same items【1】.  \n\nDefences against contamination include: using rolling or held‑out test sets, inserting “canary” strings into the data to detect leakage, and performing contamination audits before publishing a score. It is also advisable to prefer newer or private evaluation sets for headline claims and to treat older public benchmarks with suspicion【1】.",
+   "reference": "Old public benchmarks end up in pre-training data, so the score measures memorisation rather than ability; the symptom is suspiciously high scores that collapse on paraphrased or freshly written variants. Defences include rolling or held-out sets, canary strings in the data and contamination audits before publishing a score, and preferring newer or private eval sets for headline claims.",
+   "retrieved": [
+    "Topic6_Evaluation.pdf, slide 56",
+    "Topic6_Evaluation.pdf, slide 55",
+    "Topic6_Evaluation.pdf, slide 57",
+    "Topic6_Evaluation.pdf, slide 68",
+    "Topic6_Evaluation.pdf, slide 53"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t56-08",
+   "type": "conceptual",
+   "gold_slides": "71",
+   "user_input": "What biases affect an LLM-as-judge and how can they be reduced?",
+   "retrieved_contexts": [
+    "JUDGE DESIGN\nLLM-as-judge, implementation & bias\n▸Give the judge an explicit rubric and ask for a score + justification, not a bare verdict\n▸Known biases: position bias (favours first answer), verbosity bias, self-preference (rates its own\nfamily higher)\n▸Mitigations: randomize / swap answer order, control for length, use a different-family judge,\nensemble judges\n▸Always validate the judge against a human-labeled sample before trusting it at scale\n▸A biased judge produces confident, reproducible, wrong numbers, the worst kind",
+    "JUDGE ILLUSTRATED\nLLM-as-judge: rubric, scores, swap check\nTwo candidate answers are scored against an explicit rubric; the judge returns a score plus justification, aggregated to a wi n-rate/Elo. Swapping\nA\nB and re-judging controls position bias. Illustrative.\nhallucinate, not\nreproducible",
+    "JUDGE\nThe LLM-as-judge pipeline\nCandidate\noutputs\nmodel A vs B\nJudge LLM\n+ explicit rubric\nScore + reason\nnot a bare verdict\nRanking\naggregate / Elo\nValidate the judge against human labels and swap answer order to control position bias (see next slide).\n]",
+    "JUDGES\nJudging open-ended quality\n▸Response quality matters most but is exactly what accuracy benchmarks miss\n▸Human judges are the gold standard, but slow and expensive at scale\n▸LLM-as-judge: a strong model scores or compares outputs against a rubric, effective and cheap\n▸MT-Bench (2023) was the origin of automatic LLM-as-judge; Arena-Hard-Auto (v2) is the\ncurrent auto-benchmark\n▸Practical note: judging with closed models needs an API key to the judge",
+    "FIRST PRINCIPLE\nVerify first, judge only what you can't check\n▸Before reaching for a judge, ask: can I check this output in code? If yes, use a programmatic\ncheck\n▸Verifiable reward: the same idea packaged as an executable grader that returns a score (unit\ntests, a rule-based checker)\n▸This is why coding benchmarks are execution-graded (HumanEval), not string-matched\n▸Reserve LLM-as-judge for the open-ended part: helpfulness, tone, reasoning quality\n▸Human evaluation is the gold standard, and the most expensive, so it comes last\n▸Cheapest valid method wins: programmatic check → verifiable reward → LLM-judge → human"
+   ],
+   "response": "The LLM‑as‑judge can suffer from several known biases, including **position bias** (favoring the answer that appears first), **verbosity bias** (preferring longer responses), and **self‑preference bias** (rating outputs from its own model family higher)【1】.  \n\nThese biases can be mitigated by **randomizing or swapping the order of the candidate answers** when judging, **controlling for answer length**, using a **judge from a different model family**, and/or **employing an ensemble of judges**【1】. Additionally, the judge should be **validated against a human‑labeled sample** before being trusted at scale【1】.",
+   "reference": "Known biases are position bias (favouring the first answer), verbosity bias and self-preference (rating its own model family higher). Mitigations are randomising or swapping the answer order, controlling for length, using a judge from a different family and ensembling judges. The judge should always be validated against a human-labelled sample before it is trusted at scale.",
+   "retrieved": [
+    "Topic6_Evaluation.pdf, slide 71",
+    "Topic6_Evaluation.pdf, slide 70",
+    "Topic6_Evaluation.pdf, slide 69",
+    "Topic6_Evaluation.pdf, slide 68",
+    "Topic6_Evaluation.pdf, slide 66"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t7-01",
+   "type": "factual",
+   "gold_slides": "3;4;64",
+   "user_input": "According to the lecture, what is an AI agent made up of?",
+   "retrieved_contexts": [
+    "The Agent Loop & Harness Anatomy\nAn agent is an LLM wrapped in a runtime. Let's open up that runtime.",
+    "GENERATIVE AND AGENTIC AI · TOPIC 8\nAgentic Retrieval-Augmented Generation\nFrom Classic RAG to Advanced RAG to Retrieval the Agent Drives\nLaura Wynter, PhD\nSMU School of Computing and Information Sciences\nMITB CS614 · AY2026–27",
+    "FRAMING\nWhere we are\n▸T1–T4: representation, transformers, training and customising the model itself\n▸T5–T6: serving it, and measuring whether the output is any good\n▸T7: the agent, an LLM in a loop with tools, memory and guardrails\n▸Today: the single most useful tool you can give that agent, retrieval over your own data\n▸We build it in order: what RAG is (§1–§4) → making it accurate (§5–§7) → handing the controls\nto the agent (§8)",
+    "FRAMING\nA bare LLM call vs. an agent\nBare LLM call\n• One prompt in, one response out\n• No access to live data or tools\n• Cannot act on the world\n• Knowledge frozen at training time\n• You orchestrate every step by hand\nAgent = LLM + harness\n• Runs a loop over multiple steps\n• Calls tools and observes real results\n• Acts: search, run code, call APIs, send email\n• Pulls fresh context on demand\n• Plans and self-corrects toward a goal\nAI Agent is LLM (transformer) with a harness around it",
+    "§10 · JUDGEMENT\nIs this actually agentic?\n▸Teardown test: a single frontier-API call behind a nice UI is NOT an agent\n· No loop, no tools, no memory, no evaluation → it's just a prompt\n▸Ask of any 'agent': where is the loop, the tools, the memory, and the evidence it works?\n▸Next topic: the single most useful tool you can give this agent, retrieval over your own data\n(Topic 8)\n- has access to tools\n- have loop (graph) : look at output and come back to it differently\n- memory to carry out the loop"
+   ],
+   "response": "An AI agent is composed of a large‑language model (the transformer) together with a surrounding “harness” or runtime that places the model in a loop, gives it access to tools, memory, and guardrails. In other words, an agent = LLM + harness that runs multiple steps, calls tools, observes results, and can act toward a goal【4】. This is also described as “an agent is an LLM wrapped in a runtime”【1】.",
+   "reference": "An agent is an LLM (the reasoning) plus a harness (the scaffolding around it). The harness runs a loop over multiple steps, calls tools and observes real results, and handles context, memory, budgets and guardrails; this is where most real-world agent quality is won or lost.",
+   "retrieved": [
+    "Topic7_Agentic_IS469.pdf, slide 12",
+    "Topic8_AgenticRAG_MITB.pdf, slide 1",
+    "Topic8_AgenticRAG_MITB.pdf, slide 4",
+    "Topic7_Agentic_IS469.pdf, slide 4",
+    "Topic7_Agentic_IS469.pdf, slide 63"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 0.25
+  },
+  {
+   "id": "t7-02",
+   "type": "factual",
+   "gold_slides": "7;8",
+   "user_input": "Does the language model run the tool code itself? If not, what does?",
+   "retrieved_contexts": [
+    "§1 · ANATOMY\nAnatomy of a tool call\n▸A tool is just a FUNCTION the LLM is allowed to ask for by name, it never runs it itself\n▸It is declared with a schema: name, natural-language description, and typed arguments (each\nargument has a declared type, e.g. string, integer, date)\n▸The description is entered into the LLM as part of its prompt; the LLM reads it to decide when\nand how to call the tool\n▸Flow: LLM emits a structured call → harness checks the argument types & executes → result\nreturned as an observation\n▸The LLM never runs code itself, the harness does, and controls what's exposed\nAPI example : Web Search\n( Google API) acess to LLM to\ndo websearch for you\nLLM generates the text to call\nthe tool",
+    "§2 · HARNESS ANATOMY\nWhat the harness is responsible for\n▸The LLM only chooses the next step, the harness does everything around it:\n· Context / prompt assembly and output parsing\n· Tool dispatch and result handling\n· Memory, scratchpad, running history, long-term store\n· Error handling, retries and self-correction\n· Step- and token-budgets, and the stop condition\n· Permissions and sandboxing (what the agent is allowed to do)\n▸Same LLM + a better harness = a large capability difference (see: coding agents)",
+    "§1 · CODE AS A TOOL\nCode execution as a universal tool\n▸Giving the agent a sandboxed code interpreter is often more powerful than many narrow tools\n▸Handles arithmetic, data wrangling, plotting, file manipulation, deterministically\n▸Trade-off: code execution is the highest-risk tool → must be sandboxed (see §9)\n▸Coding agents (Claude Code, Codex) are this pattern, industrialised",
+    "§2 · THE LOOP\nThe core agent loop\nPerceive\nread prompt /\nobservation\nPlan\ndecide next step\nAct\ncall a tool\nObserve\nread the result\n⟳repeat until a stop condition (goal met · budget spent · error)\nLLM decides: Plan + which tool to Act with. Harness does everything else: assemble context, run the\ntool, parse output, manage memory, enforce budgets.\nbetter with reasoning model\nnow ( post train (fine tune ) to\noutput steps before of just\nanswer)\noften each step associated\nwith a tool call",
+    "§2 · BUILD IT\nBuilding a minimal harness, the loop itself\n▸A harness is not magic, its core is a short loop you can write yourself:\n· messages = [system_prompt, user_task]\n· for step in range(max_steps): # the step budget\n· reply = llm(messages, tools) # LLM decides\n· if reply.tool_call: # act\n· obs = run_tool(reply.name, reply.args) # harness executes\n· messages.append(observation(obs)) # observe → loop\n· else: return reply.text # stop: final answer\n▸That loop IS the harness, everything else is hardening built around it\ntools is a list it has access to\nprompt (content of message)\nwhat is memory here?\n- messages ( store output of the tool\nrun) : original prompt + output of too\ncall\nsome info here stored in vector\ndatabase, not just in loop. These are\nin embedding form as they come\nfrom an LLM\nhow to add budget on retries?\n- uk it fails when obs return error when tool\nis ran\nretries in observation\nfunction\nand also critique\nfunction\nharness is managing call to the LLM as well as excuting the tool calls\nif is reasoning model, the\nreply may have a lot of\nthings\nassume output iis\nstructure with tool_call"
+   ],
+   "response": "The language model does **not** execute the tool’s code itself. The LLM only emits a structured call; the harness checks the argument types, runs the tool, and returns the result as an observation [1].",
+   "reference": "No. A tool is a function the LLM may ask for by name, but it never runs it itself. The LLM emits a structured call, the harness validates the name and argument types and executes the tool, and the result is returned to the LLM as an observation.",
+   "retrieved": [
+    "Topic7_Agentic_IS469.pdf, slide 7",
+    "Topic7_Agentic_IS469.pdf, slide 14",
+    "Topic7_Agentic_IS469.pdf, slide 11",
+    "Topic7_Agentic_IS469.pdf, slide 13",
+    "Topic7_Agentic_IS469.pdf, slide 16"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t7-03",
+   "type": "factual",
+   "gold_slides": "13;15",
+   "user_input": "What are the four stages of the basic agent loop?",
+   "retrieved_contexts": [
+    "FRAMING\nWhere we are\n▸T1–T4: representation, transformers, training and customising the model itself\n▸T5–T6: serving it, and measuring whether the output is any good\n▸T7: the agent, an LLM in a loop with tools, memory and guardrails\n▸Today: the single most useful tool you can give that agent, retrieval over your own data\n▸We build it in order: what RAG is (§1–§4) → making it accurate (§5–§7) → handing the controls\nto the agent (§8)",
+    "§8 · THE LOOP\nThe agentic retrieval loop\nPlan\nwhat do I\nneed to know?\nSearch\ncall the\nretrieval tool\nJudge\nis this evidence\nenough?\nRe-query\nor switch\nsource\nAnswer\ngrounded,\nwith citations\nThe same retrieve-and-generate parts as §2, but the arrows are decided at run time by the agent, and “Judge” can send it back to\n“Search” several times before it answers.",
+    "§2 · REASONING TRACE\nReAct: the canonical loop\n▸ReAct = interleave Reasoning and Acting in one trace\n· Thought: what should I do next, and why\n· Action: a tool call with arguments\n· Observation: the tool's result, fed back into context\n▸The loop repeats; each observation updates the LLM's working context\n▸Simple, transparent, and still the default backbone inside most agent frameworks",
+    "§10 · JUDGEMENT\nIs this actually agentic?\n▸Teardown test: a single frontier-API call behind a nice UI is NOT an agent\n· No loop, no tools, no memory, no evaluation → it's just a prompt\n▸Ask of any 'agent': where is the loop, the tools, the memory, and the evidence it works?\n▸Next topic: the single most useful tool you can give this agent, retrieval over your own data\n(Topic 8)\n- has access to tools\n- have loop (graph) : look at output and come back to it differently\n- memory to carry out the loop",
+    "§8 · THE SHIFT\nWhat changes when the agent owns retrieval\n▸Everything so far is a FIXED pipeline: one query → one retrieval → one generation, decided by\nyour code\n▸Agentic RAG makes retrieval a TOOL (Topic 7): the agent decides whether to retrieve, what to\nask for, and when to stop\n▸The loop can search several times, rewrite the query between attempts, and check the\nevidence it got back\n▸Nothing from §1–§7 is thrown away: chunking, embeddings, hybrid search and re-ranking are\nthe tools it calls\n▸What moves is the control flow, out of your script and into the agent’s loop"
+   ],
+   "response": "The basic agent loop consists of four stages:  \n\n1. **Plan** – decide what information is needed.  \n2. **Search** – call the retrieval tool to get that information.  \n3. **Judge** – evaluate whether the retrieved evidence is sufficient.  \n4. **Answer** – produce a grounded response with citations.  \n\nThese stages are described in the “agentic retrieval loop” slide【2】.",
+   "reference": "Perceive (read the prompt or observation), Plan (decide the next step), Act (call a tool) and Observe (read the result), repeated until a stop condition such as the goal being met, the budget being spent or an error.",
+   "retrieved": [
+    "Topic8_AgenticRAG_MITB.pdf, slide 4",
+    "Topic8_AgenticRAG_MITB.pdf, slide 47",
+    "Topic7_Agentic_IS469.pdf, slide 18",
+    "Topic7_Agentic_IS469.pdf, slide 63",
+    "Topic8_AgenticRAG_MITB.pdf, slide 44"
+   ],
+   "hit": 0,
+   "recall": 0.0,
+   "rr": 0.0
+  },
+  {
+   "id": "t7-04",
+   "type": "factual",
+   "gold_slides": "18;19",
+   "user_input": "What does ReAct interleave in its trace?",
+   "retrieved_contexts": [
+    "§2 · REASONING TRACE\nReAct: reasoning and acting in one growing trace\nSchematic: Thought → Action → Observation blocks accumulate in a single growing context (the message history) and loop until the goal is met,\nan agent is a loop over a growing trace, not one call.",
+    "§2 · REASONING TRACE\nReAct: the canonical loop\n▸ReAct = interleave Reasoning and Acting in one trace\n· Thought: what should I do next, and why\n· Action: a tool call with arguments\n· Observation: the tool's result, fed back into context\n▸The loop repeats; each observation updates the LLM's working context\n▸Simple, transparent, and still the default backbone inside most agent frameworks",
+    "§4 · REACT VS PLAN\nReAct vs. Plan-and-Execute\n▸ReAct: decide the next single step, act, observe, repeat, flexible, adapts as it goes\n▸Plan-and-Execute: draft a full plan first, then execute the steps\n· Fewer LLM calls, more coherent on long tasks\n· But a bad up-front plan is costly, usually paired with re-planning\n▸Rule of thumb: react for open-ended/interactive; plan for well-structured multi-step tasks\nvs agile/iterative\nuse reasoning model & just act",
+    "§4 · PLANNING PATTERNS\nA ladder of planning patterns\nReAct\nstep · act ·\nobserve, repeat\nPlan-and-Execute\nplan first,\nthen run steps\nReflexion\nself-critique,\nlearn, retry\nIncreasing commitment before acting, from reactive, to planned, to self-correcting.\niterative",
+    "Planning & Reasoning Patterns\nBeyond react-one-step-at-a-time: how agents decide what to do."
+   ],
+   "response": "ReAct interleaves reasoning (and the “thought” about what to do next) with acting (the tool call), forming a single trace of thought → action → observation that repeats. 【2】",
+   "reference": "ReAct interleaves Reasoning and Acting in one trace: a Thought (what to do next and why), an Action (a tool call with arguments) and an Observation (the tool's result, fed back into context). The loop repeats, with the blocks accumulating in a single growing context.",
+   "retrieved": [
+    "Topic7_Agentic_IS469.pdf, slide 19",
+    "Topic7_Agentic_IS469.pdf, slide 18",
+    "Topic7_Agentic_IS469.pdf, slide 36",
+    "Topic7_Agentic_IS469.pdf, slide 38",
+    "Topic7_Agentic_IS469.pdf, slide 32"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t7-05",
+   "type": "factual",
+   "gold_slides": "23;25",
+   "user_input": "What three kinds of capability can an MCP server expose?",
+   "retrieved_contexts": [
+    "§3 · ARCHITECTURE\nHow MCP is structured\n▸Host / client: the app or agent runtime (e.g. an IDE, Claude Desktop, your agent)\n▸MCP server: a process that exposes three things:\n· Tools: actions the agent can invoke\n· Resources: data/context the agent can read\n· Prompts: reusable prompt templates\n▸Client and server speak a standard JSON-RPC-style protocol over a transport\nMCP server run somwhere, client is agent calling it",
+    "§3 · ARCHITECTURE\nMCP architecture at a glance\nHost / client\nthe agent\nruntime\nMCP server\none reusable\nintegration\nCapabilities\nTools ·\nResources · Prompts\nWrite the integration once as an MCP server; any MCP-aware agent reuses it, \"USB-C for tools & data\".",
+    "§3 · THE PROBLEM\nMCP, the Model Context Protocol\n▸Without a standard: every LLM × every tool = its own custom integration (N × M glue)\n▸MCP is an open protocol, think \"USB-C for tools and data\", introduced by Anthropic, now\nwidely adopted\n▸An MCP server exposes capabilities; any MCP-aware host/agent can use them\n▸Write the integration once; reuse it across agents and LLMs\nmake syntax required for\napi consistents",
+    "§3 · STATEFUL VS STATELESS\nStateful vs. stateless MCP\nStateful (the original way)\n• Init handshake first → server returns an\nMcp-Session-Id\n• Every later call must carry that session id\n• The load balancer must pin you to the SAME\nbackend (sticky routing)\n• Awkward to run serverless or scale\nhorizontally\nStateless (the 2026 shift)\n• One HTTP POST does everything, no session\nid, no handshake\n• Server keeps no per-client state between\nrequests\n• Any replica can serve any request →\nserverless & auto-scaling\n• Cleaner to implement on both client and\nserver",
+    "§3 · TRANSPORTS\nHow client and server talk: transports\n▸MCP messages are JSON-RPC; they travel over a transport, two matter in practice:\n· stdio, the server runs as a local subprocess the host launches (Claude Desktop, Cursor, our lab's\nreference server)\n· Streamable HTTP, for remote servers; it replaced the older HTTP + SSE two-endpoint design\n▸Streamable HTTP can run stateful or stateless (next slide), and that choice drives how you\ndeploy\nnot in quiz"
+   ],
+   "response": "An MCP server can expose three kinds of capability: **Tools**, **Resources**, and **Prompts**【1†L4-L7】【2†L4-L7】",
+   "reference": "Tools (actions the agent can invoke), Resources (data or context the agent can read) and Prompts (reusable prompt templates).",
+   "retrieved": [
+    "Topic7_Agentic_IS469.pdf, slide 23",
+    "Topic7_Agentic_IS469.pdf, slide 24",
+    "Topic7_Agentic_IS469.pdf, slide 22",
+    "Topic7_Agentic_IS469.pdf, slide 28",
+    "Topic7_Agentic_IS469.pdf, slide 26"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t7-06",
+   "type": "factual",
+   "gold_slides": "44;45",
+   "user_input": "What are the three tiers of memory an agent can have?",
+   "retrieved_contexts": [
+    "§5 · MEMORY TIERS\nThree tiers of agent memory\nWorking memory\nthe context\nwindow, now\nShort-term\ntask scratchpad\n& history\nLong-term\nexternal store,\nretrieved later\nWhat the agent sees at each step is a design choice, promote what matters, drop the rest.",
+    "§5 · MEMORY\nTypes of agent memory\n▸Working memory: the context window, everything the LLM sees right now\n▸Short-term: a scratchpad / running history within the current task\n▸Long-term: a store the agent can write to and retrieve from later (often a vector store, see\nTopic 8)\n▸Memory + reflection: periodically summarise and store what matters for future steps\ninput into the LLM which is increasingly\nappended\nstoring more than just what give back to the LLM, things\nuseful but may not necessary need to give back to LLM\ncan be variable, list\nlong term memory in db during the loop\nduring function, observation can add code to\nstore in db for long term memory",
+    "§10 · JUDGEMENT\nIs this actually agentic?\n▸Teardown test: a single frontier-API call behind a nice UI is NOT an agent\n· No loop, no tools, no memory, no evaluation → it's just a prompt\n▸Ask of any 'agent': where is the loop, the tools, the memory, and the evidence it works?\n▸Next topic: the single most useful tool you can give this agent, retrieval over your own data\n(Topic 8)\n- has access to tools\n- have loop (graph) : look at output and come back to it differently\n- memory to carry out the loop",
+    "Memory & Context Engineering\nWhat the agent knows at each step is a design choice, not an accident.",
+    "FRAMING\nWhere we are\n▸T1–T4: representation, transformers, training and customising the model itself\n▸T5–T6: serving it, and measuring whether the output is any good\n▸T7: the agent, an LLM in a loop with tools, memory and guardrails\n▸Today: the single most useful tool you can give that agent, retrieval over your own data\n▸We build it in order: what RAG is (§1–§4) → making it accurate (§5–§7) → handing the controls\nto the agent (§8)"
+   ],
+   "response": "The agent’s memory is organized into three tiers:\n\n1. **Working memory** – the context window that the LLM sees at the current step.  \n2. **Short‑term memory** – a task scratchpad or running history that persists for the current task.  \n3. **Long‑term memory** – an external store (e.g., a vector store) that the agent can write to and retrieve from later.  \n\nThese three tiers are described in the slides on memory tiers and types of agent memory【1†L1-L4】【2†L1-L4】.",
+   "reference": "Working memory (the context window, everything the LLM sees right now), short-term memory (a scratchpad and running history within the current task) and long-term memory (an external store the agent can write to and retrieve from later, often a vector store).",
+   "retrieved": [
+    "Topic7_Agentic_IS469.pdf, slide 45",
+    "Topic7_Agentic_IS469.pdf, slide 44",
+    "Topic7_Agentic_IS469.pdf, slide 63",
+    "Topic7_Agentic_IS469.pdf, slide 43",
+    "Topic8_AgenticRAG_MITB.pdf, slide 4"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t8-01",
+   "type": "factual",
+   "gold_slides": "6;53",
+   "user_input": "What two components does retrieval-augmented generation combine?",
+   "retrieved_contexts": [
+    "GENERATIVE AND AGENTIC AI · TOPIC 8\nAgentic Retrieval-Augmented Generation\nFrom Classic RAG to Advanced RAG to Retrieval the Agent Drives\nLaura Wynter, PhD\nSMU School of Computing and Information Sciences\nMITB CS614 · AY2026–27",
+    "FRAMING\nLearning outcomes\n▸Understand Retrieval-Augmented Generation (RAG) and how it works end-to-end\n▸Be aware of its benefits and its limitations\n▸Understand how those limitations can be addressed and reduced\n▸Situate RAG in the 2026 stack: modern embeddings, vector DBs, RAGAS, advanced retrieval\n▸Turn a fixed retrieve-then-generate pipeline into agentic RAG, where the agent (Topic 7)\ndecides what to retrieve",
+    "§8 · THE SHIFT\nWhat changes when the agent owns retrieval\n▸Everything so far is a FIXED pipeline: one query → one retrieval → one generation, decided by\nyour code\n▸Agentic RAG makes retrieval a TOOL (Topic 7): the agent decides whether to retrieve, what to\nask for, and when to stop\n▸The loop can search several times, rewrite the query between attempts, and check the\nevidence it got back\n▸Nothing from §1–§7 is thrown away: chunking, embeddings, hybrid search and re-ranking are\nthe tools it calls\n▸What moves is the control flow, out of your script and into the agent’s loop",
+    "§7 · OUR LABS\nAdding the \"G\": generation, and what it needs\n▸Everything so far produced a ranked list of chunks; the \"G\" turns the top ones into an answer\n▸Generation is one LLM call: system prompt with a grounding rule + the retrieved chunks + the\nquestion\n▸Grounding rule: answer only from the chunks, cite them by number, say \"not in the\ndocuments\" otherwise\n▸Both labs end with this step, and you change two dials: the grounding rule, and how many\nchunks go in\n▸Watch for the two failures: a wrong chunk answered confidently, and the LLM ignoring the rule\nand answering from memory",
+    "§5 · TWO-PHASE\nTwo-phase retrieval with a re-ranker\nRetrieve N′\nrecall widely\nCross-encoder\nscores query + chunk\nRe-order\njoint relevance\nTop-k → LLM\nbest chunks in prompt\nRecap of the funnel above: phase 1 recalls many candidates cheaply, phase 2 re-orders them with a model that reads the query."
+   ],
+   "response": "I can't find this in your notes.",
+   "reference": "A retriever and a generator. The retriever fetches data, from the Internet or usually a vector database, and hands it with the original query to the generator, and the generator (the LLM) uses the retrieved data to produce its response.",
+   "retrieved": [
+    "Topic8_AgenticRAG_MITB.pdf, slide 1",
+    "Topic8_AgenticRAG_MITB.pdf, slide 3",
+    "Topic8_AgenticRAG_MITB.pdf, slide 44",
+    "Topic8_AgenticRAG_MITB.pdf, slide 42",
+    "Topic8_AgenticRAG_MITB.pdf, slide 30"
+   ],
+   "hit": 0,
+   "recall": 0.0,
+   "rr": 0.0
+  },
+  {
+   "id": "t8-02",
+   "type": "conceptual",
+   "gold_slides": "12;53",
+   "user_input": "When should I pick RAG over just using a long-context prompt?",
+   "retrieved_contexts": [
+    "§2 · LONG CONTEXT\nLong context isn't free: 'lost in the middle'\nIllustrative: accuracy is highest when the key passage sits near the start or end of the context and sags in the middle, a reason to retrieve and\nsurface the right passage rather than bury it in a huge prompt.\nRAG: baseline whereby u just put ur document\nin the system prompt and compare how well it\nworks ( for model with big enough context\nwindow)",
+    "§2 · WHEN RAG WINS\nFor longer material, back to RAG\n▸Corpora bigger than any window, changing constantly, or needing per-user scoping still favour\nRAG\n▸RAG retrieves only what's relevant, cheaper per query than stuffing everything every time\n▸Rule of thumb: small/static context → long-context prompt; large/dynamic corpus → RAG",
+    "§2 · LONG CONTEXT\nJust put the text in the prompt?\n▸For long-context models (128K+ tokens ≈ 200 pages) you can include the full text directly\n▸Adding the full text to the prompt can be more effective than RAG, no retrieval to get wrong\n▸But with a paid API, large input prompts get costly on every call\n▸Prompt caching lets providers reuse a frequently-sent long prompt without re-charging full\ntokens\n▸2026 reality: context windows now reach ~1M tokens, long-context is a real baseline, not a toy\ninput context size for LLM at inference is very huge\nput entire question & document in the prompt\nsystem prompt & user prompt makes no difference just the\ninput & handled in the same way\nin a system prompt, it is called anytime a user calls ,\nsystem prompt always appended to user prompt\nKV Cache - if uk system prompt going to us\neverytime, we already have its kv cache as it is\npass everytime —> save on computation\nonly do prompt caching if is the information is\nuse everytime",
+    "LONG CONTEXT\nLong-context evaluation\n▸Models now accept 128K–1M+ token contexts, but do they actually use all of it?\n▸Needle-in-a-haystack / passcode retrieval: hide one fact in a huge context and ask for it\n▸Frontier models largely pass simple needle tests, retrieval is nearly solved at that level\n▸Harder multi-fact / reasoning-over-context tasks exist but are compute-expensive to run\ntoken context: size of\ninput, 1M token means\nput entire 1M in my\nprompt and ask questions\nabout it\nis model correctly using\nall the 1M context it is\nsuppose to use ?",
+    "ROADMAP\nWhat we'll cover\n01\nWhat RAG is, and why it helps\n02\nThe simpler alternative: long context\n03\nThe RAG pipeline: chunk → embed → retrieve →\ngenerate\n04\nEmbedding models & vector stores\n05\nWhy RAG fails (SAGE)\n06\nEvaluating a RAG pipeline\n07\nRe-ranking: the two-phase approach\n08\nContextual RAG, BM25 & rank fusion\n09\nAdvanced RAG & the frontier\n10\nAgentic RAG: retrieval as a tool the agent drives\n11\nAgentic retrieval patterns & when to use them\n12\nEvaluating and securing agentic RAG"
+   ],
+   "response": "Pick Retrieval‑Augmented Generation (RAG) instead of stuffing everything into a single long‑context prompt when the material you need to work with is **large, dynamic, or user‑specific**—i.e., when it exceeds the model’s context window, changes frequently, or must be scoped per user. In those cases RAG can retrieve only the relevant pieces, which is cheaper and more efficient than sending the entire corpus on every query. By contrast, a long‑context prompt works best for small, static contexts that fit comfortably inside the model’s window.  \n\n**Key points**\n\n* Large or constantly‑changing corpora, or those that need per‑user filtering, still favor RAG [2].  \n* RAG retrieves just the relevant passages, making it cheaper per query than repeatedly sending a huge prompt [2].  \n* The rule of thumb: *small/static* context → use a long‑context prompt; *large/dynamic* corpus → use RAG [2].  ",
+   "reference": "Use a long-context prompt for a small, static context, where it can even beat RAG. Use RAG for a large or dynamic corpus: one bigger than any context window, changing constantly, or needing per-user scoping. RAG retrieves only what is relevant, so it is cheaper per query than stuffing everything in each time.",
+   "retrieved": [
+    "Topic8_AgenticRAG_MITB.pdf, slide 11",
+    "Topic8_AgenticRAG_MITB.pdf, slide 12",
+    "Topic8_AgenticRAG_MITB.pdf, slide 10",
+    "Topic6_Evaluation.pdf, slide 63",
+    "Topic8_AgenticRAG_MITB.pdf, slide 2"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 0.5
+  },
+  {
+   "id": "t8-03",
+   "type": "conceptual",
+   "gold_slides": "19;20",
+   "user_input": "What goes wrong when a document is cut so that the answer ends up spread over two pieces?",
+   "retrieved_contexts": [
+    "§3 · THE PROBLEM\nHow RAG goes wrong, one question, three failures\nQuestion: what colour are my cat's eyes? (A) chunking splits the answer so neither piece is retrieved; (B) a noisy chunk competes with the right\none; (C) the target chunk is never retrieved at all. Source: SAGE, Zhang et al., arXiv 2025.",
+    "§7 · OUR LABS\nAdding the \"G\": generation, and what it needs\n▸Everything so far produced a ranked list of chunks; the \"G\" turns the top ones into an answer\n▸Generation is one LLM call: system prompt with a grounding rule + the retrieved chunks + the\nquestion\n▸Grounding rule: answer only from the chunks, cite them by number, say \"not in the\ndocuments\" otherwise\n▸Both labs end with this step, and you change two dials: the grounding rule, and how many\nchunks go in\n▸Watch for the two failures: a wrong chunk answered confidently, and the LLM ignoring the rule\nand answering from memory",
+    "§3 · CHUNKING\nChunk size is a trade-off with a sweet spot\nIllustrative: tiny chunks split the answer across many pieces; huge chunks dilute each vector with off-topic text. Recall peaks at a mid size, tune it,\ndon't guess.",
+    "TOP-K / TOP-P\nWhat top-k and top-p actually cut\nSame distribution, two rules. Top-k always keeps a fixed number of tokens; top-p keeps however many are needed to reach probability mass p, so\nit widens on flat distributions and narrows on confident ones.",
+    "§4 · LIMITS OF SFT\nWhat SFT cannot do\n▸SFT imitates demonstrations, it copies the answers you show it\n▸It has no notion that one answer is better than another, only \"this is the target\"\n▸So it can't directly optimise for helpfulness, safety, or a preferred style\n▸For that we need preference and reinforcement methods, the next section"
+   ],
+   "response": "When chunking splits the answer, the relevant information is divided between multiple pieces, so neither piece contains the full answer and retrieval fails to provide a complete response【1†L1-L3】【3†L1-L3】",
+   "reference": "This is bad chunking: no single chunk carries the full answer, so neither piece is retrieved. The suggested fix is to have an LLM chunk the document, or to use a learned chunker such as SAGE.",
+   "retrieved": [
+    "Topic8_AgenticRAG_MITB.pdf, slide 19",
+    "Topic8_AgenticRAG_MITB.pdf, slide 42",
+    "Topic8_AgenticRAG_MITB.pdf, slide 21",
+    "Topic6_Evaluation.pdf, slide 6",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 19"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t8-04",
+   "type": "conceptual",
+   "gold_slides": "31;32",
+   "user_input": "Why does a cross-encoder produce a better ranking than cosine similarity over stored embeddings?",
+   "retrieved_contexts": [
+    "§5 · ENCODERS\nBi-encoder vs. cross-encoder\nADVANCED\nBi-encoder (the vector DB)\n• Chunk and query embedded separately\n• Embeddings precomputed, query-\nindependent\n• Similarity = cosine of two fixed vectors\n• Very fast; scales to millions of chunks\nCross-encoder (the re-ranker)\n• Chunk + query fed in together (Sent A +\nSent B)\n• Joint attention over the pair at query time\n• Outputs one context-dependent relevance\nscore\n• Much slower, score every candidate at\nquery time",
+    "§5 · WHY IT HELPS\nWhy re-ranking beats plain cosine\n▸The vector DB embedded each chunk when it was loaded, before any query existed\n▸Those chunk embeddings do not take the user query into account, no Attention over the pair\n▸A re-ranker feeds the chunk AND the query to a transformer together\n▸It computes a joint, context-dependent similarity score, a far more relevant ranking",
+    "§5 · THE FUNNEL\nRetrieve wide, then narrow with a cross-encoder\nIllustrative: a large, cheap candidate set from the bi-encoder is re-scored by a cross-encoder that reads the query with each chunk, leaving a small,\naccurately-ordered top-k for the prompt.",
+    "§4 · SIMILARITY\nCosine similarity\n▸We often want the document most similar to a user's query (a search engine's core task)\n▸Two vectors are similar when they have a large dot (scalar) product\n▸But the dot product grows with vector length, longer counts inflate the score\n▸Cosine similarity is the normalized dot product: it measures the angle, not the magnitude\nwe want to do computations on the embedding\ncomparison between the two vectors",
+    "LAB\nHands-on lab & what's expected\n▸Lab A, Topic8-RAG-Simple: cosine retrieval over a few sentences, cross-encoder re-ranking,\ngeneration, then vector memory\n▸Lab B, Topic8-RAG-with-Reranking-and-PDFs: chunk real PDFs, retrieve by cosine, re-rank the\ntop-Nʹ, generate a cited answer\n▸No vector DB: brute-force cosine is fine at this scale, and it keeps every step visible\n▸The code is complete; you change the embedding model, the chunking, the question, Nʹ, the\ngrounding rule and k\n▸Stretch: swap in a stronger embedding model or a vector store; wrap the retriever as a tool for\nyour Topic 7 agent"
+   ],
+   "response": "A cross‑encoder scores each chunk together with the query, allowing the transformer to attend to both inputs and compute a joint, context‑dependent similarity. Because the chunk embeddings used by a bi‑encoder are pre‑computed without any knowledge of the query, they cannot capture how the query relates to each chunk. The cross‑encoder’s joint attention therefore yields a far more relevant ranking than the query‑independent cosine similarity over stored embeddings【2】. Additionally, the cross‑encoder outputs a single relevance score for each pair, whereas cosine similarity only measures the angle between two fixed vectors that were created before the query existed【1】.",
+   "reference": "The vector database embedded each chunk when it was loaded, before any query existed, so those embeddings do not take the query into account. A cross-encoder feeds the chunk and the query into a transformer together, with joint attention over the pair, and outputs a context-dependent relevance score, which gives a far more relevant ranking. It is much slower, because every candidate must be scored at query time.",
+   "retrieved": [
+    "Topic8_AgenticRAG_MITB.pdf, slide 32",
+    "Topic8_AgenticRAG_MITB.pdf, slide 31",
+    "Topic8_AgenticRAG_MITB.pdf, slide 29",
+    "Topic1_TextProcessing_IS469.pdf, slide 30",
+    "Topic8_AgenticRAG_MITB.pdf, slide 54"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t8-05",
+   "type": "conceptual",
+   "gold_slides": "35",
+   "user_input": "Why can keyword search find an exact error code that embeddings miss?",
+   "retrieved_contexts": [
+    "§6 · BM25\nKeyword search is not dead: BM25\n▸Contextual RAG (Anthropic, 2024) resurrected BM25 alongside it\n▸BM25 extends TF-IDF by also accounting for document length\n▸A query like \"Error code TS-999\": embeddings miss the exact string, BM25 nails it\n▸Lesson: semantic and lexical retrieval fail differently, combine them\n▸Combine with Reciprocal Rank Fusion (RRF): sum 1/(k+rank) across both lists",
+    "§4 · THE PROBLEM\nWhy the top-N prompt can go wrong\n▸The basic paradigm sends the top-N chunks plus the query straight to the LLM, three things can\nbreak it:\n· Chunks add irrelevant info that then leaks into the answer\n· The embedding distance doesn't produce an accurate ranking\n· The N chunks miss the relevant information entirely\n▸So: quantitatively evaluate the pipeline before trying to improve it",
+    "Contextual RAG, BM25 & Rank Fusion\nAnthropic's 2024 recipe: fix lost context and bring back keyword search.",
+    "§7 · CHOOSING\nWhat to reach for, when\nTechnique\nReach for it when\nChunking + embeddings + top-k cosine\nAlways, the strong default baseline\nHybrid (BM25 + semantic)\nExact terms, codes or names matter\nRe-ranking\nRecall is fine but ordering is noisy\nHyDE / query rewrite / GraphRAG\nEvaluation shows a specific gap\nEach technique targets a specific failure, add them in response to evaluation, not by default.",
+    "§3 · MEANING AS A VECTOR\nWord meaning as an embedding\n▸Define a word's meaning by its distribution, its neighboring words and grammatical context\n▸Shift from text generation to text representation, to capture meaning\n▸The vector is called an embedding because the word is embedded into a space\n▸Distance in that space defines similarity between words or sentences\nidea is you want to search for something (e.g Google\nsearches closest thing to query given embedding)\nvector is an arrow with\nmagnitude and direction,\nrepresent in 3 dimension\nrepresent text in vectors so we can do\noperations —> distance —> we care about\ndistance because of search\ntype in SMU —> google returns output of\nthose with different distances"
+   ],
+   "response": "Keyword search can locate an exact error code because it matches the literal string in the document, something that embedding‑based retrieval often overlooks. BM25 (a lexical retrieval model) “nails” the exact string “Error code TS‑999,” whereas embeddings may miss it since they rely on semantic similarity rather than exact term matching【1】.",
+   "reference": "For a query like 'Error code TS-999', embeddings miss the exact string while BM25 matches it exactly. Semantic and lexical retrieval fail differently, so they should be combined, for example with Reciprocal Rank Fusion, which sums 1/(k+rank) across both lists.",
+   "retrieved": [
+    "Topic8_AgenticRAG_MITB.pdf, slide 35",
+    "Topic8_AgenticRAG_MITB.pdf, slide 24",
+    "Topic8_AgenticRAG_MITB.pdf, slide 34",
+    "Topic8_AgenticRAG_MITB.pdf, slide 41",
+    "Topic1_TextProcessing_IS469.pdf, slide 21"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 1.0
+  },
+  {
+   "id": "t8-06",
+   "type": "factual",
+   "gold_slides": "39",
+   "user_input": "What is HyDE?",
+   "retrieved_contexts": [
+    "Applications & What's Next\nWhere these pieces show up in real systems.",
+    "§7 · SURVEY\nAdvanced retrieval techniques\n▸Hybrid search: run semantic + BM25 together and fuse, now the default strong baseline\n▸Query rewriting: expand or clarify the user's query before retrieval (multi-query, step-back)\n▸HyDE: have the LLM draft a hypothetical answer, embed that, and retrieve against it\n▸GraphRAG: build a knowledge graph over the corpus so retrieval can traverse entities and\nrelations\n▸Each targets a specific failure: vocabulary mismatch, under-specified queries, multi-hop\nquestions",
+    "Training Libraries & the HF Stack\nThe tools you'll actually reach for, and what each one is good at.",
+    "§7 · CHOOSING\nWhat to reach for, when\nTechnique\nReach for it when\nChunking + embeddings + top-k cosine\nAlways, the strong default baseline\nHybrid (BM25 + semantic)\nExact terms, codes or names matter\nRe-ranking\nRecall is fine but ordering is noisy\nHyDE / query rewrite / GraphRAG\nEvaluation shows a specific gap\nEach technique targets a specific failure, add them in response to evaluation, not by default.",
+    "Embeddings, Hands-On\nStatic vs. contextual, what you get with and without a forward pass."
+   ],
+   "response": "HyDE (Hybrid Retrieval‑augmented Generation) is a technique where the large language model first drafts a hypothetical answer to the user’s question, then embeds that draft and uses the embedding to retrieve relevant information from the corpus. This approach helps address failures such as vocabulary mismatch or under‑specified queries by turning the query into a richer, answer‑like representation before retrieval【2†L1-L4】.",
+   "reference": "HyDE has the LLM draft a hypothetical answer, embeds that draft, and retrieves against it.",
+   "retrieved": [
+    "Topic7_Agentic_IS469.pdf, slide 61",
+    "Topic8_AgenticRAG_MITB.pdf, slide 39",
+    "Topic4_Efficient_FineTuning_IS469new.pdf, slide 12",
+    "Topic8_AgenticRAG_MITB.pdf, slide 41",
+    "Topic2_Transformers_IS469.pdf, slide 46"
+   ],
+   "hit": 1,
+   "recall": 1.0,
+   "rr": 0.5
+  }
+ ]
+}

@@ -3,6 +3,9 @@ python-pptx>=1.0
 pyyaml>=6.0
 numpy>=1.26
 sentence-transformers>=3.0
-groq>=0.11
+torchvision  
+openai>=1.0
 pytest>=8.0
 rank_bm25>=0.2
+python-dotenv
+chromadb>=1.0

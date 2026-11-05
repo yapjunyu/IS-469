@@ -1,0 +1,27 @@
+{
+ "judge": "openai/gpt-oss-20b",
+ "means": {
+  "faithfulness": 1.0,
+  "factual_correctness": 1.0,
+  "context_precision": 0.933,
+  "context_recall": 1.0
+ },
+ "rows": [
+  {
+   "id": "t1-01",
+   "faithfulness": 1.0,
+   "factual_correctness": 1.0,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "t1-02",
+   "faithfulness": 1.0,
+   "factual_correctness": 1.0,
+   "context_precision": 0.8666666666377778,
+   "context_recall": 1.0,
+   "errors": {}
+  }
+ ]
+}

@@ -1,0 +1,6 @@
+format,method,group,questions,chunks,pages_per_chunk,index_s,quotes_reachable,ev3_recall,ev3_precision,ev3_f1,ev5_recall,ev5_precision,ev5_f1,ev_mrr,dev_ev3_recall,dev_ev_mrr,test_ev3_recall,test_ev_mrr,page3_recall,page3_precision,page3_f1,page5_recall,page5_precision,page5_f1,page_mrr,dev_page3_recall,dev_page_mrr,test_page3_recall,test_page_mrr,winner
+slides,slide,"ev=text_q, page=all",144,689,1.0,155.9,1.0,0.873,0.432,0.557,0.905,0.275,0.409,0.852,0.9,0.871,0.858,0.841,0.901,0.412,0.547,0.926,0.26,0.394,0.876,0.9,0.863,0.902,0.882,False
+slides,fixed,"ev=text_q, page=all",144,248,4.25,117.6,1.0,0.897,0.408,0.544,0.962,0.27,0.41,0.908,0.912,0.94,0.889,0.891,0.607,0.282,0.373,0.74,0.217,0.325,0.413,0.563,0.383,0.63,0.429,False
+slides,recursive,"ev=text_q, page=all",144,306,3.85,135.8,1.0,0.926,0.458,0.593,0.948,0.289,0.431,0.912,0.963,0.958,0.905,0.887,0.59,0.28,0.367,0.769,0.225,0.337,0.43,0.537,0.383,0.619,0.455,True
+documents,fixed,"ev=text_q, page=all",62,153,1.73,117.6,1.0,0.946,0.469,0.605,0.973,0.302,0.446,0.884,0.962,0.923,0.94,0.87,0.89,0.435,0.564,0.93,0.281,0.417,0.788,0.861,0.706,0.902,0.822,True
+documents,recursive,"ev=text_q, page=all",62,172,1.61,127.1,1.0,0.905,0.435,0.57,0.973,0.294,0.438,0.852,0.923,0.872,0.898,0.845,0.89,0.425,0.556,0.938,0.281,0.418,0.752,0.861,0.694,0.902,0.775,False
