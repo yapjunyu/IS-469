@@ -2,7 +2,7 @@
 
 - Cache every successful response to disk, keyed by a hash of
   (model, messages, tools, tool_choice, temperature, max_tokens).
-- On 429: sleep for the `retry-after` header, then retry.
+- On 429: the Groq SDK's own retries (max_retries) honour `retry-after`.
 - On 400 `tool_use_failed`: retry; never append the bad call to history.
 - Return plain dicts (not SDK objects) so cache and trace can JSON them.
 """
@@ -14,7 +14,9 @@ import groq
 from dotenv import load_dotenv
 
 load_dotenv()
-CACHE_DIR = Path('cache/llm')
+# same gitignored folder as src/tutor/llm.py; keys hash the full request, so no collisions
+# shortcut: path copied from src/tutor/llm.py, import it once `tutor` is installed as a package
+CACHE_DIR = Path(__file__).resolve().parents[1] / "data" / "llm_cache"
 _client = None
 
 # Create Groq connection 1st time then reuses it

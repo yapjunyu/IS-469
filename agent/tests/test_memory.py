@@ -2,11 +2,6 @@ import pytest
 from agent.memory import  learner
 from agent.s2_tools import TurnContext, run_tool
 
-@pytest.fixture(autouse=True)
-def tmp_db(monkeypatch, tmp_path):
-    monkeypatch.setattr(learner, "DB_DIR", tmp_path)
-
-
 def test_score_moves_with_answers():
     assert learner.update_mastery("alice", "LoRA", True) == 0.65      # 0.5 + 0.3 * (1 - 0.5)
     assert learner.update_mastery("alice", " lora ", False) == 0.455  # same concept, pulled down

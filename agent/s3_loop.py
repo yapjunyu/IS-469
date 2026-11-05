@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 from agent.prompts import SYSTEM_PROMPT
-from agent.s1_llm import chat
+from agent import s1_llm
 from agent.s2_tools import TOOL_SCHEMAS, TurnContext, run_tool
 from agent.s4_trace import log_call
 from agent.memory import learner
@@ -35,14 +35,15 @@ TRACE_PATH = Path("logs/trace.jsonl")
 #   4d: Run the tools the LLM wants to use. Bad input never raises errors, but instead goes back to the LLM so it can fix its calls. logged and sources added to citation array
 #   4e: repeat itself until meet turn cap
 
-def run_turn(user_message, student_id, *, history=None, search_again=True, guard=True, step_cap=6):
+def run_turn(user_message, student_id, turn, *, history=None, search_again=True, guard=True, step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int}.
 
+    turn: the app's turn number, written on every trace row.
     history: earlier {"role": "user"/"assistant", "content": ...} messages, so quiz
     answers can be graded against the question asked last turn.
     """
 
-    ctx = TurnContext(student_id=student_id, search_again=search_again, guard=guard, step_cap=step_cap)
+    ctx = TurnContext(student_id=student_id, turn=turn, search_again=search_again, guard=guard, step_cap=step_cap)
     system = SYSTEM_PROMPT
     weak = learner.weak_concepts(student_id)
     if weak:
@@ -63,7 +64,7 @@ def run_turn(user_message, student_id, *, history=None, search_again=True, guard
     citations = []
 
     for step in range(1, step_cap+1):
-        reply = chat(messages, MODEL, tools=TOOL_SCHEMAS)
+        reply = s1_llm.chat(messages, MODEL, tools=TOOL_SCHEMAS)
         msg = reply["message"]
 
         messages.append({k: msg[k] for k in ("role", "content", "tool_calls") if k in msg})
@@ -86,5 +87,5 @@ def run_turn(user_message, student_id, *, history=None, search_again=True, guard
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)})
 
     # cap hit: one last call with tools off, so it must answer from what it has
-    msg = chat(messages, MODEL, tools=TOOL_SCHEMAS, tool_choice="none")["message"]
+    msg = s1_llm.chat(messages, MODEL, tools=TOOL_SCHEMAS, tool_choice="none")["message"]
     return {"answer": msg.get("content", ""), "citations": citations, "steps": step_cap + 1}

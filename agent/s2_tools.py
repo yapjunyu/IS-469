@@ -56,7 +56,7 @@ def update_mastery(ctx, concept, correct, wrong_belief=None):
     score = learner.update_mastery(ctx.student_id, concept, correct, wrong_belief)
 
     return {
-        "ok": True, "concept": concept, "mastery": score, "correct": correct
+        "ok": True, "concept": concept, "mastery": score
     }
 
 
