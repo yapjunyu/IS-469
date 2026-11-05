@@ -37,7 +37,7 @@ def search_notes(ctx, query):
             ]
     }
 
-# Shortcut: stub, replace with an s1_llm.chat call over retrieved passages
+# Shortcut: stub, replace with an s4_trace.traced_chat call over retrieved passages
 def make_quiz(ctx, topic, n=3):
     n = max(1, min(n, 5))
     return {
@@ -47,7 +47,7 @@ def make_quiz(ctx, topic, n=3):
             ]
     }
 
-# Shortcut: stub, replace with an s1_llm.chat call that grades and gives a hint
+# Shortcut: stub, replace with an s4_trace.traced_chat call that grades and gives a hint
 def grade_answer(ctx, question, student_answer):
     return {
         "correct": False, "hint": "Stub hint: check your notes again."
