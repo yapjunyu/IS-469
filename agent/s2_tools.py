@@ -8,7 +8,7 @@
 """
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from agent.memory import  learner
 
 # Context to be sent in for every tool call as "ctx"
@@ -16,12 +16,17 @@ from agent.memory import  learner
 class TurnContext:
     student_id: str
     turn: int = 0
+    step: int = 0
+    # running totals for the turn, so LLM calls made inside tools count too
+    tokens: dict = field(default_factory=lambda: {"in": 0, "out": 0})
+    searches: int = 0
     search_again: bool = True
     guard: bool = True
     step_cap: int = 6
 
 # Shortcut: stub, swap for retrieval teammate's search(student_id, query) when ready
 def search_notes(ctx, query):
+    ctx.searches += 1
     return {
         "chunks":
             [

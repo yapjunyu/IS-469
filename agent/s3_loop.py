@@ -4,23 +4,21 @@ load learner model + recent session notes
 for step in range(step_cap):
     reply = llm.chat(messages, tools)
     if no tool_calls: break
-    for each tool_call: run_tool, append `role: tool` message, log to trace
+    for each tool_call: run_tool, append `role: tool` message, write a tool row
 if cap hit: one last llm.chat(..., tool_choice="none") to force an answer
+write the final trace row (see s4_trace for the row format)
 """
 
 import json
 import time
-from pathlib import Path
 
 from agent.prompts import SYSTEM_PROMPT
-from agent import s1_llm
 from agent.s2_tools import TOOL_SCHEMAS, TurnContext, run_tool
-from agent.s4_trace import log_call
+from agent import s4_trace
 from agent.memory import learner
 
 # shortcut: hardcoded, move to config.yaml once the team agrees on it
 MODEL = "llama-3.3-70b-versatile"
-TRACE_PATH = Path("logs/trace.jsonl")
 
 # 1. TurnContext: bundles the student_id and config switches to the current turn (all the loops tgt). Basically giving the turn context on which student it's doing + how many steps alrdy, etc.
 
@@ -31,9 +29,10 @@ TRACE_PATH = Path("logs/trace.jsonl")
 # 4. the loop itself, each step is 1 loop
 #   4a: Asking LLM: Give LLM whole convo + tool menu => Either answer now or use tools
 #   4b: Add LLM reply to the messages array as history, comes BEFORE the tool result
-#   4c: if the LLM did not choose to use a tool, that means it has a final answer => return
-#   4d: Run the tools the LLM wants to use. Bad input never raises errors, but instead goes back to the LLM so it can fix its calls. logged and sources added to citation array
+#   4c: if the LLM did not choose to use a tool, that means it has a final answer => break
+#   4d: Run the tools the LLM wants to use. Bad input never raises errors, but instead goes back to the LLM so it can fix its calls. Each call gets a tool row and its sources go in the citation array
 #   4e: repeat itself until meet turn cap
+#   4f: write the final row (every LLM call already wrote its own llm row through s4_trace.traced_chat)
 
 def run_turn(user_message, student_id, turn, *, history=None, search_again=True, guard=True, step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int}.
@@ -43,6 +42,7 @@ def run_turn(user_message, student_id, turn, *, history=None, search_again=True,
     answers can be graded against the question asked last turn.
     """
 
+    t_start = time.perf_counter()
     ctx = TurnContext(student_id=student_id, turn=turn, search_again=search_again, guard=guard, step_cap=step_cap)
     system = SYSTEM_PROMPT
     weak = learner.weak_concepts(student_id)
@@ -63,29 +63,42 @@ def run_turn(user_message, student_id, turn, *, history=None, search_again=True,
     ]
     citations = []
 
+    answer, cap_hit = None, False
     for step in range(1, step_cap+1):
-        reply = s1_llm.chat(messages, MODEL, tools=TOOL_SCHEMAS)
-        msg = reply["message"]
+        ctx.step = step
+        msg = s4_trace.traced_chat(ctx, "tutor", messages, MODEL, tools=TOOL_SCHEMAS)["message"]
 
         messages.append({k: msg[k] for k in ("role", "content", "tool_calls") if k in msg})
 
         if not msg.get("tool_calls"):
-            return {"answer": msg.get("content", ""), "citations": citations, "steps": step}
+            answer = msg.get("content") or ""
+            break
 
         for call in msg["tool_calls"]:
             name, args = call["function"]["name"], call["function"]["arguments"]
             t0 = time.perf_counter()
             result = run_tool(name, args, ctx)
+            try:
+                inputs = json.loads(args)
+            except (json.JSONDecodeError, TypeError):
+                inputs = args  # bad JSON: keep the raw string so the trace shows what the LLM sent
 
-            log_call(TRACE_PATH, student=student_id, turn=ctx.turn, step=step, tool=name,
-                     inputs=args, result_summary=json.dumps(result)[:200],
-                     duration_ms=round((time.perf_counter() - t0) * 1000),
-                     tokens=reply.get("usage"), ok="error" not in result,
-                     error=result.get("error"))
+            s4_trace.log_row(ctx, "tool", tool=name, inputs=inputs, ok="error" not in result,
+                             error=result.get("error"),
+                             duration_ms=round((time.perf_counter() - t0) * 1000),
+                             result_summary=json.dumps(result)[:200])
 
             citations += [{"file": c["file"], "page": c["page"]} for c in result.get("chunks", [])]
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)})
+    else:
+        # cap hit: one last call with tools off, so it must answer from what it has
+        ctx.step, cap_hit = step_cap + 1, True
+        msg = s4_trace.traced_chat(ctx, "forced_answer", messages, MODEL,
+                                   tools=TOOL_SCHEMAS, tool_choice="none")["message"]
+        answer = msg.get("content") or ""
 
-    # cap hit: one last call with tools off, so it must answer from what it has
-    msg = s1_llm.chat(messages, MODEL, tools=TOOL_SCHEMAS, tool_choice="none")["message"]
-    return {"answer": msg.get("content", ""), "citations": citations, "steps": step_cap + 1}
+    s4_trace.log_row(ctx, "final", steps=ctx.step, cap_hit=cap_hit, searches=ctx.searches,
+                     tokens=dict(ctx.tokens),
+                     duration_ms=round((time.perf_counter() - t_start) * 1000),
+                     answer_preview=answer[:100])
+    return {"answer": answer, "citations": citations, "steps": ctx.step}
