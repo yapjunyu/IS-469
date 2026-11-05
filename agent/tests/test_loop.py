@@ -1,5 +1,6 @@
 """Tests with a fake LLM and fake search_notes: step cap, tool dispatch, trace rows."""
 from agent import s1_llm, s3_loop
+from agent.memory import learner
 import json
 
 SEARCH_CALL = {"role": "assistant", "tool_calls": [{"id": "c1", "type": "function",
@@ -84,3 +85,14 @@ def test_bad_tool_json_traced_raw_and_turn_completes(monkeypatch, tmp_data):
     tool_row = read_trace(tmp_data)[1]
     assert out["answer"] == "ok"
     assert tool_row["inputs"] == '{"query": LoRA' and not tool_row["ok"] and tool_row["error"]
+
+
+def test_system_prompt_lists_the_notebooks_concepts(monkeypatch):
+    learner.add_concepts("alice", "notes.pdf", ["LoRA", "KV cache"])
+    sent = []
+    def chat(messages, model, **kw):
+        sent.append(messages[0]["content"])
+        return reply({"role": "assistant", "content": "hi"})
+    monkeypatch.setattr(s1_llm, "chat", chat)
+    s3_loop.run_turn("hello", "alice", 1)
+    assert "lora" in sent[0] and "kv cache" in sent[0]

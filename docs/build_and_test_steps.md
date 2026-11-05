@@ -122,15 +122,18 @@ Like the index at the back of a textbook: which passages contain which exact wor
 
 ### Step 6. Find the key concepts
 
-These concepts become the bars in the weak-spots panel and the topics a student can pick in quiz mode.
+These concepts become the bars in the weak-spots panel and the concepts a student can pick in quiz mode. One idea is one concept.
 
 **What to do**
-- When a file is uploaded, ask the LLM for its main concepts as a JSON list (e.g. "LoRA", "KV cache", "photosynthesis").
-- Merge duplicates across files (case-insensitive, trimmed; the LLM can also merge near-synonyms).
-- Store concepts in the student's learner model (step 10) with a starting mastery score.
-- Go through saved responses (step 9) so concept lists repeat across reruns.
+- When a file is uploaded, call `agent.ingest.extract_concepts(student_id, file, text)`. One LLM call returns the file's concepts as a JSON list (e.g. "LoRA", "KV cache", "photosynthesis"). The notebook's known concepts go in the prompt, so the LLM reuses an existing name instead of adding a synonym. A reply with no valid list stores nothing.
+- Concepts are stored in the student's learner model (step 10), one row per (concept, file), with names normalised (trimmed, lowercased). A concept never tested starts at mastery 0.5.
+- When a file is deleted, call `learner.remove_file(student_id, file)`. A concept another file still has stays.
+- The system prompt lists the notebook's concepts, and the concept-taking tools (step 11) accept only these.
+- The concept list comes from the files, not the student, so it is not shown on the memory page.
+- The call goes through saved responses (step 9), so concept lists repeat across reruns.
+- Shortcut: only the start of a long file is read, to stay under Groq's free-tier token limit.
 
-**Done when** uploading a file adds its concepts to the weak-spots panel without duplicates.
+**Done when** uploading a file adds its concepts to the concept list without duplicates, and deleting it removes only the concepts no other file has. The weak-spots panel (step 17) shows one bar per concept from `learner.concepts()`, with its mastery score, or 0.5 if not yet tested.
 
 ### Step 7. `search_notes`: the librarian
 
@@ -213,6 +216,8 @@ Each tool has a name, a short description and typed inputs, so the AI knows when
 | `make_quiz` | `concept: str`, `n: int` (3–5) | Questions grounded in the student's files |
 | `grade_answer` | `question: str`, `answer: str` | Correct or not, plus a hint (not the answer) |
 | `update_mastery` | `concept: str`, `correct: bool`, optional `wrong_belief: str` | Updated score |
+
+`make_quiz` and `update_mastery` accept only a concept from the notebook's concept list (step 6). An unknown name returns an error that lists the valid concepts, so the LLM can retry. While a notebook has no concepts yet, any name is accepted (a shortcut until ingest always runs extraction).
 
 **Done when** each tool works when called directly, and its schema is passed to the LLM.
 

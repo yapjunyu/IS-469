@@ -24,6 +24,15 @@ class TurnContext:
     guard: bool = True
     step_cap: int = 6
 
+# Concept-taking tools accept only names on the notebook's concept list; the error lists them so the LLM can retry
+def _check_concept(ctx, concept):
+    if not isinstance(concept, str):
+        return {"error": "concept must be a string"}
+    known = learner.concepts(ctx.student_id)
+    # shortcut: an empty list accepts any name, drop once ingest always runs extraction
+    if known and learner.norm(concept) not in known:
+        return {"error": f"Unknown concept {concept!r}. Use one of: {', '.join(known)}"}
+
 # Shortcut: stub, swap for retrieval teammate's search(student_id, query) when ready
 def search_notes(ctx, query):
     ctx.searches += 1
@@ -38,12 +47,14 @@ def search_notes(ctx, query):
     }
 
 # Shortcut: stub, replace with an s4_trace.traced_chat call over retrieved passages
-def make_quiz(ctx, topic, n=3):
+def make_quiz(ctx, concept, n=3):
+    if err := _check_concept(ctx, concept):
+        return err
     n = max(1, min(n, 5))
     return {
         "questions":
             [
-                f"Stub question {i + 1} on {topic}?" for i in range(n)
+                f"Stub question {i + 1} on {concept}?" for i in range(n)
             ]
     }
 
@@ -57,6 +68,8 @@ def grade_answer(ctx, question, student_answer):
 def update_mastery(ctx, concept, correct, wrong_belief=None):
     if not isinstance(correct,bool):
         return {"error": "correct must be true or false"}
+    if err := _check_concept(ctx, concept):
+        return err
 
     score = learner.update_mastery(ctx.student_id, concept, correct, wrong_belief)
 
@@ -87,10 +100,10 @@ TOOL_SCHEMAS = [
             {"query": {"type": "string", "description": "What to look for, in your own words."}},
             ["query"]),
     _schema("make_quiz",
-            "Make practice questions on a topic from the student's notes.",
-            {"topic": {"type": "string"},
+            "Make practice questions on a concept from the student's notes.",
+            {"concept": {"type": "string", "description": "A concept from the notebook's concept list."},
              "n": {"type": "integer", "description": "Number of questions, 1 to 5."}},
-            ["topic"]),
+            ["concept"]),
     _schema("grade_answer",
             "Grade the student's answer to a quiz question. Returns correct or not and a hint, never the answer.",
             {"question": {"type": "string"}, "student_answer": {"type": "string"}},
@@ -98,7 +111,8 @@ TOOL_SCHEMAS = [
     _schema("update_mastery",
             "Record whether the student got a concept right, after grading or after a clear misconception in chat.",
             {
-                "concept": {"type": "string"}, "correct": {"type": "boolean"},
+                "concept": {"type": "string", "description": "A concept from the notebook's concept list."},
+                "correct": {"type": "boolean"},
                 "wrong_belief": {"type": "string", "description":"The student's misconception in one sentence, only if they showed one."}
             },
             ["concept", "correct"])

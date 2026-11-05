@@ -4,6 +4,7 @@ Tables:
   mastery        score per concept (0 to 1), last updated
   wrong_beliefs  a misconception, its concept, when it was seen
   facts          true claims only, each with the chunk id that supports it
+  concepts       the notebook's concept list, one row per (concept, file); not on the memory page
 shortcut: session-notes vector store not built yet, add when the memory page needs it
 """
 
@@ -35,6 +36,11 @@ CREATE TABLE IF NOT EXISTS facts (
     fact     TEXT NOT NULL,
     chunk_id TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS concepts (
+    concept TEXT NOT NULL,
+    file    TEXT NOT NULL,
+    PRIMARY KEY (concept, file)
+);
 """
 TABLE_KEYS = {"mastery": "concept", "wrong_beliefs": "id", "facts": "id"}
 
@@ -57,7 +63,7 @@ def _db(student_id):
         conn.close()        # `with conn` alone does not close
 
 # Normalizes concept name by cleaning it
-def _norm(concept):
+def norm(concept):
     """'  LoRA ' and 'lora' are the same concept."""
     return " ".join(concept.lower().split())
 
@@ -67,7 +73,7 @@ def _norm(concept):
 #   If misconception observed, will log it into wrong_beliefs table
 def update_mastery(student_id, concept, correct, wrong_belief=None):
     """Move the concept's score toward 1 (correct) or 0 (wrong). Returns the new score."""
-    concept = _norm(concept)
+    concept = norm(concept)
     with _db(student_id) as conn:
         row = conn.execute(
             "SELECT score FROM mastery WHERE concept = ?",
@@ -98,7 +104,7 @@ def add_fact(student_id, concept, fact, chunk_id):
     with _db(student_id) as conn:
         conn.execute(
             "INSERT INTO facts (concept, fact, chunk_id) VALUES (?, ?, ?)",
-     (_norm(concept), fact, chunk_id)
+     (norm(concept), fact, chunk_id)
         )
 
 # Returns up to 3 concepts scoring under 0.6 w/ weakest 1st.
@@ -128,5 +134,26 @@ def delete(student_id, table, key):
             f"DELETE FROM {table} WHERE {TABLE_KEYS[table]} = ?",
             (key,)
         )
+
+# Concept list: built from the files at upload, so kept out of TABLE_KEYS and the memory page
+def add_concepts(student_id, file, names):
+    """Record the concepts found in one file. Names are normalised, so 'LoRA' and ' lora ' are one.
+    Returns the normalised names, each once."""
+    names = list(dict.fromkeys(norm(n) for n in names if n.strip()))
+    with _db(student_id) as conn:
+        conn.executemany("INSERT OR IGNORE INTO concepts VALUES (?, ?)", [(n, file) for n in names])
+    return names
+
+
+def remove_file(student_id, file):
+    """Drop a deleted file's concepts. A concept another file still has stays."""
+    with _db(student_id) as conn:
+        conn.execute("DELETE FROM concepts WHERE file = ?", (file,))
+
+
+def concepts(student_id):
+    """The notebook's concept list, sorted, each name once."""
+    with _db(student_id) as conn:
+        return [r["concept"] for r in conn.execute("SELECT DISTINCT concept FROM concepts ORDER BY concept")]
 
 # shortcut: no edit function yet, memory page (step 17) can delete + re-add; add edit when the UI needs it

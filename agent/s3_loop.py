@@ -45,6 +45,9 @@ def run_turn(user_message, student_id, turn, *, history=None, search_again=True,
     t_start = time.perf_counter()
     ctx = TurnContext(student_id=student_id, turn=turn, search_again=search_again, guard=guard, step_cap=step_cap)
     system = SYSTEM_PROMPT
+    concepts = learner.concepts(student_id)
+    if concepts:
+        system += "\nConcepts in this notebook (use these exact names in tools): " + ", ".join(concepts)
     weak = learner.weak_concepts(student_id)
     if weak:
         system += ("\nThis student's weak spots (score 0 to 1): " + ", "
