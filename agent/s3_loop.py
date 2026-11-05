@@ -16,6 +16,7 @@ from agent.prompts import SYSTEM_PROMPT
 from agent.s1_llm import chat
 from agent.s2_tools import TOOL_SCHEMAS, TurnContext, run_tool
 from agent.s4_trace import log_call
+from agent.memory import learner
 
 # shortcut: hardcoded, move to config.yaml once the team agrees on it
 MODEL = "llama-3.3-70b-versatile"
@@ -42,11 +43,16 @@ def run_turn(user_message, student_id, *, history=None, search_again=True, guard
     """
 
     ctx = TurnContext(student_id=student_id, search_again=search_again, guard=guard, step_cap=step_cap)
+    system = SYSTEM_PROMPT
+    weak = learner.weak_concepts(student_id)
+    if weak:
+        system += ("\nThis student's weak spots (score 0 to 1): " + ", "
+                   .join(f"{w['concept']} {w['score']:.2f}" for w in weak))
 
     messages = [
         {
             "role": "system",
-            "content": SYSTEM_PROMPT
+            "content": system
         },
         *(history or []),
         {

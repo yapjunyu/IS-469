@@ -177,3 +177,9 @@ __pycache__/
 # Office lock files and macOS clutter
 ~$*
 .DS_Store
+
+# personal progress notes
+agent/PROGRESS.md
+
+# local issue tracker (specs and tickets)
+.scratch/

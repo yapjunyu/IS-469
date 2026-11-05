@@ -9,6 +9,7 @@
 
 import json
 from dataclasses import dataclass
+from agent.memory import  learner
 
 # Context to be sent in for every tool call as "ctx"
 @dataclass
@@ -48,10 +49,16 @@ def grade_answer(ctx, question, student_answer):
     }
 
 # Shortcut: stub, replace with a call into memory/learner.py
-def update_mastery(ctx, concept, correct):
+def update_mastery(ctx, concept, correct, wrong_belief=None):
+    if not isinstance(correct,bool):
+        return {"error": "correct must be true or false"}
+
+    score = learner.update_mastery(ctx.student_id, concept, correct, wrong_belief)
+
     return {
-        "ok": True, "concept": concept, "correct": correct
+        "ok": True, "concept": concept, "mastery": score, "correct": correct
     }
+
 
 # Hashmap iteration so the name of tool linking to the tool itself
 TOOLS = {f.__name__: f for f in (search_notes, make_quiz, grade_answer, update_mastery)}
@@ -85,7 +92,10 @@ TOOL_SCHEMAS = [
             ["question", "student_answer"]),
     _schema("update_mastery",
             "Record whether the student got a concept right, after grading or after a clear misconception in chat.",
-            {"concept": {"type": "string"}, "correct": {"type": "boolean"}},
+            {
+                "concept": {"type": "string"}, "correct": {"type": "boolean"},
+                "wrong_belief": {"type": "string", "description":"The student's misconception in one sentence, only if they showed one."}
+            },
             ["concept", "correct"])
 ]
 
