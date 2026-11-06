@@ -193,14 +193,14 @@ The plan requires model ID, temperature, search mode, chunk size, the search-aga
 
 ### Step 10. The tutor's notes on each student (SQLite)
 
-One SQLite database per student, plus a small vector store of session notes.
+One SQLite database per student. Session notes live in it too; the vector memory variant (not built yet) will embed them.
 
 | Store | Holds | Example |
 |---|---|---|
 | `mastery` | Score per concept, last updated | LoRA 40% |
 | `wrong_beliefs` | A misconception, its concept, when it was seen | "Alice thinks temperature 0 means random output" |
 | `facts` | True claims only, each with the chunk ID that supports it | — |
-| Session notes (vector store) | Short summaries of past sessions | "Struggled with top-p" |
+| `session_notes` | Short summaries of past sessions, written by reflection | "Struggled with top-p" |
 
 Keeping beliefs and facts apart means the tutor never learns something false from a student. A fact without a supporting chunk from the student's files is never stored.
 
@@ -258,7 +258,7 @@ Every LLM call and every tool call is written down. This is how we prove the age
 
 One JSONL line per event, in three kinds. Every row starts with `kind, ts, student, turn, step`:
 
-- `llm`: one per LLM call anywhere. `purpose` is one of `tutor`, `forced_answer`, `concepts`, `quiz`, `grading`, `judge`, `regenerate`, `search_again`. Only these rows carry tokens.
+- `llm`: one per LLM call anywhere. `purpose` is one of `tutor`, `forced_answer`, `concepts`, `quiz`, `grading`, `judge`, `regenerate`, `search_again`, `reflection`. Only these rows carry tokens.
 - `tool`: one per tool call. `inputs` is the parsed arguments, or the raw string if the JSON was bad.
 - `final`: one per turn, always its last row, with the turn's totals. `steps` counts a forced answer and a regeneration as one step each.
 

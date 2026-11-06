@@ -2,9 +2,9 @@ import json
 
 import pytest
 from agent import s1_llm
-from agent.memory import  learner
+from agent.memory import learner, reflection
 from agent.s2_tools import TOOL_SCHEMAS, run_tool
-from agent.tests.test_loop import tool_ctx
+from agent.tests.test_loop import read_trace, tool_ctx, turn
 
 def test_score_moves_with_answers():
     assert learner.update_mastery("alice", "LoRA", True) == 0.65      # 0.5 + 0.3 * (1 - 0.5)
@@ -73,3 +73,71 @@ def test_concept_tools_accept_only_listed_concepts(monkeypatch, tool, args):
 def test_no_topic_parameter_in_tool_schemas():
     assert all("topic" not in s["function"]["parameters"]["properties"] for s in TOOL_SCHEMAS)
 
+
+
+def _system_prompt(monkeypatch, **switches):
+    """The system prompt the tutor's first LLM call gets."""
+    sent = []
+    def chat(messages, model, **kw):
+        sent.append(messages[0]["content"])
+        return {"message": {"role": "assistant", "content": "hi"}, "usage": {"in": 1, "out": 1}, "cached": False}
+    monkeypatch.setattr(s1_llm, "chat", chat)
+    turn("hello", "alice", 1, **switches)
+    return sent[0]
+
+
+def _remembered_student():
+    learner.add_concepts("alice", "notes.pdf", ["LoRA"])
+    learner.update_mastery("alice", "LoRA", False, wrong_belief="LoRA retrains every weight")
+    learner.add_session_note("alice", "Struggled with rank in LoRA.")
+
+
+def test_memory_none_leaves_the_student_out_of_the_system_prompt(monkeypatch):
+    _remembered_student()
+    system = _system_prompt(monkeypatch, memory="none")
+    assert "lora" in system  # the concept list describes the notebook, so it stays
+    assert "0.35" not in system and "retrains every weight" not in system and "rank in LoRA" not in system
+
+
+def test_memory_learner_puts_weak_spots_and_wrong_beliefs_in_the_system_prompt(monkeypatch):
+    _remembered_student()
+    system = _system_prompt(monkeypatch, memory="learner")
+    assert "0.35" in system  # 0.5 + 0.3 * (0 - 0.5)
+    assert "LoRA retrains every weight" in system
+
+
+SESSION = [{"role": "user", "content": "Does LoRA retrain every weight?"},
+           {"role": "assistant", "content": "No, only the low-rank adapters (notes.pdf, 3)."}]
+
+
+def _reflect(monkeypatch, content):
+    monkeypatch.setattr(s1_llm, "chat", lambda *a, **k: {"message": {"role": "assistant", "content": content},
+                                                         "usage": {"in": 7, "out": 3}, "cached": False})
+    return reflection.end_session("alice", SESSION)
+
+
+def test_ending_a_session_stores_one_session_note_and_traces_the_call(monkeypatch, tmp_data):
+    _reflect(monkeypatch, '{"note": "Unsure which weights LoRA trains.", "weak_spots": []}')
+    assert [n["note"] for n in learner.read_all("alice")["session_notes"]] == ["Unsure which weights LoRA trains."]
+    rows = read_trace(tmp_data)
+    assert [(r["kind"], r["purpose"]) for r in rows] == [("llm", "reflection")]
+    assert rows[0]["tokens"] == {"in": 7, "out": 3}
+
+
+def test_reflection_marks_its_listed_concepts_as_weak_spots(monkeypatch):
+    learner.add_concepts("alice", "notes.pdf", ["LoRA", "KV cache"])
+    _reflect(monkeypatch, '{"note": "Mixed up LoRA.", "weak_spots": ["LoRA", "not a concept"]}')
+    assert learner.weak_concepts("alice") == [{"concept": "lora", "score": pytest.approx(0.35)}]  # 0.5 + 0.3 * (0 - 0.5)
+
+
+def test_a_bad_reflection_reply_stores_nothing(monkeypatch):
+    _reflect(monkeypatch, "Sorry, I can't.")
+    assert learner.read_all("alice")["session_notes"] == []
+
+
+def test_session_notes_on_the_memory_page_and_deletable():
+    learner.add_session_note("alice", "Struggled with rank in LoRA.")
+    note = learner.read_all("alice")["session_notes"][0]
+    assert note["note"] == "Struggled with rank in LoRA."
+    learner.delete("alice", "session_notes", note["id"])
+    assert learner.read_all("alice")["session_notes"] == []

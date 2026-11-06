@@ -1,6 +1,6 @@
 """Step 12: the agent loop.
 
-load learner model + recent session notes
+memory 'learner': weak spots + wrong beliefs into the system prompt; 'none': only the concept list
 for step in range(step_cap):
     reply = llm.chat(messages, tools)
     if no tool_calls: break
@@ -33,7 +33,7 @@ from agent.memory import learner
 #   4f: write the final row (every LLM call already wrote its own llm row through s4_trace.traced_chat)
 
 def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_search,
-             passages_fn=stub_passages, search_again=True, guard=True, memory_check=True, faithfulness=True, step_cap=6):
+             passages_fn=stub_passages, search_again=True, guard=True, memory_check=True, faithfulness=True, memory="learner", step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int,
     "faithfulness": the judge's {"supported", "reason"} or None when off, "warning": bool}.
 
@@ -48,20 +48,28 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     off is the unsafe baseline for the poisoning test.
     faithfulness: judge the answer against every passage retrieved this turn; warning is true
     when it still fails after one regeneration.
+    memory: "learner" puts the student's weak spots and wrong beliefs in the system prompt;
+    "none" leaves the student out (the concept list stays, it describes the notebook).
+    The app calls memory.reflection.end_session at session end only with "learner".
     """
+    if memory not in ("none", "learner"):
+        raise ValueError(f"unknown memory variant: {memory!r}")
 
     t_start = time.perf_counter()
     ctx = TurnContext(student_id=student_id, turn=turn, search_fn=search_fn,
                       passages_fn=passages_fn, search_again=search_again, guard=guard,
-                      memory_check=memory_check, faithfulness=faithfulness, step_cap=step_cap)
+                      memory_check=memory_check, faithfulness=faithfulness, memory=memory, step_cap=step_cap)
     system = SYSTEM_PROMPT + (GUARD_PROMPT if guard else "")
     concepts = learner.concepts(student_id)
     if concepts:
         system += "\nConcepts in this notebook (use these exact names in tools): " + ", ".join(concepts)
-    weak = learner.weak_concepts(student_id)
-    if weak:
-        system += ("\nThis student's weak spots (score 0 to 1): " + ", "
-                   .join(f"{w['concept']} {w['score']:.2f}" for w in weak))
+    if memory == "learner":
+        if weak := learner.weak_concepts(student_id):
+            system += ("\nThis student's weak spots (score 0 to 1): " + ", "
+                       .join(f"{w['concept']} {w['score']:.2f}" for w in weak))
+        if beliefs := learner.wrong_beliefs(student_id):
+            system += ("\nWrong beliefs this student showed (never treat them as true): " + "; "
+                       .join(f"{b['concept']}: {b['belief']}" for b in beliefs))
 
     messages = [
         {

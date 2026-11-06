@@ -5,8 +5,9 @@ Every row starts with the same fields, in this order:
 Then, by kind:
 - llm:   purpose, model, tokens {in, out}, cached
          One per LLM call anywhere. purpose is one of: tutor, forced_answer, concepts,
-         quiz, grading, judge, regenerate, search_again. Only llm rows carry tokens.
-         Concept extraction runs at upload, outside a chat turn, so its row has turn 0.
+         quiz, grading, judge, regenerate, search_again, reflection. Only llm rows carry tokens.
+         Concept extraction (at upload) and reflection (at session end) run outside a chat turn,
+         so their rows have turn 0.
 - tool:  tool, inputs (parsed object, or the raw string if the JSON was bad),
          ok, error, duration_ms, result_summary (first 200 chars of the result)
 - final: steps (including a forced answer and a regeneration), cap_hit, searches, tokens {in, out} (sum of the turn's llm rows),

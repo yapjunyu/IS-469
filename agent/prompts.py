@@ -35,3 +35,8 @@ Do not include answers."""
 GRADE_PROMPT = """Grade the student's answer to the question below, using only the passages given.
 Reply with a JSON object only: {"correct": true or false, "hint": "..."}.
 The hint points the student to what to reread. It never states or paraphrases the answer."""
+
+REFLECTION_PROMPT = """You read one finished tutoring session and write the tutor's notes for next time.
+Reply with a JSON object only: {{"note": "...", "weak_spots": ["..."]}}.
+"note" says in one or two sentences what the student struggled with or got wrong.
+"weak_spots" lists the concepts they struggled with, using these exact names: {known}."""

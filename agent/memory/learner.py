@@ -4,8 +4,9 @@ Tables:
   mastery        score per concept (0 to 1), last updated
   wrong_beliefs  a misconception, its concept, when it was seen
   facts          true claims only, each with the id of the passage that supports it
+  session_notes  what the student struggled with in one past session, written by reflection
   concepts       the notebook's concept list, one row per (concept, file); not on the memory page
-shortcut: session-notes vector store not built yet, add when the memory page needs it
+shortcut: session notes are not embedded yet, add with the vector memory variant (ticket 10)
 """
 
 import re
@@ -36,13 +37,18 @@ CREATE TABLE IF NOT EXISTS facts (
     fact     TEXT NOT NULL,
     passage_id TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS session_notes (
+    id      INTEGER PRIMARY KEY,
+    note    TEXT NOT NULL,
+    written REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS concepts (
     concept TEXT NOT NULL,
     file    TEXT NOT NULL,
     PRIMARY KEY (concept, file)
 );
 """
-TABLE_KEYS = {"mastery": "concept", "wrong_beliefs": "id", "facts": "id"}
+TABLE_KEYS = {"mastery": "concept", "wrong_beliefs": "id", "facts": "id", "session_notes": "id"}
 
 # Setup comms w/ DB
 #   checks student_id if exist, if not create a new table for them
@@ -118,7 +124,20 @@ def weak_concepts(student_id, limit=3, below=0.6):
         ).fetchall()
     return [dict(r) for r in rows]
 
-# Returns every row of all 3 tables. Used in memory page to show everything the agent remembers
+def add_session_note(student_id, note):
+    """Store reflection's summary of one session."""
+    with _db(student_id) as conn:
+        conn.execute("INSERT INTO session_notes (note, written) VALUES (?, ?)", (note, time.time()))
+
+
+# shortcut: limit hardcoded, move to config.yaml once the team agrees on it
+def wrong_beliefs(student_id, limit=5):
+    """The latest wrong beliefs, newest first, for the system prompt."""
+    with _db(student_id) as conn:
+        rows = conn.execute("SELECT concept, belief FROM wrong_beliefs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+# Returns every row of the memory-page tables. Used in memory page to show everything the agent remembers
 def read_all(student_id):
     """Everything the tutor remembers, for the memory page."""
     with _db(student_id) as conn:
