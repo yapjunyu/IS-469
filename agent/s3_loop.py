@@ -12,9 +12,9 @@ write the final trace row (see s4_trace for the row format)
 import json
 import time
 
-from agent.prompts import SYSTEM_PROMPT
-from agent.s2_tools import TOOL_SCHEMAS, TurnContext, run_tool
-from agent import s4_trace
+from agent.prompts import GUARD_PROMPT, SYSTEM_PROMPT
+from agent.s2_tools import TOOL_SCHEMAS, TurnContext, run_tool, stub_search
+from agent import s4_trace, s6_guard
 from agent.memory import learner
 
 # shortcut: hardcoded, move to config.yaml once the team agrees on it
@@ -34,17 +34,20 @@ MODEL = "llama-3.3-70b-versatile"
 #   4e: repeat itself until meet turn cap
 #   4f: write the final row (every LLM call already wrote its own llm row through s4_trace.traced_chat)
 
-def run_turn(user_message, student_id, turn, *, history=None, search_again=True, guard=True, step_cap=6):
+def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_search,
+             search_again=True, guard=True, step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int}.
 
     turn: the app's turn number, written on every trace row.
     history: earlier {"role": "user"/"assistant", "content": ...} messages, so quiz
     answers can be graded against the question asked last turn.
+    search_fn: search(student_id, query) -> [{id, file, page, text}, ...].
     """
 
     t_start = time.perf_counter()
-    ctx = TurnContext(student_id=student_id, turn=turn, search_again=search_again, guard=guard, step_cap=step_cap)
-    system = SYSTEM_PROMPT
+    ctx = TurnContext(student_id=student_id, turn=turn, search_fn=search_fn,
+                      search_again=search_again, guard=guard, step_cap=step_cap)
+    system = SYSTEM_PROMPT + (GUARD_PROMPT if guard else "")
     concepts = learner.concepts(student_id)
     if concepts:
         system += "\nConcepts in this notebook (use these exact names in tools): " + ", ".join(concepts)
@@ -91,8 +94,10 @@ def run_turn(user_message, student_id, turn, *, history=None, search_again=True,
                              duration_ms=round((time.perf_counter() - t0) * 1000),
                              result_summary=json.dumps(result)[:200])
 
-            citations += [{"file": c["file"], "page": c["page"]} for c in result.get("chunks", [])]
-            messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)})
+            citations += [{"file": c["file"], "page": c["page"]} for c in result.get("passages", [])]
+            content = (s6_guard.wrap_passages(result["passages"]) if guard and "passages" in result
+                       else json.dumps(result))
+            messages.append({"role": "tool", "tool_call_id": call["id"], "content": content})
     else:
         # cap hit: one last call with tools off, so it must answer from what it has
         ctx.step, cap_hit = step_cap + 1, True

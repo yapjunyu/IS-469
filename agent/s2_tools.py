@@ -3,13 +3,21 @@
 - TOOL_SCHEMAS: JSON schemas passed to the LLM (name, description, typed params).
 - run_tool(): parse the JSON `arguments` string, validate inputs, dispatch.
   Bad JSON or an unknown tool name returns an error dict, never raises.
-- search_notes comes from retrieval (teammate); stub it until ready.
+- search_notes calls the search function passed into run_turn (retrieval teammate's);
+  stub_search until it lands.
 - update_mastery talks to the learner model (teammate); stub it until ready.
 """
 
 import json
 from dataclasses import dataclass, field
+from typing import Callable
 from agent.memory import  learner
+
+
+# shortcut: stub, the app passes the retrieval teammate's search(student_id, query) once it lands
+def stub_search(student_id, query):
+    """The search function's shape: a list of passages, each with id, file, page and text."""
+    return [{"id": "stub-1", "file": "stub.pdf", "page": 1, "text": f"Stub passage about {query}."}]
 
 # Context to be sent in for every tool call as "ctx"
 @dataclass
@@ -20,6 +28,8 @@ class TurnContext:
     # running totals for the turn, so LLM calls made inside tools count too
     tokens: dict = field(default_factory=lambda: {"in": 0, "out": 0})
     searches: int = 0
+    passage_ids: list = field(default_factory=list)  # every passage retrieved this turn
+    search_fn: Callable = stub_search
     search_again: bool = True
     guard: bool = True
     step_cap: int = 6
@@ -33,18 +43,12 @@ def _check_concept(ctx, concept):
     if known and learner.norm(concept) not in known:
         return {"error": f"Unknown concept {concept!r}. Use one of: {', '.join(known)}"}
 
-# Shortcut: stub, swap for retrieval teammate's search(student_id, query) when ready
 def search_notes(ctx, query):
     ctx.searches += 1
-    return {
-        "chunks":
-            [
-                {
-                    "file": "stub.pdf", "page": 1,
-                    "text": f"Stub passage about {query}."
-                 }
-            ]
-    }
+    # keep only the fields the tutor needs, whatever else the search returns (scores etc.)
+    passages = [{k: p[k] for k in ("id", "file", "page", "text")} for p in ctx.search_fn(ctx.student_id, query)]
+    ctx.passage_ids += [p["id"] for p in passages]
+    return {"passages": passages}
 
 # Shortcut: stub, replace with an s4_trace.traced_chat call over retrieved passages
 def make_quiz(ctx, concept, n=3):
