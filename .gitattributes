@@ -1,2 +1,0 @@
-# shell scripts break with CRLF line endings
-.githooks/* text eol=lf

@@ -57,11 +57,6 @@ def _db(student_id):
     conn.row_factory = sqlite3.Row
     try:
         conn.executescript(SCHEMA)
-        try:  # databases made before the glossary settled on "passage"
-            conn.execute("ALTER TABLE facts RENAME COLUMN chunk_id TO passage_id")
-        except sqlite3.OperationalError as e:
-            if "no such column" not in str(e):
-                raise
         with conn:          # commits, or rolls back on error
             yield conn
     finally:

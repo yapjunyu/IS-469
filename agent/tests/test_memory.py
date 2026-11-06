@@ -64,14 +64,3 @@ def test_concept_tools_accept_only_listed_concepts(tool, args):
 def test_no_topic_parameter_in_tool_schemas():
     assert all("topic" not in s["function"]["parameters"]["properties"] for s in TOOL_SCHEMAS)
 
-
-def test_fact_stored_in_a_database_made_before_the_passage_rename(tmp_data):
-    import sqlite3
-    (tmp_data / "students").mkdir()
-    with sqlite3.connect(tmp_data / "students" / "alice.sqlite") as old:
-        old.execute("CREATE TABLE facts (id INTEGER PRIMARY KEY, concept TEXT NOT NULL,"
-                    " fact TEXT NOT NULL, chunk_id TEXT NOT NULL)")
-        old.execute("INSERT INTO facts (concept, fact, chunk_id) VALUES ('lora', 'old fact', 'p0')")
-    learner.add_fact("alice", "LoRA", "LoRA adds low-rank matrices", passage_id="p1")
-    assert [(f["fact"], f["passage_id"]) for f in learner.read_all("alice")["facts"]] == [
-        ("old fact", "p0"), ("LoRA adds low-rank matrices", "p1")]

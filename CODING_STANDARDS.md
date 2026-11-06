@@ -1,6 +1,6 @@
 # Coding standards
 
-Rules a reviewer applies to every diff. Each is a judgement call. Mechanical rules live in ruff (`pyproject.toml`) and in tests (`agent/tests/test_seams.py`, `agent/tests/conftest.py`), so they fail on their own.
+Rules a reviewer applies to every diff. Each is a judgement call. Mechanical rules live in tests instead (`agent/tests/test_seams.py`, `agent/tests/conftest.py`), so they fail on their own.
 
 ## Known limits
 
