@@ -32,7 +32,7 @@ from agent.memory import learner
 #   4f: write the final row (every LLM call already wrote its own llm row through s4_trace.traced_chat)
 
 def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_search,
-             passages_fn=stub_passages, search_again=True, guard=True, step_cap=6):
+             passages_fn=stub_passages, search_again=True, guard=True, memory_check=True, step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int}.
 
     turn: the app's turn number, written on every trace row.
@@ -40,11 +40,14 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     answers can be graded against the question asked last turn.
     search_fn: search(student_id, query) -> [{id, file, page, text}, ...].
     passages_fn: get_passages(student_id, ids) -> the passages with those ids, same shape.
+    memory_check: remember_fact stores only facts citing a passage retrieved this turn;
+    off is the unsafe baseline for the poisoning test.
     """
 
     t_start = time.perf_counter()
     ctx = TurnContext(student_id=student_id, turn=turn, search_fn=search_fn,
-                      passages_fn=passages_fn, search_again=search_again, guard=guard, step_cap=step_cap)
+                      passages_fn=passages_fn, search_again=search_again, guard=guard,
+                      memory_check=memory_check, step_cap=step_cap)
     system = SYSTEM_PROMPT + (GUARD_PROMPT if guard else "")
     concepts = learner.concepts(student_id)
     if concepts:

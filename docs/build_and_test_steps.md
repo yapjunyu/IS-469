@@ -18,7 +18,7 @@ The step-by-step plan from Section 5 of [`IS469_Project_Plan_Study_Tutor_General
 | 8 | Config file | — | — |
 | 9 | Saved AI responses | 8 | — |
 | 10 | Learner model (SQLite) | 6 | Topic 7 (slide 44) |
-| 11 | The four tools | 7, 10 | Topic 7 (slides 7–9) |
+| 11 | The five tools | 7, 10 | Topic 7 (slides 7–9) |
 | 12 | Agent loop | 11 | Topic 7 (slides 13–16) |
 | 13 | Search-again | 7, 12 | Topic 8 (slides 47–48) |
 | 14 | Trace file | 12 | Topic 7 (slides 14, 57) |
@@ -206,7 +206,7 @@ Keeping beliefs and facts apart means the tutor never learns something false fro
 
 **Done when** each student's database is separate, and the memory page (step 17) can read, edit and delete every row.
 
-### Step 11. The four tools: the tutor's buttons
+### Step 11. The five tools: the tutor's buttons
 
 Each tool has a name, a short description and typed inputs, so the AI knows when and how to use it (Topic 7, slides 7–9).
 
@@ -216,8 +216,11 @@ Each tool has a name, a short description and typed inputs, so the AI knows when
 | `make_quiz` | `concept: str`, `n: int` (1–5) | Questions grounded in the student's files, each with the ids of its passages; never answers |
 | `grade_answer` | `question: str`, `student_answer: str`, `passage_ids: list[str]` | Correct or not, plus a hint (not the answer), graded against those passages |
 | `update_mastery` | `concept: str`, `correct: bool`, optional `wrong_belief: str` | Updated score |
+| `remember_fact` | `concept: str`, `fact: str`, `passage_id: str` | Ok, or an error if the passage was not retrieved in this turn |
 
-`make_quiz` and `update_mastery` accept only a concept from the notebook's concept list (step 6). An unknown name returns an error that lists the valid concepts, so the LLM can retry. While a notebook has no concepts yet, any name is accepted (a shortcut until ingest always runs extraction).
+`make_quiz`, `update_mastery` and `remember_fact` accept only a concept from the notebook's concept list (step 6). An unknown name returns an error that lists the valid concepts, so the LLM can retry. While a notebook has no concepts yet, any name is accepted (a shortcut until ingest always runs extraction).
+
+The memory-write check (a `run_turn` switch, on by default) lets `remember_fact` store a fact only if its passage was retrieved in this turn: returned by `search_notes` or `make_quiz`'s search, or fetched by `grade_answer`. With the check off, any fact is stored; this is the unsafe baseline for the poisoning test (step 25).
 
 **Done when** each tool works when called directly, and its schema is passed to the LLM.
 

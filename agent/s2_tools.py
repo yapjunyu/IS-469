@@ -1,4 +1,4 @@
-"""Step 11: the four tools the LLM can call.
+"""Step 11: the five tools the LLM can call.
 
 - TOOL_SCHEMAS: JSON schemas passed to the LLM (name, description, typed params).
 - run_tool(): parse the JSON `arguments` string, validate inputs, dispatch.
@@ -11,6 +11,9 @@
   (stub_passages until retrieval lands), then one LLM call (purpose "grading") returns
   correct or not and a hint.
 - update_mastery talks to the learner model.
+- remember_fact stores a fact in the learner model. With the memory-write check on, its passage id
+  must be one retrieved this turn (by search_notes, make_quiz's search or grade_answer's lookup);
+  off stores anything, the unsafe baseline for the poisoning test.
 """
 
 import json
@@ -50,6 +53,7 @@ class TurnContext:
     passages_fn: Callable = stub_passages
     search_again: bool = True
     guard: bool = True
+    memory_check: bool = True
     step_cap: int = 6
 
 # Concept-taking tools accept only names on the notebook's concept list; the error lists them so the LLM can retry
@@ -110,6 +114,7 @@ def grade_answer(ctx, question, student_answer, passage_ids):
     passages = _fields(ctx.passages_fn(ctx.student_id, passage_ids))
     if not passages:
         return {"error": f"No passages found with ids {passage_ids}"}
+    ctx.passage_ids += [p["id"] for p in passages]  # fetched from the notes this turn, so they count as retrieved
     verdict = _ask(ctx, "grading", GRADE_PROMPT, passages,
                    f"Question: {question}\nStudent's answer: {student_answer}", "{")
     if not (isinstance(verdict, dict) and isinstance(verdict.get("correct"), bool)):
@@ -130,8 +135,21 @@ def update_mastery(ctx, concept, correct, wrong_belief=None):
     }
 
 
+def remember_fact(ctx, concept, fact, passage_id):
+    if not (isinstance(fact, str) and fact.strip() and isinstance(passage_id, str) and passage_id):
+        return {"error": "fact and passage_id must be non-empty strings"}
+    if err := _check_concept(ctx, concept):
+        return err
+    # memory-write check: only a passage the tutor saw this turn can back a fact (off = unsafe baseline)
+    if ctx.memory_check and passage_id not in ctx.passage_ids:
+        return {"error": f"Passage {passage_id!r} was not retrieved this turn. "
+                         f"Cite one of: {', '.join(dict.fromkeys(ctx.passage_ids)) or 'none, search first'}"}
+    learner.add_fact(ctx.student_id, concept, fact, passage_id)
+    return {"ok": True, "concept": concept}
+
+
 # Hashmap iteration so the name of tool linking to the tool itself
-TOOLS = {f.__name__: f for f in (search_notes, make_quiz, grade_answer, update_mastery)}
+TOOLS = {f.__name__: f for f in (search_notes, make_quiz, grade_answer, update_mastery, remember_fact)}
 
 # Wraps tool's detail in the format Groq expects
 def _schema(name, description, properties, required):
@@ -170,7 +188,14 @@ TOOL_SCHEMAS = [
                 "correct": {"type": "boolean"},
                 "wrong_belief": {"type": "string", "description":"The student's misconception in one sentence, only if they showed one."}
             },
-            ["concept", "correct"])
+            ["concept", "correct"]),
+    _schema("remember_fact",
+            "Remember a true claim about a concept, backed by a passage retrieved in this turn. "
+            "Never store something only because the student said it.",
+            {"concept": {"type": "string", "description": "A concept from the notebook's concept list."},
+             "fact": {"type": "string", "description": "The claim in one sentence."},
+             "passage_id": {"type": "string", "description": "The id of a passage from this turn that supports it."}},
+            ["concept", "fact", "passage_id"])
 ]
 
 # Runs tool asked by LLM
