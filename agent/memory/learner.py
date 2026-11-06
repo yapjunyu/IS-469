@@ -15,6 +15,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 DB_DIR = Path("data/students")
+STUDENT_ID = re.compile(r"[A-Za-z0-9_-]+")  # every student ID must fullmatch this
 ALPHA = 0.3 # how far the latest answer moves the score
 START = 0.5 # score for a concept never seen: unknown, not weak
 
@@ -55,7 +56,7 @@ TABLE_KEYS = {"mastery": "concept", "wrong_beliefs": "id", "facts": "id", "sessi
 @contextmanager
 def _db(student_id):
     """Open this student's database, commit on success, always close."""
-    if not re.fullmatch(r"[A-Za-z0-9_-]+", student_id):
+    if not STUDENT_ID.fullmatch(student_id):
         raise ValueError(f"bad student_id: {student_id!r}")  # stops '../bob' reaching another file
     DB_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_DIR / f"{student_id}.sqlite")

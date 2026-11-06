@@ -26,6 +26,7 @@ from tutor.retrieval.clean import clean_pages  # noqa: E402
 from tutor.retrieval.embed import Embedder  # noqa: E402
 from tutor.retrieval.extract import extract, file_sha256  # noqa: E402
 from tutor.retrieval.search import DEFAULT_CHROMA_DIR, ChromaIndex, ChromaTextOnly, HybridRerankIndex  # noqa: E402
+from tutor.retrieval.types import PageRecord  # noqa: E402
 
 # chunk_pages arguments per page kind: one chunk per slide; documents recursive 200 words, 30-word overlap
 CHUNKING = {"slide": dict(slide_method="slide"), "page": dict(method="recursive", chunk_size=200, chunk_overlap=30)}
@@ -42,6 +43,16 @@ def corpus_files() -> list[Path]:
     return sorted(files, key=lambda p: p.name)
 
 
+def store_pages(store: ChromaIndex, pages: list[PageRecord], digest: str) -> None:
+    """Chunk one file's cleaned pages and store them. `digest` is the file's fingerprint."""
+    store.add_file(chunk_pages(pages, digest, **CHUNKING[pages[0].kind]))
+
+
+def search_index(store: ChromaIndex, reranker=None) -> HybridRerankIndex:
+    """The chosen search method over everything in `store`."""
+    return HybridRerankIndex(store.chunks, store.embed, dense=store, text_dense=ChromaTextOnly(store), model=reranker)
+
+
 def build_index(files: list[Path], embed=None, path=DEFAULT_CHROMA_DIR, reranker=None) -> HybridRerankIndex:
     """Extract, clean, chunk and embed any file that isn't stored yet, and return the search index."""
     embed = embed or Embedder(EMBEDDER)
@@ -49,9 +60,8 @@ def build_index(files: list[Path], embed=None, path=DEFAULT_CHROMA_DIR, reranker
     for file in files:
         digest = file_sha256(file)
         if not store.has_file(digest):
-            pages = clean_pages(extract(file, images=True))
-            store.add_file(chunk_pages(pages, digest, **CHUNKING[pages[0].kind]))
-    return HybridRerankIndex(store.chunks, embed, dense=store, text_dense=ChromaTextOnly(store), model=reranker)
+            store_pages(store, clean_pages(extract(file, images=True)), digest)
+    return search_index(store, reranker)
 
 
 def ask(question: str, index, llm=None) -> Answer:
