@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Local markdown: specs and tickets live under `.scratch/<feature>/` (gitignored). See `docs/agents/issue-tracker.md`.
+Before starting or closing a ticket, read `docs/agents/issue-tracker.md`. Specs and tickets live under `.scratch/<feature>/` (gitignored).
 
 ### Triage labels
 
