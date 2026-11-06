@@ -10,8 +10,7 @@ from agent.prompts import CONCEPTS_PROMPT
 from agent.s2_tools import TurnContext, reply_json
 from agent.s3_loop import MODEL
 
-# shortcut: reads only the start of a file to stay under Groq's free-tier token limit, so concepts
-# late in a long PDF are missed; upgrade to per-passage extraction on a paid tier
+# shortcut: reads only the start of a file to bound each upload's tokens, so concepts late in a long PDF are missed, move to per-passage extraction once that matters
 MAX_CHARS = 12000
 
 

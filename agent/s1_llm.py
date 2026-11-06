@@ -32,6 +32,8 @@ def _get_client(provider):
     if provider not in _clients:
         if provider == "opencode":
             # os.environ, not getenv: with api_key=None the SDK would send OPENAI_API_KEY to OpenCode
+            # shortcut: base URL and user agent are hard-coded, move to config.yaml once the team agrees on it
+            # shortcut: one session id per process, make it per-conversation if Go asks for it or more than one person uses the app
             _clients[provider] = openai.OpenAI(
                 base_url="https://opencode.ai/inference/go/openai/v1", api_key=os.environ["OPENCODE_API_KEY"],
                 max_retries=5,
@@ -55,8 +57,8 @@ def _call_with_retry(provider, request, attempts=3):
                 raise
 
 # 1. Build request: model, messages, temp, len limit is compulsory. Tool added only if needed
-# 2. Check cache, if question same as one in cached, will return the answer w/o calling Groq
-# 3. Call Groq and dump the results in hashmap
+# 2. Check cache, if question same as one in cached, will return the answer w/o calling the provider
+# 3. Call the provider and dump the results in hashmap
 # 4. Write result to cache file
 def chat(messages, model,
          tools=None, tool_choice="auto",
@@ -73,14 +75,18 @@ def chat(messages, model,
         request["tools"] = tools
         request["tool_choice"] = tool_choice
 
-    # shortcut: only gpt- IDs route to OpenAI, add o-series prefixes if the team ever uses them
-    provider = "openai" if model.startswith("gpt-") else "groq"
     if model.startswith(OPENCODE_PREFIX):
         provider = "opencode"
         request["model"] = model.removeprefix(OPENCODE_PREFIX)
         # DeepSeek's thinking defaults to on and then needs reasoning_content sent back; the loop and history drop it
         # shortcut: set for every Go model, make it per-model if the tutor leaves DeepSeek
         request["extra_body"] = {"thinking": {"type": "disabled"}}
+    elif model.startswith("gpt-"):
+        # shortcut: only gpt- IDs route to OpenAI, add o-series prefixes if the team ever uses them
+        provider = "openai"
+    else:
+        provider = "groq"
+
     if model.startswith("gpt-5"):
         del request["temperature"]
         request["max_completion_tokens"] = request.pop("max_tokens")

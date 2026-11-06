@@ -85,22 +85,23 @@ def test_trace_rows_name_the_tutor_model_and_judge_stays_on_openai(monkeypatch, 
             return reply(SEARCH_CALL)
         return reply({"role": "assistant", "content": '{"supported": false, "enough": true, "reason": "why", "note": "n"}'})
     monkeypatch.setattr(s1_llm, "chat", chat)
-    search, get = (lambda s, q: PASSAGES), (lambda s, ids: PASSAGES)
-    turn("What is LoRA?", "alice", 1, search_fn=search, passages_fn=get, faithfulness=True, search_again=True)  # tutor, search_again, judge, regenerate
+    search, get_passages = (lambda s, q: PASSAGES), (lambda s, ids: PASSAGES)
+    turn("What is LoRA?", "alice", 1, search_fn=search, passages_fn=get_passages, faithfulness=True, search_again=True)  # tutor, search_again, judge, regenerate
     monkeypatch.setattr(s1_llm, "chat", always_search)
     turn("loop", "alice", 2, step_cap=1, search_fn=search)  # forced_answer
     monkeypatch.setattr(s1_llm, "chat", chat)
     learner.add_concepts("alice", "lec3.pdf", ["lora"])
-    ctx = tool_ctx(search_fn=search, passages_fn=get)
+    ctx = tool_ctx(search_fn=search, passages_fn=get_passages)
     run_tool("make_quiz", '{"concept": "lora"}', ctx)
     run_tool("grade_answer", '{"question": "q", "student_answer": "a", "passage_ids": ["p1"]}', ctx)
     ingest.extract_concepts("alice", "lec3.pdf", "text")
     reflection.end_session("alice", [{"role": "user", "content": "hi"}])
-    models = {r["purpose"]: r["model"] for r in read_trace(tmp_data) if r["kind"] == "llm"}
-    tutor = "opencode-go/deepseek-v4.1-flash"
-    assert models == {"tutor": tutor, "forced_answer": tutor, "regenerate": tutor, "quiz": tutor, "grading": tutor,
-                      "search_again": tutor, "concepts": tutor, "reflection": tutor,
-                      "judge": "gpt-5.4-mini-2026-03-17"}
+    rows = [r for r in read_trace(tmp_data) if r["kind"] == "llm"]
+    assert {r["purpose"] for r in rows} == {"tutor", "forced_answer", "regenerate", "quiz", "grading", "search_again",
+                                            "concepts", "reflection", "judge"}
+    wrong = [r for r in rows if r["model"] != ("gpt-5.4-mini-2026-03-17" if r["purpose"] == "judge"
+                                               else "opencode-go/deepseek-v4.1-flash")]
+    assert wrong == []
 
 
 def test_gpt5_request_has_no_temperature_and_uses_max_completion_tokens(monkeypatch):
@@ -114,7 +115,6 @@ def test_gpt5_request_has_no_temperature_and_uses_max_completion_tokens(monkeypa
 
 def test_setting_the_tutor_model_switches_the_passage_calls_too(monkeypatch):
     from agent import s2_tools
-    from agent.tests.test_loop import tool_ctx
     sent = []
     monkeypatch.setattr(s1_llm, "chat", lambda messages, model, **kw: sent.append(model) or
                         {"message": {"role": "assistant", "content": "{}"}, "usage": {"in": 1, "out": 1}, "cached": False})
