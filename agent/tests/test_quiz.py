@@ -28,7 +28,7 @@ def test_quiz_returns_questions_and_passage_ids_but_no_answers(monkeypatch):
         {"question": "What does LoRA add?", "answer": "low-rank matrices", "passage_ids": ["p1"]},
         {"question": "What is r?", "model_answer": "the rank", "passage_ids": ["p2", "made-up"]},
         {"question": "Why low rank?", "passage_ids": ["made-up"]}]))
-    ctx = TurnContext(student_id="alice", search_fn=fake_search)
+    ctx = TurnContext(student_id="alice", search_fn=fake_search, search_again=False)
     out = run_tool("make_quiz", '{"concept": "LoRA", "n": 3}', ctx)
     assert out == {"questions": [{"question": "What does LoRA add?", "passage_ids": ["p1"]},
                                  {"question": "What is r?", "passage_ids": ["p2"]},
@@ -59,7 +59,7 @@ GRADE = ("grade_answer", {"question": "What does LoRA add?", "student_answer": "
 def test_guard_on_wraps_passages_in_markers_off_sends_plain_json(monkeypatch, tool, args, llm_reply):
     sent = fake_chat(monkeypatch, llm_reply, llm_reply)
     for guard in (True, False):
-        ctx = TurnContext(student_id="alice", search_fn=fake_search, passages_fn=lookup, guard=guard)
+        ctx = TurnContext(student_id="alice", search_fn=fake_search, passages_fn=lookup, guard=guard, search_again=False)
         assert "error" not in run_tool(tool, json.dumps(args), ctx)
     on, off = (next(m["content"] for m in s if m["role"] == "user") for s in sent)
     assert '<document id="p1" file="lec3.pdf" page="12">\nLoRA adds low-rank matrices.\n</document>' in on

@@ -1,9 +1,9 @@
 """The judge checks the final answer against every passage retrieved in the turn, before the student sees it."""
 import json
 
-from agent import s1_llm, s3_loop
+from agent import s1_llm
 from agent.s7_faithfulness import JUDGE_MODEL
-from agent.tests.test_loop import SEARCH_CALL, read_trace, reply
+from agent.tests.test_loop import SEARCH_CALL, read_trace, reply, turn
 
 PASSAGES = [{"id": "p1", "file": "lec3.pdf", "page": 12, "text": "LoRA adds low-rank matrices."}]
 
@@ -20,8 +20,8 @@ def run(monkeypatch, *verdicts, **switches):
         supported = next(verdicts)
         return reply({"role": "assistant", "content": json.dumps({"supported": supported, "reason": "why"})}, 50, 8)
     monkeypatch.setattr(s1_llm, "chat", chat)
-    out = s3_loop.run_turn("What is LoRA?", "alice", 1, search_fn=lambda s, q: PASSAGES,
-                           passages_fn=lambda s, ids: [p for p in PASSAGES if p["id"] in ids], **switches)
+    out = turn("What is LoRA?", "alice", 1, search_fn=lambda s, q: PASSAGES,
+               passages_fn=lambda s, ids: [p for p in PASSAGES if p["id"] in ids], **{"faithfulness": True, **switches})
     return out, judged
 
 

@@ -26,7 +26,7 @@ def always_search(messages, model, tools=None, tool_choice="auto", **kw):
 
 
 # switches that add LLM calls a scripted fake would not answer; add each new one here
-EXTRA_CALLS_OFF = {"faithfulness": False}
+EXTRA_CALLS_OFF = {"faithfulness": False, "search_again": False}
 
 
 def turn(*args, **switches):

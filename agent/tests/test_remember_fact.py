@@ -16,7 +16,7 @@ def remember(ctx, **changes):
 
 
 def test_check_on_stores_a_fact_citing_a_passage_searched_this_turn():
-    ctx = TurnContext(student_id="alice", search_fn=fake_search)
+    ctx = TurnContext(student_id="alice", search_fn=fake_search, search_again=False)
     run_tool("search_notes", '{"query": "LoRA"}', ctx)
     assert remember(ctx) == {"ok": True, "concept": "LoRA"}
     assert [(f["concept"], f["fact"], f["passage_id"]) for f in learner.read_all("alice")["facts"]] == \
@@ -24,7 +24,7 @@ def test_check_on_stores_a_fact_citing_a_passage_searched_this_turn():
 
 
 def test_check_on_refuses_a_passage_not_retrieved_this_turn_and_stores_nothing():
-    ctx = TurnContext(student_id="alice", search_fn=fake_search)
+    ctx = TurnContext(student_id="alice", search_fn=fake_search, search_again=False)
     run_tool("search_notes", '{"query": "LoRA"}', ctx)
     assert "error" in remember(ctx, passage_id="p9")
     assert "error" in remember(TurnContext(student_id="alice"))  # p1 from an earlier turn's context does not count

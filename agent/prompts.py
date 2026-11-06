@@ -16,7 +16,10 @@ for example ["LoRA", "KV cache"]. Reply with the list only.
 Concepts already in the notebook: {known}.
 If the file teaches one of these, use that exact name instead of a synonym."""
 
-SEARCH_AGAIN_PROMPT = ""    # "are these passages enough? yes/no + rephrased query"
+SEARCH_AGAIN_PROMPT = """You check whether passages from the student's notes are enough to answer a search query.
+Reply with a JSON object only: {"enough": true or false, "query": "..."}.
+If they are not enough, "query" is the search rephrased to find better passages
+(other words, a synonym, a narrower or broader topic). If they are enough, "query" is ""."""
 FAITHFULNESS_PROMPT = """You check a study tutor's answer against passages from the student's notes.
 The answer is supported if every claim about course content in it is stated in the passages.
 Greetings, questions to the student and saying the notes do not cover something need no support.

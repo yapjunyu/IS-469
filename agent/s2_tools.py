@@ -4,7 +4,9 @@
 - run_tool(): parse the JSON `arguments` string, validate inputs, dispatch.
   Bad JSON or an unknown tool name returns an error dict, never raises.
 - search_notes calls the search function passed into run_turn (retrieval teammate's);
-  stub_search until it lands.
+  stub_search until it lands. With search-again on it goes through s5_search_again: up to 3
+  searches, each extra one after an LLM check (purpose "search_again") says the passages are not enough.
+  It returns every query it searched (traced in the tool row) and the last search's passages.
 - make_quiz searches the concept, then one LLM call (purpose "quiz") writes questions from
   those passages. It returns each question with its passage ids, never an answer.
 - grade_answer looks those ids up through the passages function passed into run_turn
@@ -20,7 +22,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Callable
 
-from agent import s4_trace, s6_guard
+from agent import s4_trace, s5_search_again, s6_guard
 from agent.memory import  learner
 from agent.prompts import GRADE_PROMPT, GUARD_PROMPT, QUIZ_PROMPT
 
@@ -72,13 +74,19 @@ def _fields(passages):
 
 
 def search_notes(ctx, query):
-    ctx.searches += 1
-    passages = _fields(ctx.search_fn(ctx.student_id, query))
+    queries = []
+    def search(q):
+        ctx.searches += 1
+        queries.append(q)
+        return _fields(ctx.search_fn(ctx.student_id, q))
+    passages = s5_search_again.search_with_retries(ctx, query, search) if ctx.search_again else search(query)
+    # only the passages the tutor gets count as retrieved, not those of rejected attempts
     ctx.passage_ids += [p["id"] for p in passages]
-    return {"passages": passages}
+    # queries first, so the tool row's result_summary shows every attempt; the tutor is sent only the passages
+    return {"queries": queries, "passages": passages}
 
 def ask(ctx, purpose, prompt, passages, user_text, start, model=MODEL):
-    """One LLM call over the passages (quiz, grading, judge). Returns the reply's JSON value starting at `start` ("[" or "{"), or None."""
+    """One LLM call over the passages (quiz, grading, judge, search_again). Returns the reply's JSON value starting at `start` ("[" or "{"), or None."""
     system = prompt + (GUARD_PROMPT if ctx.guard else "")
     messages = [{"role": "system", "content": system},
                 {"role": "user", "content": s6_guard.material(passages, ctx.guard) + "\n\n" + user_text}]

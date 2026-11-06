@@ -258,7 +258,7 @@ Every LLM call and every tool call is written down. This is how we prove the age
 
 One JSONL line per event, in three kinds. Every row starts with `kind, ts, student, turn, step`:
 
-- `llm`: one per LLM call anywhere. `purpose` is one of `tutor`, `forced_answer`, `concepts`, `quiz`, `grading`, `judge`, `regenerate` (later search-again). Only these rows carry tokens.
+- `llm`: one per LLM call anywhere. `purpose` is one of `tutor`, `forced_answer`, `concepts`, `quiz`, `grading`, `judge`, `regenerate`, `search_again`. Only these rows carry tokens.
 - `tool`: one per tool call. `inputs` is the parsed arguments, or the raw string if the JSON was bad.
 - `final`: one per turn, always its last row, with the turn's totals. `steps` counts a forced answer and a regeneration as one step each.
 

@@ -42,6 +42,8 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     answers can be graded against the question asked last turn.
     search_fn: search(student_id, query) -> [{id, file, page, text}, ...].
     passages_fn: get_passages(student_id, ids) -> the passages with those ids, same shape.
+    search_again: rephrase and search again, up to 3 searches, while an LLM check says the passages
+    are not enough; off uses the first result, the fixed-pipeline baseline.
     memory_check: remember_fact stores only facts citing a passage retrieved this turn;
     off is the unsafe baseline for the poisoning test.
     faithfulness: judge the answer against every passage retrieved this turn; warning is true
