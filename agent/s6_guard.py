@@ -4,6 +4,7 @@ With the guard on, each passage goes to the LLM wrapped in <document id=".." fil
 ... </document> markers, and the system prompt says marked text is material, never instructions.
 """
 import html
+import json
 import re
 
 
@@ -17,3 +18,8 @@ def _wrap(p):
 def wrap_passages(passages):
     """Return one string with every passage wrapped in <document> markers."""
     return "\n".join(_wrap(p) for p in passages)
+
+
+def material(passages, guard):
+    """Passages as an LLM sees them: inside markers with the guard on, plain JSON with it off."""
+    return wrap_passages(passages) if guard else json.dumps({"passages": passages})

@@ -213,8 +213,8 @@ Each tool has a name, a short description and typed inputs, so the AI knows when
 | Tool | Inputs (suggested) | Returns |
 |---|---|---|
 | `search_notes` | `query: str` | Top passages with file and page |
-| `make_quiz` | `concept: str`, `n: int` (3–5) | Questions grounded in the student's files |
-| `grade_answer` | `question: str`, `answer: str` | Correct or not, plus a hint (not the answer) |
+| `make_quiz` | `concept: str`, `n: int` (1–5) | Questions grounded in the student's files, each with the ids of its passages; never answers |
+| `grade_answer` | `question: str`, `student_answer: str`, `passage_ids: list[str]` | Correct or not, plus a hint (not the answer), graded against those passages |
 | `update_mastery` | `concept: str`, `correct: bool`, optional `wrong_belief: str` | Updated score |
 
 `make_quiz` and `update_mastery` accept only a concept from the notebook's concept list (step 6). An unknown name returns an error that lists the valid concepts, so the LLM can retry. While a notebook has no concepts yet, any name is accepted (a shortcut until ingest always runs extraction).

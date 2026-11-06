@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from agent import s1_llm
 from agent.memory import  learner
 from agent.s2_tools import TOOL_SCHEMAS, TurnContext, run_tool
 
@@ -53,11 +54,18 @@ def test_removing_a_file_keeps_concepts_another_file_has():
     ("update_mastery", {"correct": True}),
     ("make_quiz", {"n": 2}),
 ])
-def test_concept_tools_accept_only_listed_concepts(tool, args):
+def test_concept_tools_accept_only_listed_concepts(monkeypatch, tool, args):
     learner.add_concepts("alice", "notes.pdf", ["LoRA", "KV cache"])
+    llm_calls = []
+    def chat(messages, model, **kw):
+        llm_calls.append(messages)
+        return {"message": {"role": "assistant", "content": '[{"question": "Q?", "passage_ids": ["stub-1"]}]'},
+                "usage": {"in": 1, "out": 1}, "cached": False}
+    monkeypatch.setattr(s1_llm, "chat", chat)
     ctx = TurnContext(student_id="alice")
     bad = run_tool(tool, json.dumps({"concept": "low-rank adaptation", **args}), ctx)
     assert "kv cache" in bad["error"] and "lora" in bad["error"]
+    assert llm_calls == []
     assert "error" not in run_tool(tool, json.dumps({"concept": " LoRA", **args}), ctx)
 
 

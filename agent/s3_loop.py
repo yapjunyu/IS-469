@@ -13,12 +13,9 @@ import json
 import time
 
 from agent.prompts import GUARD_PROMPT, SYSTEM_PROMPT
-from agent.s2_tools import TOOL_SCHEMAS, TurnContext, run_tool, stub_search
+from agent.s2_tools import MODEL, TOOL_SCHEMAS, TurnContext, run_tool, stub_passages, stub_search
 from agent import s4_trace, s6_guard
 from agent.memory import learner
-
-# shortcut: hardcoded, move to config.yaml once the team agrees on it
-MODEL = "llama-3.3-70b-versatile"
 
 # 1. TurnContext: bundles the student_id and config switches to the current turn (all the loops tgt). Basically giving the turn context on which student it's doing + how many steps alrdy, etc.
 
@@ -35,18 +32,19 @@ MODEL = "llama-3.3-70b-versatile"
 #   4f: write the final row (every LLM call already wrote its own llm row through s4_trace.traced_chat)
 
 def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_search,
-             search_again=True, guard=True, step_cap=6):
+             passages_fn=stub_passages, search_again=True, guard=True, step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int}.
 
     turn: the app's turn number, written on every trace row.
     history: earlier {"role": "user"/"assistant", "content": ...} messages, so quiz
     answers can be graded against the question asked last turn.
     search_fn: search(student_id, query) -> [{id, file, page, text}, ...].
+    passages_fn: get_passages(student_id, ids) -> the passages with those ids, same shape.
     """
 
     t_start = time.perf_counter()
     ctx = TurnContext(student_id=student_id, turn=turn, search_fn=search_fn,
-                      search_again=search_again, guard=guard, step_cap=step_cap)
+                      passages_fn=passages_fn, search_again=search_again, guard=guard, step_cap=step_cap)
     system = SYSTEM_PROMPT + (GUARD_PROMPT if guard else "")
     concepts = learner.concepts(student_id)
     if concepts:
@@ -95,8 +93,7 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
                              result_summary=json.dumps(result)[:200])
 
             citations += [{"file": c["file"], "page": c["page"]} for c in result.get("passages", [])]
-            content = (s6_guard.wrap_passages(result["passages"]) if guard and "passages" in result
-                       else json.dumps(result))
+            content = s6_guard.material(result["passages"], guard) if "passages" in result else json.dumps(result)
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": content})
     else:
         # cap hit: one last call with tools off, so it must answer from what it has
