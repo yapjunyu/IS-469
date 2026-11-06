@@ -2,11 +2,11 @@
 
 ### Issue tracker
 
-Before starting or closing a ticket, read `docs/agents/issue-tracker.md`. Specs and tickets live under `.scratch/<feature>/` (gitignored).
+Before starting or closing a ticket, read `docs/agents/issue-tracker.md`. Specs and tickets live as GitHub issues.
 
 ### Triage labels
 
-The five default labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), recorded as a `Status:` line. See `docs/agents/triage-labels.md`.
+The five default labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), applied as GitHub labels. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
