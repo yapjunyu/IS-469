@@ -50,18 +50,18 @@ def test_pictures_are_attached_numbered_after_the_passages_and_citable():
     llm = FakeLLM("Text says A [1]; the diagram shows B [2].")
     picture = passage(3, "", image_path="fig.png")
     result = answer("q", FakeIndex(passage(2, "text"), picture), llm)
-    assert result.figures == [picture] and result.images_sent == 1
+    assert result.figures == [picture]
     assert llm.images == ["fig.png"]
     assert "[2] (deck.pptx, slide 3)" in llm.prompts[-1] and "Pictures" in llm.prompts[-1]
     assert result.citations() == ["deck.pptx, slide 2", "deck.pptx, slide 3"]
 
 
-def test_only_the_top_pictures_are_sent_but_all_are_returned():
+def test_every_picture_in_the_top_3_is_sent():
     llm = FakeLLM("A [1].")
-    pictures = [passage(n, "", image_path=f"fig{n}.png") for n in (3, 4, 5)]
-    result = answer("q", FakeIndex(passage(2, "text"), *pictures), llm, max_images=2)
-    assert llm.images == ["fig3.png", "fig4.png"]
-    assert result.figures == pictures and result.images_sent == 2
+    pictures = [passage(n, "", image_path=f"fig{n}.png") for n in (3, 4, 5, 6)]
+    result = answer("q", FakeIndex(*pictures), llm)
+    assert llm.images == ["fig3.png", "fig4.png", "fig5.png"]
+    assert result.figures == pictures[:3]
 
 
 def test_a_picture_alone_is_enough_to_answer():

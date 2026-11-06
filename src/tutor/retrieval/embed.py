@@ -1,8 +1,11 @@
 """Turn text and images into embedding vectors with sentence-transformers (plan step 4).
 
 Two multimodal models, so one question can match a text chunk or a figure:
-  gemma2   embeddinggemma-2      740M params, reads 8,192 tokens (Google, open weights)
-  qwen3vl  Qwen3-VL-Embedding-2B 2B params, reads 32K tokens     (Alibaba, open weights)
+  gemma2     embeddinggemma-2    740M params, reads 8,192 tokens (Google, open weights)
+  jinaclip2  jina-clip-v2        865M params, reads 8,192 tokens (Jina AI, CC BY-NC 4.0: non-commercial)
+
+jinaclip2 runs custom code from its Hugging Face repo and does not load on transformers 5, so it has
+its own environment, .venv-jina (see requirements-jina.txt).
 
 One small text-only model, used as the retrieval baseline:
   minilm   all-MiniLM-L6-v2      22M params, reads 256 tokens    (sentence-transformers)
@@ -11,21 +14,25 @@ from functools import lru_cache
 
 import numpy as np
 
-# Each model is trained to embed questions and passages slightly differently.
-# query / doc hold the extrai lo arguments passed to encode(): Gemma 2 has named
-# prompts built in, Qwen3-VL takes an instruction string (passages use its default).
 MODELS = {
     "gemma2": dict(name="google/embeddinggemma-2",
                    query=dict(prompt_name="SearchQuery"), doc=dict(prompt_name="Document"),
-                   max_tokens=8192,  # the model reports no limit of its own
+                   max_tokens=8192,  
                    skip_audio=True),  # text + image only: don't load the 300M audio encoder
-    "qwen3vl": dict(name="Qwen/Qwen3-VL-Embedding-2B",
-                    query=dict(prompt="Retrieve study material that answers the question."),
-                    doc=dict(batch_size=8),  # small batches and half precision fit in 16 GB of memory
-                    half=True),
+    "jinaclip2": dict(name="jinaai/jina-clip-v2",
+                      query=dict(prompt_name="retrieval.query"), doc=dict(batch_size=8),
+                      max_tokens=8192,
+                      load=dict(revision="e10d47f5691d0454a0fb5d13f46f2199b74cb436", trust_remote_code=True)),
     "minilm": dict(name="sentence-transformers/all-MiniLM-L6-v2", query=dict(), doc=dict(), images=False),
 }
 DEFAULT_MODEL = "gemma2"
+
+
+def _as_text(text: str) -> str:
+    """Keep text as text. sentence-transformers treats a string with no spaces that looks like a media
+    link or file (a slide that is only a YouTube URL) as that media, and tries to load it. jinaclip2
+    goes further and downloads any string starting with "http". Tokenizers ignore the added space."""
+    return " " + text if " " not in text or text.startswith(("data:", "http")) else text
 
 
 class Embedder:
@@ -45,7 +52,7 @@ class Embedder:
         self.query_args = spec["query"]
         self.doc_args = spec["doc"]
         self._max_tokens = spec.get("max_tokens")
-        self.model = _load(self.model_name, spec.get("skip_audio", False), spec.get("half", False))
+        self.model = _load(key)
 
     @property
     def max_tokens(self) -> int:
@@ -54,11 +61,11 @@ class Embedder:
 
     def __call__(self, texts: list[str]) -> np.ndarray:
         """Embed passages (chunks)."""
-        return self._encode(texts, self.doc_args)
+        return self._encode([_as_text(t) for t in texts], self.doc_args)
 
     def embed_query(self, text: str) -> np.ndarray:
         """Embed one question."""
-        return self._encode([text], self.query_args)[0]
+        return self._encode([_as_text(text)], self.query_args)[0]
 
     def embed_images(self, paths: list[str]) -> np.ndarray:
         """Embed picture files into the same space as the text. Images get no prompt."""
@@ -76,9 +83,9 @@ class Embedder:
 
 
 @lru_cache(maxsize=None)
-def _load(model_name: str, skip_audio: bool, half: bool = False):
+def _load(key: str):
     # Imported here so modules that only chunk don't pay the slow torch import.
     from sentence_transformers import SentenceTransformer
-    config = {"audio_config": None} if skip_audio else {}
-    model_kwargs = {"torch_dtype": "float16"} if half else {}
-    return SentenceTransformer(model_name, config_kwargs=config, model_kwargs=model_kwargs)
+    spec = MODELS[key]
+    config = {"audio_config": None} if spec.get("skip_audio") else {}
+    return SentenceTransformer(spec["name"], config_kwargs=config, **spec.get("load", {}))

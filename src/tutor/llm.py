@@ -1,6 +1,6 @@
 """
-Calls Gemma through Google's OpenAI-compatible API & cache reply on disk
-Needs GOOGLE_API_KEY (environment or .env) only when a reply is not cached yet.
+Calls a model through OpenRouter's OpenAI-compatible API & cache reply on disk
+Needs OPENROUTER_API_KEY (environment or .env) only when a reply is not cached yet.
 """
 
 import base64
@@ -12,11 +12,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CACHE = ROOT / "data" / "llm_cache"
-BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+BASE_URL = "https://openrouter.ai/api/v1"
 
 
 def strip_thinking(text: str | None) -> str:
-    """Gemma 4 on Google writes its reasoning into the reply as <thought>...</thought>
+    """Gemma 4 can write its reasoning into the reply as <thought>...</thought>
     before the answer, and the thinking can't be switched off. Keep only the answer."""
     text = re.sub(r"<thought>.*?</thought>", "", text or "", flags=re.DOTALL)
     return re.sub(r"<thought>.*", "", text, flags=re.DOTALL).strip()  # cut off before it closed
@@ -79,9 +79,9 @@ class LLM:
         import openai
         from dotenv import load_dotenv
 
-        load_dotenv(ROOT / ".env")  # lets GOOGLE_API_KEY live in .env
+        load_dotenv(ROOT / ".env")  # lets OPENROUTER_API_KEY live in .env
         if self._client is None:
-            self._client = openai.OpenAI(base_url=BASE_URL, api_key=os.environ["GOOGLE_API_KEY"], max_retries=0)
+            self._client = openai.OpenAI(base_url=BASE_URL, api_key=os.environ["OPENROUTER_API_KEY"], max_retries=0)
         extra = {"reasoning_effort": self.reasoning_effort} if self.reasoning_effort else {}
         for attempt in range(self.max_retries):
             try:
@@ -91,7 +91,7 @@ class LLM:
                     temperature=self.temperature,
                     **extra,
                 )
-            # 429 rate limit; 500/503 Google is busy or failed (the same request often works next time)
+            # 429 rate limit; 500/503 the host is busy or failed (the same request often works next time)
             except (openai.RateLimitError, openai.InternalServerError, openai.APIConnectionError) as e:
                 if attempt == self.max_retries - 1:
                     raise

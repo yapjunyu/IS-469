@@ -50,6 +50,101 @@ The agent is a single tool-calling loop with four tools (`search_notes`, `make_q
 
 **Search modes** (set in config): `dense`, `hybrid` (BM25 + dense merged with RRF), or `hybrid + rerank` (top 20 reranked to top 5).
 
+## RAG pipeline
+
+The retrieval and answering part of the tutor runs today from the command line. The tech stack above is the project plan; this section describes what the RAG code actually uses.
+
+### Final setup
+
+All the champion settings are in [`src/tutor/pipeline.py`](src/tutor/pipeline.py). Change them there, and everything that runs the pipeline picks them up.
+
+| Stage | Champion |
+|---|---|
+| Slide chunking | One chunk per slide |
+| Document chunking | Fixed 200 words, 30-word overlap |
+| Embedder | Gemma 2 (`google/embeddinggemma-2`), with image chunks |
+| Search | Dense, top 3 chunks |
+| Answering model | `nvidia/nemotron-3.5-super-vl:free` through OpenRouter |
+
+The RAGAS judge is `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`, set in `eval/ragas_eval.py`. `K` and the answering model are defined in `src/tutor/rag.py`, and `pipeline.py` imports them.
+
+Results and reasons are in [`SUMMARY_minilm_chunking.md`](eval/results/SUMMARY_minilm_chunking.md) (chunking) and [`SUMMARY_jina_vs_gemma2.md`](eval/results/SUMMARY_jina_vs_gemma2.md) (embedder and search).
+
+### Set up
+
+You need Python 3.11 and an [OpenRouter API key](https://openrouter.ai/keys). The corpus is in the repository under `corpora/`.
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+echo 'OPENROUTER_API_KEY=your-key-here' > .env
+.venv/bin/python -m pytest tests
+```
+
+`.env` is ignored by git. Never commit your key.
+
+### Ask the tutor
+
+```bash
+.venv/bin/python src/tutor/pipeline.py "What is cloud computing, and which key problems does it solve?"
+.venv/bin/python src/tutor/pipeline.py     # keeps asking until you press Enter on an empty line
+```
+
+The first run downloads Gemma 2 and embeds the whole corpus, which took about 20 minutes on an Apple M2 with 16 GB of memory. The vectors are saved in `data/`, so later runs start quickly. If you see "I can't find this in your notes", the top 3 chunks did not contain the answer, or the topic is not in the corpus.
+
+To call the pipeline from your own code, such as the agent's `search_notes` tool:
+
+```python
+from tutor.pipeline import ask, build_index, corpus_files
+
+index = build_index(corpus_files())  # or a list of Paths to your own .pptx and PDF files
+result = ask("What is re-ranking?", index)
+
+print(result.readable())    # the answer, with its citations
+print(result.sources)       # the text chunks it read
+print(result.figures)       # the pictures it read
+```
+
+Run it with `src` on your Python path, for example `PYTHONPATH=src .venv/bin/python your_script.py`. To search without calling the LLM, use `index.search("What is re-ranking?", k=3)`.
+
+### Rerun the evaluation
+
+Run these in order. They need no API key, and each one saves its results in `eval/results/`. Vectors are cached, so only the first run of each model is slow.
+
+```bash
+.venv/bin/python eval/run_minilm_chunking.py            # chunking methods
+.venv/bin/python eval/run_minilm_document_sizes.py      # document chunk sizes
+.venv/bin/python eval/run_text_embedders.py minilm      # embedders, text questions
+.venv/bin/python eval/run_text_embedders.py gemma2
+.venv/bin/python eval/run_image_embedders.py gemma2     # embedders, text and images
+.venv/bin/python eval/run_search.py                     # search methods
+```
+
+Jina CLIP v2 does not load on transformers 5, so it has its own environment:
+
+```bash
+.venv/bin/python -m venv .venv-jina
+.venv-jina/bin/python -m pip install -r requirements-jina.txt
+.venv-jina/bin/python eval/run_text_embedders.py jinaclip2
+.venv-jina/bin/python eval/run_image_embedders.py jinaclip2
+
+.venv/bin/python eval/run_text_embedders.py --compare   # paired comparison, from the saved results
+.venv/bin/python eval/run_image_embedders.py --compare
+```
+
+### Score answers with RAGAS
+
+This needs your OpenRouter key. The default set is the 75 questions marked `llm_eval` in `eval/gold/gold.csv`.
+
+```bash
+.venv/bin/python eval/run_generation.py --limit 3   # try a few first
+.venv/bin/python eval/ragas_eval.py sample --limit 3
+.venv/bin/python eval/run_generation.py             # then all 75
+.venv/bin/python eval/ragas_eval.py sample
+```
+
+A text question takes about 9 API calls and an image question about 6, so all 75 take about 630. Free OpenRouter models are limited to 50 requests a day, or 1,000 a day once you add $10 of credit, and can also be rate-limited, so a run may need several days. Answers and judge replies are cached, so rerunning continues where it stopped. Check the `scored` counts in `eval/results/ragas_sample.json`, because a metric that fails is left out of its mean.
+
 ## Getting started
 
 > Setup commands will be added once the one-command launch is in place.
@@ -58,7 +153,7 @@ The agent is a single tool-calling loop with four tools (`search_notes`, `make_q
 2. Launch the app with a single command.
 3. Enter your name or ID, then upload your .pptx or PDF files into your notebook.
 
-AI responses are cached to disk, so reruns of the evaluation are free, repeatable and don't hit Groq rate limits.
+AI responses are cached to disk, so reruns of the evaluation are free, repeatable and don't hit API rate limits.
 
 ## Evaluation
 

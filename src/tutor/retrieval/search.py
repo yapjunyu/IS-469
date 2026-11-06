@@ -16,7 +16,7 @@ from typing import Callable
 import numpy as np
 from rank_bm25 import BM25Okapi
 
-from .types import Chunk, Passage
+from tutor.retrieval.types import Chunk, Passage
 
 # Takes a list of texts and returns one embedding vector per text (one row each).
 EmbedFn = Callable[[list[str]], np.ndarray]

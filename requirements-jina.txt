@@ -1,0 +1,27 @@
+# Only for jina-clip-v2 (jinaclip2 in src/tutor/retrieval/embed.py). Its custom code does not load on
+# transformers 5, so it gets its own environment:
+#
+#   .venv/bin/python -m venv .venv-jina
+#   .venv-jina/bin/python -m pip install -r requirements-jina.txt
+#   .venv-jina/bin/python eval/run_image_embedders.py jinaclip2
+
+# The versions jina-clip-v2 needs
+transformers==4.46.2
+sentence-transformers==3.3.0
+tokenizers==0.20.3
+huggingface_hub==0.26.5
+datasets==3.1.0
+einops==0.8.2
+timm==1.0.31
+
+# The same versions as the main environment, so the two models are compared fairly
+torch==2.15.0
+torchvision==0.29.2
+numpy==2.4.6
+pillow==13.0.0
+pymupdf==2.0
+python-pptx==1.0.2
+rank_bm25==0.2.2
+chromadb==1.5.9
+python-dotenv
+pyyaml

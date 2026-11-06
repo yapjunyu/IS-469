@@ -4,7 +4,7 @@ import unicodedata
 from collections import Counter
 from dataclasses import replace
 
-from .types import PageRecord
+from tutor.retrieval.types import PageRecord
 
 MAX_BOILERPLATE_WORDS = 8  # headers and footers are short; longer lines are always kept
 

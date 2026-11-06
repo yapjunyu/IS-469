@@ -1,0 +1,46 @@
+group,value,dev,test,total,dev_share
+overall,all,102,166,268,0.381
+format,documents,29,33,62,0.468
+format,slides,73,133,206,0.354
+evidence_type,image,20,38,58,0.345
+evidence_type,text,82,128,210,0.39
+format_and_evidence,documents image,5,8,13,0.385
+format_and_evidence,documents text,24,25,49,0.49
+format_and_evidence,slides image,15,30,45,0.333
+format_and_evidence,slides text,58,103,161,0.36
+question_type,conceptual,81,124,205,0.395
+question_type,factual,1,4,5,0.2
+question_type,figure,20,38,58,0.345
+n_parts,1,61,111,172,0.355
+n_parts,2,36,51,87,0.414
+n_parts,3,3,3,6,0.5
+n_parts,4,2,1,3,0.667
+llm_sample,in sample,0,75,75,0.0
+llm_sample,not in sample,102,91,193,0.528
+collection,cloud,25,42,67,0.373
+collection,datasci,11,15,26,0.423
+collection,genai,25,52,77,0.325
+collection,is212,23,39,62,0.371
+collection,softdev,18,18,36,0.5
+file,Lesson1-Introduction.pptx,5,6,11,0.455
+file,Lesson2-Compute.pptx,4,6,10,0.4
+file,Lesson3-StorageDB.pptx,2,9,11,0.182
+file,Lesson4-Network.pptx,2,5,7,0.286
+file,Lesson5-IAM-Security.pptx,1,6,7,0.143
+file,Lesson6-Reliability.pptx,2,4,6,0.333
+file,Lesson7-DevOps.pptx,3,4,7,0.429
+file,Lesson8-Hybrid-Migration.pptx,6,2,8,0.75
+file,OpenStax Principles of Data Science - Ch2 Collecting and Preparing Data.pdf,11,15,26,0.423
+file,Software Development - Requirements Testing Architecture.pdf,18,18,36,0.5
+file,Topic1_TextProcessing_IS469.pdf,2,6,8,0.25
+file,Topic2_Transformers_IS469.pdf,3,6,9,0.333
+file,Topic3_Training_IS469.pdf,5,4,9,0.556
+file,Topic4_Efficient_FineTuning_IS469new.pdf,4,8,12,0.333
+file,Topic6_Evaluation.pdf,6,8,14,0.429
+file,Topic7_Agentic_IS469.pdf,3,9,12,0.25
+file,Topic8_AgenticRAG_MITB.pdf,2,11,13,0.154
+file,Week1b-SWDevProcess.pdf,4,8,12,0.333
+file,Week2-UserStories.pdf,5,7,12,0.417
+file,Week3-Estimation_ScrumMeetings.pdf,5,8,13,0.385
+file,Week4-TestCases-Git.pdf,5,8,13,0.385
+file,Week5-SoftwareArchitecture.pdf,4,8,12,0.333

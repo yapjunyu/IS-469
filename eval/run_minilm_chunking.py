@@ -8,8 +8,6 @@ Everything except the chunking stays fixed: MiniLM, dense search, no image chunk
 Slides and documents share one index, so all 6 combinations are run. Each format is scored on its
 own text questions. The winner for a format is picked on dev (evidence recall@3, then MRR).
 
-    .venv/bin/python eval/run_minilm_chunking.py
-
 Saves eval/results/minilm_chunking.csv and minilm_chunking_questions.csv.
 """
 import random
@@ -20,9 +18,8 @@ from statistics import mean, median
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "eval")]
 
+import common  # noqa: E402  (corpus_files, GOLD, OUT, CachedEmbed)
 import eval_retrieval as ev  # noqa: E402  (load_gold, evaluate, summarise, normalise, write_csv)
-import run_baseline as rb  # noqa: E402  (corpus_files, GOLD, OUT)
-import run_chunking as rc  # noqa: E402  (CachedEmbed)
 from tutor.retrieval.chunk import chunk_pages  # noqa: E402
 from tutor.retrieval.clean import clean_pages  # noqa: E402
 from tutor.retrieval.embed import Embedder  # noqa: E402
@@ -62,15 +59,15 @@ def paired_gain(a: dict, b: dict, ids: list[str], metric: str, rounds: int = 500
 
 
 def main():
-    files = rb.corpus_files()
+    files = common.corpus_files()
     pages = {f: clean_pages(extract(f, images=False)) for f in files}
     hashes = {f: file_sha256(f) for f in files}
     kinds = {f: p[0].kind for f, p in pages.items()}
-    questions = [q for q in ev.load_gold(rb.GOLD) if q["evidence_type"] == "text"]
+    questions = [q for q in ev.load_gold(common.GOLD) if q["evidence_type"] == "text"]
     print(f"{len(files)} files, {len(questions)} text questions\n", flush=True)
 
     model = Embedder("minilm")
-    embed = rc.CachedEmbed(model)
+    embed = common.CachedEmbed(model)
     summary, per_question, scores = [], [], {}
     for slide_method, slide_use in SLIDE_METHODS.items():
         for document_method, document_use in DOCUMENT_METHODS.items():
@@ -104,8 +101,8 @@ def main():
                          **truncation(model, own)}
                 summary += ev.summarise(scored, qs, labels, extra, {"text_q": lambda q: True})
 
-    ev.write_csv(rb.OUT / "minilm_chunking.csv", summary)
-    ev.write_csv(rb.OUT / "minilm_chunking_questions.csv", per_question)
+    ev.write_csv(common.OUT / "minilm_chunking.csv", summary)
+    ev.write_csv(common.OUT / "minilm_chunking_questions.csv", per_question)
 
     print("\n=== paired gains on dev against the baseline, other format held at its baseline method")
     for fmt, (_, corpus, _) in FORMATS.items():
@@ -116,9 +113,9 @@ def main():
             config = (method, "fixed") if fmt == "slides" else ("fixed", method)
             if config == BASELINE:
                 continue
-            for metric in ("ev3_recall", "ev5_rr", "page3_recall", "page5_rr"):
+            for metric in ("ev3_recall", "ev3_rr", "page3_recall", "page3_rr"):
                 print(f"  {fmt:9s} {method:9s} {metric:12s} n={len(ids)} {paired_gain(base, scores[(config, fmt)], ids, metric)}")
-    print(f"\nSaved {rb.OUT / 'minilm_chunking.csv'} and {rb.OUT / 'minilm_chunking_questions.csv'}")
+    print(f"\nSaved {common.OUT / 'minilm_chunking.csv'} and {common.OUT / 'minilm_chunking_questions.csv'}")
 
 
 if __name__ == "__main__":

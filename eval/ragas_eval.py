@@ -12,8 +12,8 @@ The two context metrics only read text, so they are skipped for image questions 
 scored without the figure. The judge is a different model from the one that wrote the answers, so
 it does not grade its own work. Judge replies are cached in data/ragas_cache, so a rerun is free.
 
-    .venv/bin/python eval/ragas_eval.py slide --limit 3    # try a few first, to see the token cost
-    .venv/bin/python eval/ragas_eval.py slide              # all questions in the run
+    .venv/bin/python eval/ragas_eval.py sample --limit 3   # try a few first, to see the token cost
+    .venv/bin/python eval/ragas_eval.py sample             # all questions in the run
 """
 import argparse
 import asyncio
@@ -30,8 +30,9 @@ from ragas.metrics.collections import ContextPrecision, ContextRecall, FactualCo
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "eval" / "results"
-JUDGE_MODEL = "gemini-3.8-flash"  # reads pictures; the answers come from Gemma 4 (rag.py)
-GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"  # the OpenAI API, which RAGAS expects
+JUDGE_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"  # reads pictures; a different model from rag.py
+JUDGE_MAX_TOKENS = 8192  # the judge reasons before it replies, and the reasoning counts towards this limit
+OPENROUTER_URL = "https://openrouter.ai/api/v1"  # the OpenAI API, which RAGAS expects
 
 tokens_used = 0  # counted from every judge reply, to see how much of the daily quota a run takes
 
@@ -44,10 +45,10 @@ async def _count_tokens(response: httpx.Response):
 
 
 def make_judge():
-    client = AsyncOpenAI(api_key=os.environ["GOOGLE_API_KEY"], base_url=GOOGLE_URL, max_retries=8,
+    client = AsyncOpenAI(api_key=os.environ["OPENROUTER_API_KEY"], base_url=OPENROUTER_URL, max_retries=8,
                          http_client=httpx.AsyncClient(event_hooks={"response": [_count_tokens]}, timeout=120))
     return llm_factory(JUDGE_MODEL, client=client, cache=DiskCacheBackend(str(ROOT / "data" / "ragas_cache")),
-                       temperature=0.0)
+                       temperature=0.0, max_tokens=JUDGE_MAX_TOKENS)
 
 
 async def score_row(row: dict, metrics: dict) -> dict:
@@ -96,11 +97,11 @@ async def main():
         for name, err in result["errors"].items():
             print(f"        {name} failed: {err}")
 
-    means = {k: round(sum(r[k] for r in results if r[k] is not None) /
-                      max(1, sum(r[k] is not None for r in results)), 3) for k in metrics}
+    scored = {k: [r[k] for r in results if r[k] is not None] for k in metrics}
+    means = {k: round(sum(v) / len(v), 3) if v else None for k, v in scored.items()}  # None: no question scored
     out = RESULTS / f"ragas_{args.run}.json"
-    out.write_text(json.dumps({"judge": JUDGE_MODEL, "means": means, "rows": results}, indent=1))
-    print("\nmean  " + "  ".join(f"{k} {v:.2f}" for k, v in means.items()))
+    out.write_text(json.dumps({"judge": JUDGE_MODEL, "means": means, "scored": {k: len(v) for k, v in scored.items()}, "rows": results}, indent=1))
+    print("\nmean  " + "  ".join(f"{k} {'-' if v is None else f'{v:.2f}'} (n={len(scored[k])})" for k, v in means.items()))
     print(f"{len(results)} questions, {tokens_used} judge tokens this run "
           f"(cached replies cost nothing), saved {out}")
 

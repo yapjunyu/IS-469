@@ -5,7 +5,7 @@ Three methods, chosen with `method` (documents) or `slide_method` (slide decks):
   recursive  pack whole paragraphs, then sentences, up to `chunk_size` words
 """
 import re
-from .types import Chunk, PageRecord
+from tutor.retrieval.types import Chunk, PageRecord
 
 def _chunk_id(file_hash: str, n: int) -> str:
     """e.g. 'a1b2c3d4e5f6:0007': the file's fingerprint plus the chunk's position."""

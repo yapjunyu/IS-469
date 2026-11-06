@@ -1,126 +1,89 @@
-# Chunking evaluation with MiniLM (text questions)
+# MiniLM chunking evaluation
 
-Run on 2026-11-05 with `eval/run_minilm_chunking.py`. No LLM or RAGAS was used. Raw scores are in `minilm_chunking.csv` and `minilm_chunking_questions.csv`.
-
-## Result
-
-| Format | Decision | Confidence |
-|---|---|---|
-| **Slides** | **One chunk per slide** | Strong: best on every dev metric, with the least text retrieved |
-| **Documents** | **No winner yet.** Carry both fixed and recursive to the next step | Low: every difference on 24 dev questions is within noise, and the evidence winner flips with the slide method |
-
-## Setup
-
-- **Embedder:** `all-MiniLM-L6-v2`, text only, which reads up to 256 tokens per chunk.
-- **Search:** dense, top 3 chunks. There are no image chunks.
-- **Corpus:** 22 files, with student annotations removed.
-- **Questions:** 210 text questions.
+**Setup:** `all-MiniLM-L6-v2`, dense search, top 3 chunks and no image chunks, on 210 text questions.
 
 | Format | Dev | Test | Total |
 |---|---|---|---|
 | Slides | 58 | 103 | 161 |
 | Documents | 24 | 25 | 49 |
+| All text | 82 | 128 | 210 |
 
-**Chunking compared**
+**Winner rule:** highest dev evidence recall@3, then MRR@3. Test scores are for reporting only.
 
-| Format | Options |
-|---|---|
-| Slides | Fixed 100/15, recursive 100/15, one chunk per slide |
-| Documents | Fixed 200/30, recursive 200/30 |
+**Reading the tables:** each cell is evidence recall@3 / precision@3 / F1@3 / MRR@3. Precision has a low ceiling: when one chunk holds the evidence, the most a question can score is 0.333.
 
-Slides and documents share one index, so all 6 combinations were run. Three were requested, and three were added so that every possible winning combination was tested.
+**MRR source:** MRR@3 is the `ev_mrr` column family in the summary CSVs, averaged from `ev3_rr` in the `_questions.csv` files.
 
-**Rule:** the winner is picked on dev by evidence recall@3, then MRR. Test scores are for reporting and were not used to choose.
+## Baseline
 
-**Split change:** the first version of this run had only 13 document dev questions, so 11 document text questions outside the LLM sample moved from test to dev (`ds-08`, `ds-14`, `ds-18`, `ds-20`, `ds-21`, `sd-02`, `sd-14`, `sd-15`, `sd-16`, `sd-18`, `sd-21`). All 11 were moved, with none chosen by score. Aggregate test scores from the first version had already been seen, so document test scores here are not fully untouched.
+Slides use fixed 100/15 and documents use fixed 200/30.
 
-## The requested runs
-
-Dev evidence recall@3 for each format:
-
-| Run | Slides | Documents | Slides score | Documents score |
-|---|---|---|---|---|
-| Baseline | Fixed | Fixed | 0.756 | 0.826 |
-| Run A | Recursive | Recursive | 0.825 | 0.806 |
-| Run B | One per slide | Recursive | 0.838 | 0.785 |
-| Added | One per slide | Fixed | 0.842 | 0.806 |
-
-## Slides
-
-Documents held at fixed 200/30.
-
-| Method | Chunks | Slides per chunk | Words in top 3 | Dev evidence R@3 / MRR | Dev page R@3 / MRR | Test evidence R@3 / MRR | Test page R@3 / MRR |
-|---|---|---|---|---|---|---|---|
-| Fixed 100/15 (baseline) | 658 | 2.76 | 306 | 0.756 / 0.737 | 0.772 / 0.592 | 0.690 / 0.669 | 0.608 / 0.493 |
-| Recursive 100/15 | 814 | 2.33 | 260 | 0.825 / 0.806 | 0.764 / 0.595 | 0.755 / 0.729 | 0.576 / 0.536 |
-| **One per slide** | 983 | 1.00 | 202 | **0.842 / 0.864** | **0.842 / 0.864** | **0.788 / 0.799** | **0.798 / 0.808** |
-
-**Question-by-question gain for one chunk per slide, on dev (58 questions, 95% bootstrap interval):**
-
-| Metric | Against recursive | Against fixed |
+| Questions | Dev | Test |
 |---|---|---|
-| Evidence R@3 | +0.017 (-0.040 to +0.080) | +0.086 (-0.007 to +0.182) |
-| Evidence MRR | +0.058 (-0.014 to +0.130) | +0.127 (+0.022 to +0.231) |
-| Page R@3 | +0.078 (+0.006 to +0.152) | +0.070 (-0.003 to +0.151) |
-| Page MRR | +0.269 (+0.188 to +0.350) | +0.272 (+0.178 to +0.365) |
+| Slides | 0.756 / 0.362 / 0.472 / 0.718 | 0.690 / 0.333 / 0.431 / 0.649 |
+| Documents | 0.826 / 0.403 / 0.522 / 0.868 | 0.940 / 0.400 / 0.548 / 0.893 |
+| All text | 0.776 / 0.374 / 0.486 / 0.762 | 0.739 / 0.346 / 0.454 / 0.697 |
 
-**Findings**
+## Chunking permutations
 
-- One chunk per slide scores highest on every dev metric, while retrieving about 22% less text than recursive and 34% less than fixed.
-- Its evidence recall lead over recursive is small and within noise. The clear gains are in ranking and page-level retrieval.
-- This settles the earlier conflict, where recursive won on evidence and one chunk per slide won on pages. That run used 200-word chunks with Gemma 2, so the change may come from the smaller chunks, the model, or the updated corpus and questions.
-- The result held on test.
+Slides and documents share one index, so all 6 combinations were run. Fixed and recursive use 100/15 on slides and 200/30 on documents. A format's score can change with the other format's method, because its questions compete with different chunks.
 
-## Documents
+**Overall (all text questions):**
 
-| Slides held at | Method | Chunks | Words in top 3 | Dev evidence R@3 / MRR | Dev page R@3 / MRR | Test evidence R@3 / MRR | Test page R@3 / MRR |
-|---|---|---|---|---|---|---|---|
-| One per slide | Fixed 200/30 | 153 | 529 | **0.806** / 0.847 | 0.840 / 0.786 | 0.940 / 0.873 | 0.880 / 0.830 |
-| One per slide | Recursive 200/30 | 172 | 480 | 0.785 / 0.812 | 0.924 / 0.795 | 0.920 / 0.888 | 0.880 / 0.790 |
-| Fixed 100/15 | Fixed 200/30 | 153 | 568 | 0.826 / 0.868 | 0.861 / 0.788 | 0.940 / 0.893 | 0.880 / 0.850 |
-| Fixed 100/15 | Recursive 200/30 | 172 | 515 | **0.847** / 0.847 | 0.944 / 0.816 | 0.980 / 0.873 | 0.840 / 0.760 |
+| Slides | Documents | Dev | Test |
+|---|---|---|---|
+| Fixed | Fixed (baseline) | 0.776 / 0.374 / 0.486 / 0.762 | 0.739 / 0.346 / 0.454 / 0.697 |
+| Fixed | Recursive | 0.783 / 0.382 / 0.495 / 0.754 | 0.739 / 0.352 / 0.458 / 0.689 |
+| Recursive | Fixed | 0.819 / 0.390 / 0.510 / 0.817 | 0.791 / 0.375 / 0.492 / 0.745 |
+| Recursive | Recursive | 0.819 / 0.398 / 0.517 / 0.807 | 0.791 / 0.380 / 0.496 / 0.742 |
+| **One per slide** | **Fixed (chosen)** | **0.831 / 0.407 / 0.526 / 0.854** | 0.818 / 0.370 / 0.495 / 0.803 |
+| One per slide | Recursive | 0.822 / 0.407 / 0.525 / 0.831 | 0.814 / 0.372 / 0.495 / 0.801 |
 
-**Recursive against fixed on dev, with slides at one per slide (24 questions):**
+**By format:**
 
-| Metric | Gain for recursive (95% interval) | Better / worse questions |
-|---|---|---|
-| Evidence R@3 | -0.021 (-0.188 to +0.125) | 5 / 4 |
-| Evidence MRR | -0.035 (-0.177 to +0.111) | 4 / 5 |
-| Page R@3 | +0.083 (-0.062 to +0.229) | 5 / 1 |
-| Page MRR | +0.009 (-0.107 to +0.131) | 5 / 3 |
+| Slides | Documents | Slides dev | Slides test | Documents dev | Documents test |
+|---|---|---|---|---|---|
+| Fixed | Fixed (baseline) | 0.756 / 0.362 / 0.472 / 0.718 | 0.690 / 0.333 / 0.431 / 0.649 | 0.826 / 0.403 / 0.522 / 0.868 | 0.940 / 0.400 / 0.548 / 0.893 |
+| Fixed | Recursive | 0.756 / 0.362 / 0.472 / 0.716 | 0.680 / 0.330 / 0.427 / 0.644 | 0.847 / 0.431 / 0.551 / 0.847 | 0.980 / 0.440 / 0.587 / 0.873 |
+| Recursive | Fixed | 0.825 / 0.391 / 0.511 / 0.802 | 0.755 / 0.369 / 0.479 / 0.714 | 0.806 / 0.389 / 0.506 / 0.854 | 0.940 / 0.400 / 0.548 / 0.873 |
+| Recursive | Recursive | 0.825 / 0.391 / 0.511 / 0.799 | 0.755 / 0.369 / 0.479 / 0.709 | 0.806 / 0.417 / 0.531 / 0.826 | 0.940 / 0.427 / 0.567 / 0.880 |
+| **One per slide** | **Fixed (chosen)** | **0.842 / 0.414 / 0.534 / 0.856** | 0.788 / 0.362 / 0.482 / 0.786 | **0.806 / 0.389 / 0.506 / 0.847** | 0.940 / 0.400 / 0.548 / 0.873 |
+| One per slide | Recursive | 0.838 / 0.408 / 0.529 / 0.848 | 0.788 / 0.362 / 0.482 / 0.782 | 0.785 / 0.403 / 0.514 / 0.792 | 0.920 / 0.413 / 0.551 / 0.880 |
 
-**Findings**
+**Document window sizes, with slides at one per slide:**
 
-- Fixed wins the dev rule when slides use one chunk per slide, but recursive wins when slides use fixed chunks. The winner depends on the other format's setup.
-- Every interval includes zero, and a single-part question changes the dev score by about 0.04.
-- Recursive finds more of the right pages (page recall +0.083, 5 questions better and 1 worse), while evidence recall and MRR are about level. This is a hint only, because the interval includes zero.
-- MiniLM truncation also affects this comparison (see below).
-- The evidence does not support choosing either method, so both should move to the next step.
-
-## MiniLM truncation
-
-Chunks over 256 tokens are cut off before embedding, but evidence is still scored against the full chunk text.
-
-| Chunking | Median tokens | Longest chunk | Chunks truncated | Tokens never embedded |
+| Method and size | Words in top 3 | Chunks truncated | Dev | Test |
 |---|---|---|---|---|
-| Slides: fixed 100/15 | 140 | 284 | 0.3% | 0.1% |
-| Slides: recursive 100/15 | 121 | 283 | 0.4% | 0.1% |
-| Slides: one per slide | 81 | 302 | 0.5% | 0.1% |
-| **Documents: fixed 200/30** | 249 | 577 | **38.6%** | **5.8%** |
-| **Documents: recursive 200/30** | 233 | 626 | **19.8%** | **3.6%** |
+| Fixed 100/15 | 289 | 1.0% | 0.611 / 0.319 / 0.403 / 0.646 | 0.820 / 0.320 / 0.452 / 0.780 |
+| Recursive 100/15 | 256 | 0.6% | 0.646 / 0.306 / 0.404 / 0.618 | 0.900 / 0.440 / 0.572 / 0.773 |
+| Fixed 150/22 | 419 | 3.5% | 0.799 / 0.431 / 0.544 / 0.715 | 0.920 / 0.387 / 0.532 / 0.833 |
+| Recursive 150/22 | 384 | 2.2% | 0.792 / 0.361 / 0.483 / 0.681 | 0.920 / 0.440 / 0.576 / 0.880 |
+| **Fixed 200/30 (chosen)** | 529 | 38.6% | **0.806 / 0.389 / 0.506 / 0.847** | 0.940 / 0.400 / 0.548 / 0.873 |
+| Recursive 200/30 | 480 | 19.8% | 0.785 / 0.403 / 0.514 / 0.792 | 0.920 / 0.413 / 0.551 / 0.880 |
 
-Truncation has almost no effect on the slide comparison. It does affect documents, and it hits fixed chunks about twice as often as recursive ones, so fixed is at a disadvantage in this run.
+## Best outcome
 
-## Limits of this run
+**One chunk per slide for slides, and fixed 200/30 for documents.**
 
-- **The results are specific to MiniLM.** Winners may change with a stronger embedder, so they should be rechecked.
-- **These scores cover text questions only.** Image questions and image chunks were not part of this step.
-- **Evidence recall has a built-in bias.** Larger chunks have more chances to contain a quote, which is why words retrieved is reported alongside it.
-- **Reachability is close to complete.** All evidence quotes can be found within a single chunk, except 0.4% under fixed 100/15 on slides.
-- **The gold questions are not from real students.** They were written by an AI assistant to resemble student questions.
-- **Sizes were not tuned.** One size per format was chosen from word counts, and other sizes were not tested.
-- **Earlier results are not comparable.** `SUMMARY_retrieval.md` used a different embedder, chunk sizes, corpus and question wording.
+This combination has the highest overall dev recall@3 (0.831) and MRR@3 (0.854). Against the baseline, it adds 0.055 to dev recall@3, 0.092 to dev MRR@3 and 0.040 to dev F1@3. Test recall@3 also rises, from 0.739 to 0.818.
 
-## Next step
+**Slides: one chunk per slide (strong)**
 
-Compare Gemma 2 and Qwen on text questions, using one chunk per slide for slides and both fixed and recursive for documents. Gemma 2 reads 8,192 tokens and Qwen about 32K, so those runs should not have the truncation problem seen here. They should also give a fairer documents comparison, with 24 dev questions. Larger gains should be detectable, but a small difference may still be too close to call. If so, the simpler method or the one retrieving less text is a reasonable tie-break.
+- It scores highest on dev recall@3, precision@3, F1@3 and MRR@3, and it retrieves the least text: 202 words in the top 3, against 306 for fixed and 260 for recursive.
+- A slide is usually one idea, so this avoids mixing topics across slides, which fixed and recursive chunks do.
+- Its clearest gain over fixed is MRR@3: +0.138 on dev (95% interval +0.029 to +0.250). Its recall@3 lead over recursive is small and within noise (+0.017, interval -0.040 to +0.080).
+- It stays the best slide method whichever document method is used, and it has the highest slide recall@3 and MRR@3 on test.
+
+**Documents: fixed 200/30 (moderate)**
+
+- It has the highest dev recall@3 and MRR@3 of the six document settings, so it wins the rule when slides use one chunk per slide.
+- Fixed and recursive are effectively tied. At 200 words, recursive's dev recall@3 gain is -0.021 (interval -0.188 to +0.125), and recursive wins instead when slides use fixed chunks. Fixed was chosen as the simpler method.
+- 100-word chunks are clearly too small: dev recall@3 is 0.194 lower than fixed 200/30 (interval -0.375 to -0.021).
+
+**Limits of this choice**
+
+- **Fixed 150/22 is the close alternative for documents.** Its dev recall@3 is about level, and it has higher dev F1@3 (0.544 vs 0.506) and retrieves 21% less text. Fixed 200/30 wins because of its higher MRR@3 (+0.132, interval +0.014 to +0.264), and its F1@3 lead on test is small (0.548 vs 0.532).
+- **MiniLM truncates long chunks.** It reads up to 256 tokens, which cuts off 38.6% of fixed 200/30 chunks. Evidence is still scored against the full chunk text, so this could affect the document result.
+- **Larger chunks can inflate recall.** They have more chances to contain an evidence quote.
+- **Document results rest on few questions.** There are 24 on dev, and one single-part question moves dev recall@3 by about 0.04.
+- **Document test scores are not fully untouched.** Eleven document questions moved from test to dev after aggregate test scores from a first run had been seen. All 11 eligible questions moved, with none chosen by score.

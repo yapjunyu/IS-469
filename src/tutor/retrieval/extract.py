@@ -3,7 +3,7 @@ from pathlib import Path
 import pymupdf
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
-from .types import PageRecord
+from tutor.retrieval.types import PageRecord
 import hashlib
 import shutil
 import subprocess
