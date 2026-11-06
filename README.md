@@ -37,7 +37,7 @@ The agent is a single tool-calling loop with these tools (`search_notes`, `make_
 | UI | Streamlit: file uploader, chat, quiz mode, weak-spots panel, memory page |
 | File extraction | python-pptx for .pptx, PyMuPDF for .pdf; PDFs without selectable text are rejected |
 | Chunking | One passage per slide for decks; a few hundred tokens with overlap for documents, split at headings; size set in config |
-| Tutor LLM | Llama on Groq, model ID pinned in config, temperature 0 |
+| Tutor LLM | `deepseek-v4.1-flash` on OpenCode Go, thinking off, temperature 0 |
 | Judge / faithfulness checker | `gpt-5.4-mini-2026-03-17` on OpenAI |
 | Embeddings | sentence-transformers |
 | Vector store | FAISS or Chroma; one index per notebook, keyed by file hash so each file is embedded once |
@@ -150,7 +150,7 @@ A text question takes about 9 API calls and an image question about 6, so all 75
 
 > Setup commands will be added once the one-command launch is in place.
 
-1. Copy `.env.example` to `.env` and fill in the Groq and OpenAI API keys, then choose settings in the config file: model ID, temperature, search mode, chunk size, search-again switch and random seeds all live there.
+1. Copy `.env.example` to `.env` and fill in the OpenCode and OpenAI API keys (Groq only for a Groq model, such as the one the agent walkthrough notebook pins), then choose settings in the config file: model ID, temperature, search mode, chunk size, search-again switch and random seeds all live there.
 2. Launch the app with a single command.
 3. Enter your name or ID, then upload your .pptx or PDF files into your notebook.
 

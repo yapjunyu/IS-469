@@ -131,7 +131,7 @@ These concepts become the bars in the weak-spots panel and the concepts a studen
 - The system prompt lists the notebook's concepts, and the concept-taking tools (step 11) accept only these.
 - The concept list comes from the files, not the student, so it is not shown on the memory page.
 - The call goes through saved responses (step 9), so concept lists repeat across reruns.
-- Shortcut: only the start of a long file is read, to stay under Groq's free-tier token limit.
+- Shortcut: only the start of a long file is read, to bound each upload's tokens.
 
 **Done when** uploading a file adds its concepts to the concept list without duplicates, and deleting it removes only the concepts no other file has. The weak-spots panel (step 17) shows one bar per concept from `learner.concepts()`, with its mastery score, or 0.5 if not yet tested.
 
@@ -161,7 +161,7 @@ Everything we might change lives in one place. Running a test means changing a s
 Example (`config.yaml`):
 
 ```yaml
-tutor_model: <groq model id>      # pinned
+tutor_model: <opencode-go model>  # pinned
 judge_model: <other-family model> # to be confirmed by the team
 temperature: 0                    # same question -> same answer
 embedding_model: <sentence-transformers model>
@@ -187,7 +187,7 @@ The plan requires model ID, temperature, search mode, chunk size, the search-aga
 - If a saved response exists for that hash, return it. If not, call the API and save the response to disk.
 - Use this for the tutor, judge, faithfulness checker and simulated students alike.
 
-**Why:** reruns are free, give identical results and don't hit Groq's rate limits.
+**Why:** reruns are free, give identical results and don't hit API rate limits.
 
 **Done when** rerunning the same evaluation makes zero API calls.
 
@@ -258,12 +258,12 @@ A search-then-answer turn:
 
 ```json
 {"kind": "llm", "ts": "2026-11-05T14:03:12.481+08:00", "student": "<anon id>", "turn": 12, "step": 1,
- "purpose": "tutor", "model": "openai/gpt-oss-120b", "tokens": {"in": 812, "out": 45}, "cached": false}
+ "purpose": "tutor", "model": "opencode-go/deepseek-v4.1-flash", "tokens": {"in": 812, "out": 45}, "cached": false}
 {"kind": "tool", "ts": "2026-11-05T14:03:12.822+08:00", "student": "<anon id>", "turn": 12, "step": 1,
  "tool": "search_notes", "inputs": {"query": "..."}, "ok": true, "error": null, "duration_ms": 340,
  "result_summary": "..."}
 {"kind": "llm", "ts": "2026-11-05T14:03:13.610+08:00", "student": "<anon id>", "turn": 12, "step": 2,
- "purpose": "tutor", "model": "openai/gpt-oss-120b", "tokens": {"in": 1290, "out": 160}, "cached": false}
+ "purpose": "tutor", "model": "opencode-go/deepseek-v4.1-flash", "tokens": {"in": 1290, "out": 160}, "cached": false}
 {"kind": "final", "ts": "2026-11-05T14:03:13.611+08:00", "student": "<anon id>", "turn": 12, "step": 2,
  "steps": 2, "cap_hit": false, "searches": 1, "tokens": {"in": 2102, "out": 205}, "duration_ms": 1480,
  "faithfulness": {"supported": true, "reason": "..."}, "answer_preview": "..."}

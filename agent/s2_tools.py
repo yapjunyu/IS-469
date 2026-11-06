@@ -27,7 +27,7 @@ from agent.memory import  learner
 from agent.prompts import GRADE_PROMPT, GUARD_PROMPT, QUIZ_PROMPT
 
 # shortcut: hardcoded, move to config.yaml once the team agrees on it
-MODEL = "openai/gpt-oss-120b"  # a Groq model id: only "gpt-..." names route to OpenAI
+MODEL = "opencode-go/deepseek-v4.1-flash"  # the prefix routes it to OpenCode Go, see s1_llm
 
 
 # shortcut: stub, the app passes the retrieval teammate's search(student_id, query) once it lands
