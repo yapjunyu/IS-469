@@ -22,6 +22,7 @@ Per-turn state lives on `TurnContext` in `agent/s2_tools.py`: who and where (stu
 
 - Agent tests are unit tests: the network, real LLMs and real retrieval stay out.
 - Drive a whole turn through `run_turn` with a scripted fake of `s1_llm.chat` (see the helpers in `agent/tests/test_loop.py`). Assert on what `run_turn` returns, the trace rows and the learner model.
+- A turn test switches on only the checks it tests, through the shared `turn` helper in `agent/tests/test_loop.py`. A new switch that adds LLM calls goes in its `EXTRA_CALLS_OFF`.
 - Assert on external behaviour only: private helpers and prompt wording change freely.
 - A tool's own return value (and the prompt it sends its LLM) may be checked by calling it through `run_tool` on a `TurnContext`; `run_turn` is for loop behaviour and trace rows.
 - Turn state that no output shows yet (such as the retrieved passage ids) is checked by running one tool through `run_tool` on a `TurnContext`, as `agent/tests/test_memory.py` does.

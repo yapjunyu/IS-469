@@ -1,9 +1,10 @@
 """remember_fact and the memory-write check: a fact must cite a passage retrieved in this turn."""
 import json
 
-from agent import s1_llm, s3_loop
+from agent import s1_llm
 from agent.memory import learner
 from agent.s2_tools import TurnContext, run_tool
+from agent.tests.test_loop import turn
 from agent.tests.test_quiz import answer, call, fake_chat, lookup
 from agent.tests.test_search import fake_search
 
@@ -59,8 +60,8 @@ def test_run_turn_offers_remember_fact_and_passes_the_check_switch(monkeypatch):
         tools_sent.append([t["function"]["name"] for t in tools or []])
         return next(replies)
     monkeypatch.setattr(s1_llm, "chat", chat)
-    s3_loop.run_turn("Remember that", "alice", 1, faithfulness=False)
+    turn("Remember that", "alice", 1)
     assert learner.read_all("alice")["facts"] == []  # check on by default: nothing searched, nothing stored
-    s3_loop.run_turn("Remember that", "alice", 2, memory_check=False, faithfulness=False)
+    turn("Remember that", "alice", 2, memory_check=False)
     assert len(learner.read_all("alice")["facts"]) == 1
     assert set(tools_sent[0]) == {"search_notes", "make_quiz", "grade_answer", "update_mastery", "remember_fact"}

@@ -45,5 +45,23 @@ One student message and the tutor's final reply to it.
 _Avoid_: Round, exchange
 
 **Step**:
-One LLM call inside a turn, plus the tool calls it asks for. A turn has at most the step cap of steps, plus one forced-answer step (tools off) when the cap is hit.
+One LLM call inside a turn, plus the tool calls it asks for. A turn has at most the step cap of steps, plus one forced-answer step (tools off) when the cap is hit, plus one regenerate step when the judge fails the answer.
 _Avoid_: Iteration, hop
+
+## Checks
+
+**Judge**:
+The LLM, from a different model family than the tutor, that runs the faithfulness check.
+_Avoid_: Grader (that is `grade_answer`), checker, critic
+
+**Faithfulness**:
+Whether every claim about course content in the tutor's final answer is stated in the passages retrieved that turn. It checks the answer matches the notes, not that the notes are right.
+_Avoid_: Correctness, accuracy, groundedness
+
+**Regenerate**:
+The tutor's single retry after the judge fails an answer, with the judge's reason added. It counts as one more step.
+_Avoid_: Retry (alone), rewrite
+
+**Warning**:
+The flag on a turn's answer when it still fails the faithfulness check after the regeneration. The answer is shown, marked as unsupported.
+_Avoid_: Error, alert

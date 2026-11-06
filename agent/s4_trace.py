@@ -9,7 +9,7 @@ Then, by kind:
          Concept extraction runs at upload, outside a chat turn, so its row has turn 0.
 - tool:  tool, inputs (parsed object, or the raw string if the JSON was bad),
          ok, error, duration_ms, result_summary (first 200 chars of the result)
-- final: steps, cap_hit, searches, tokens {in, out} (sum of the turn's llm rows),
+- final: steps (including a forced answer and a regeneration), cap_hit, searches, tokens {in, out} (sum of the turn's llm rows),
          duration_ms (whole turn), faithfulness (the judge's last verdict {supported, reason},
          null with the check off), answer_preview (first 100 chars). Always the turn's last row.
 """

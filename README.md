@@ -54,7 +54,7 @@ The agent is a single tool-calling loop with these tools (`search_notes`, `make_
 
 > Setup commands will be added once the one-command launch is in place.
 
-1. Set your Groq API key and choose settings in the config file: model ID, temperature, search mode, chunk size, search-again switch and random seeds all live there.
+1. Copy `.env.example` to `.env` and fill in the Groq and OpenAI API keys, then choose settings in the config file: model ID, temperature, search mode, chunk size, search-again switch and random seeds all live there.
 2. Launch the app with a single command.
 3. Enter your name or ID, then upload your .pptx or PDF files into your notebook.
 
