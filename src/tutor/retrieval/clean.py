@@ -4,7 +4,7 @@ import unicodedata
 from collections import Counter
 from dataclasses import replace
 
-from .types import PageRecord
+from tutor.retrieval.types import PageRecord
 
 MAX_BOILERPLATE_WORDS = 8  # headers and footers are short; longer lines are always kept
 
@@ -15,7 +15,8 @@ _BULLET = re.compile(r"^([-•▪◦*–]|\d+[.)])\s+")
 
 def clean_pages(pages: list[PageRecord]) -> list[PageRecord]:
     """Normalise characters, drop repeated headers/footers and page numbers,
-    rejoin wrapped lines in documents, and drop pages left empty.
+    rejoin wrapped lines in documents, and drop pages left empty (a page with no
+    text is kept if it has an image, e.g. a slide that is only a chart).
     Case is kept as-is; BM25 lowercases its own tokens.
     """
     pages = [replace(p, text=_normalize(p.text)) for p in pages]
@@ -27,7 +28,7 @@ def clean_pages(pages: list[PageRecord]) -> list[PageRecord]:
         if p.kind == "page":
             text = _join_wrapped_lines(text)
         text = _tidy_spaces(text)
-        if text:
+        if text or p.image_paths:
             cleaned.append(replace(p, text=text))
     return cleaned
 
