@@ -25,10 +25,14 @@ def index_upload(student, upload):
         try:
             added = notebook.add_file(student, path)
         except FileRejected as e:
-            return "error", str(e)
+            return st.error, str(e)
+        except Exception as e:  # the embedder or store failing: cached like any outcome, so a rerun doesn't retry and die before chat
+            return st.error, f"{upload.name} couldn't be indexed: {e}. Remove it from the uploader and add it again to retry."
     if added["status"] == "already_held":
-        return "info", f"{upload.name} has the same content as {added['file']}, already in your notebook."
-    return "success", f"{added['file']} added to your notebook."
+        return st.info, f"{upload.name} has the same content as {added['file']}, already in your notebook."
+    if not added["concepts_found"]:
+        return st.warning, f"{added['file']} added, but its concepts couldn't be listed. Removing and re-uploading it retries."
+    return st.success, f"{added['file']} added to your notebook."
 
 
 state = st.session_state
@@ -51,16 +55,16 @@ if "student" not in state:
     st.stop()
 
 student = state.student
-state.setdefault("uploads", {})  # file_id -> outcome, as Streamlit hands back every uploaded file on every rerun
+state.setdefault("upload_outcomes", {})  # file_id -> outcome, as Streamlit hands back every uploaded file on every rerun
 
 with st.sidebar:
     st.write(f"Notebook: {student}")
     for upload in st.file_uploader("Add .pptx or PDF files", type=["pptx", "pdf"], accept_multiple_files=True):
-        if upload.file_id not in state.uploads:
+        if upload.file_id not in state.upload_outcomes:
             with st.spinner(f"Indexing {upload.name}...", show_time=True):
-                state.uploads[upload.file_id] = index_upload(student, upload)
-        show, text = state.uploads[upload.file_id]
-        getattr(st, show)(text)
+                state.upload_outcomes[upload.file_id] = index_upload(student, upload)
+        show, text = state.upload_outcomes[upload.file_id]
+        show(text)
     st.subheader("Your files")
     for file in notebook.files(student):
         st.text(file)
@@ -69,11 +73,11 @@ if not notebook.files(student):
     st.info("Upload a .pptx or PDF in the sidebar to start chatting.")
     st.stop()
 
-state.setdefault("chat", [])  # the messages shown, each {"role", "content"}, and "warning" on an answer
+state.setdefault("messages", [])  # the messages shown, each {"role", "content"}, and "warning" on an answer
 state.setdefault("turn", 1)
-state.setdefault("failed", None)  # the turn that failed last, {"message", "error"}; neither chat nor turn counted it
+state.setdefault("failed", None)  # the turn that failed last, {"message", "error"}; neither messages nor turn counted it
 
-for entry in state.chat:
+for entry in state.messages:
     with st.chat_message(entry["role"]):
         st.markdown(entry["content"])
         if entry.get("warning"):
@@ -86,15 +90,15 @@ if message:
     with st.chat_message("user"):
         st.markdown(message)
     with st.chat_message("assistant"), st.spinner("The tutor is working...", show_time=True):
-        history = [{"role": entry["role"], "content": entry["content"]} for entry in state.chat]
+        history = [{"role": entry["role"], "content": entry["content"]} for entry in state.messages]
         try:
             out = run_turn(message, student, state.turn, history=history, search_fn=notebook.search,
                            passages_fn=notebook.get_passages, memory="learner")
         except Exception as e:  # a turn can fail in many ways (rate limit, missing key), and the student can resend
             state.failed = {"message": message, "error": str(e)}
         else:
-            state.chat += [{"role": "user", "content": message},
-                           {"role": "assistant", "content": out["answer"], "warning": out["warning"]}]
+            state.messages += [{"role": "user", "content": message},
+                               {"role": "assistant", "content": out["answer"], "warning": out["warning"]}]
             state.turn += 1
     st.rerun()
 
