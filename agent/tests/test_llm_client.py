@@ -1,7 +1,16 @@
-"""s1_llm.chat routes by model name to a fake OpenAI or Groq client, and adapts GPT-5 requests."""
+"""s1_llm.chat routes by model name to a fake OpenAI, Groq or OpenCode client, and adapts GPT-5 and DeepSeek requests."""
+import uuid
 from types import SimpleNamespace
 
-from agent import s1_llm
+import pytest
+
+from agent import ingest, s1_llm
+from agent.memory import learner, reflection
+from agent.s2_tools import run_tool
+from agent.tests.test_loop import SEARCH_CALL, always_search, read_trace, reply, tool_ctx, turn
+
+PASSAGES = [{"id": "p1", "file": "lec3.pdf", "page": 12, "text": "LoRA adds low-rank matrices."}]
+REAL_GET_CLIENT = s1_llm._get_client  # taken at import: the shared fixture replaces it for each test
 
 
 class FakeClient:
@@ -18,7 +27,7 @@ class FakeClient:
 
 
 def fakes(monkeypatch):
-    clients = {"openai": FakeClient("from openai"), "groq": FakeClient("from groq")}
+    clients = {"openai": FakeClient("from openai"), "groq": FakeClient("from groq"), "opencode": FakeClient("from opencode")}
     monkeypatch.setattr(s1_llm, "_get_client", lambda provider: clients[provider])
     return clients
 
@@ -31,6 +40,67 @@ def test_model_name_picks_the_client(monkeypatch):
                      "usage": {"in": 7, "out": 3}, "cached": False}
     assert tutor["message"]["content"] == "from groq"
     assert len(clients["openai"].requests) == len(clients["groq"].requests) == 1
+
+
+def test_opencode_go_prefix_uses_the_opencode_client_with_the_prefix_stripped(monkeypatch):
+    clients = fakes(monkeypatch)
+    out = s1_llm.chat([{"role": "user", "content": "hi"}], "opencode-go/deepseek-v4.1-flash")
+    assert out["message"]["content"] == "from opencode"
+    assert clients["opencode"].requests[0]["model"] == "deepseek-v4.1-flash"
+    assert not clients["openai"].requests and not clients["groq"].requests
+
+
+def test_opencode_client_uses_the_go_endpoint_key_and_its_own_headers(monkeypatch):
+    monkeypatch.setattr(s1_llm, "_clients", {})
+    monkeypatch.setenv("OPENCODE_API_KEY", "test-key")
+    client = REAL_GET_CLIENT("opencode")
+    assert str(client.base_url).rstrip("/") == "https://opencode.ai/inference/go/openai/v1"
+    assert client.api_key == "test-key"
+    assert client.max_retries == 5
+    assert client.default_headers["User-Agent"] == "is-469-tutor"
+    assert uuid.UUID(client.default_headers["x-opencode-session"]).version == 4  # random, so no personal data
+    assert REAL_GET_CLIENT("opencode") is client  # one client per process, so the session header stays stable
+
+
+def test_missing_opencode_key_raises_instead_of_sending_the_openai_key(monkeypatch):
+    monkeypatch.setattr(s1_llm, "_clients", {})
+    monkeypatch.delenv("OPENCODE_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-key")  # the SDK reads this one when api_key is None
+    with pytest.raises(KeyError):
+        REAL_GET_CLIENT("opencode")
+
+
+def test_deepseek_request_turns_thinking_off_and_others_do_not(monkeypatch):
+    clients = fakes(monkeypatch)
+    s1_llm.chat([{"role": "user", "content": "hi"}], "opencode-go/deepseek-v4.1-flash")
+    s1_llm.chat([{"role": "user", "content": "hi"}], "gpt-5.4-mini-2026-03-17")
+    s1_llm.chat([{"role": "user", "content": "hi"}], "openai/gpt-oss-120b")
+    assert clients["opencode"].requests[0]["extra_body"] == {"thinking": {"type": "disabled"}}
+    assert "extra_body" not in clients["openai"].requests[0] and "extra_body" not in clients["groq"].requests[0]
+
+
+def test_trace_rows_name_the_tutor_model_and_judge_stays_on_openai(monkeypatch, tmp_data):
+    def chat(messages, model, tools=None, tool_choice="auto", **kw):
+        if tools and tool_choice != "none" and not any(m["role"] == "tool" for m in messages):
+            return reply(SEARCH_CALL)
+        return reply({"role": "assistant", "content": '{"supported": false, "enough": true, "reason": "why", "note": "n"}'})
+    monkeypatch.setattr(s1_llm, "chat", chat)
+    search, get = (lambda s, q: PASSAGES), (lambda s, ids: PASSAGES)
+    turn("What is LoRA?", "alice", 1, search_fn=search, passages_fn=get, faithfulness=True, search_again=True)  # tutor, search_again, judge, regenerate
+    monkeypatch.setattr(s1_llm, "chat", always_search)
+    turn("loop", "alice", 2, step_cap=1, search_fn=search)  # forced_answer
+    monkeypatch.setattr(s1_llm, "chat", chat)
+    learner.add_concepts("alice", "lec3.pdf", ["lora"])
+    ctx = tool_ctx(search_fn=search, passages_fn=get)
+    run_tool("make_quiz", '{"concept": "lora"}', ctx)
+    run_tool("grade_answer", '{"question": "q", "student_answer": "a", "passage_ids": ["p1"]}', ctx)
+    ingest.extract_concepts("alice", "lec3.pdf", "text")
+    reflection.end_session("alice", [{"role": "user", "content": "hi"}])
+    models = {r["purpose"]: r["model"] for r in read_trace(tmp_data) if r["kind"] == "llm"}
+    tutor = "opencode-go/deepseek-v4.1-flash"
+    assert models == {"tutor": tutor, "forced_answer": tutor, "regenerate": tutor, "quiz": tutor, "grading": tutor,
+                      "search_again": tutor, "concepts": tutor, "reflection": tutor,
+                      "judge": "gpt-5.4-mini-2026-03-17"}
 
 
 def test_gpt5_request_has_no_temperature_and_uses_max_completion_tokens(monkeypatch):
