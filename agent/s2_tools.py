@@ -1,4 +1,4 @@
-"""Step 11: the five tools the LLM can call.
+"""Step 11: the tools the LLM can call.
 
 - TOOL_SCHEMAS: JSON schemas passed to the LLM (name, description, typed params).
 - run_tool(): parse the JSON `arguments` string, validate inputs, dispatch.
@@ -121,7 +121,6 @@ def grade_answer(ctx, question, student_answer, passage_ids):
         return {"error": "The grading reply had no valid verdict"}
     return {"correct": verdict["correct"], "hint": str(verdict.get("hint", ""))}
 
-# Shortcut: stub, replace with a call into memory/learner.py
 def update_mastery(ctx, concept, correct, wrong_belief=None):
     if not isinstance(correct,bool):
         return {"error": "correct must be true or false"}

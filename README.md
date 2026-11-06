@@ -28,7 +28,7 @@ It is similar in spirit to Google's NotebookLM, which answers questions from a u
 8. It calls `update_mastery`. Wrong beliefs are stored as weak spots; facts are stored only if the student's files support them.
 9. Every tool call goes to the trace file and every AI response is saved to disk.
 
-The agent is a single tool-calling loop with five tools (`search_notes`, `make_quiz`, `grade_answer`, `update_mastery`, `remember_fact`) and a step cap per turn.
+The agent is a single tool-calling loop with these tools (`search_notes`, `make_quiz`, `grade_answer`, `update_mastery`, `remember_fact`) and a step cap per turn.
 
 ## Tech stack
 

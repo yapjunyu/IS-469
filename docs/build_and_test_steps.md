@@ -18,7 +18,7 @@ The step-by-step plan from Section 5 of [`IS469_Project_Plan_Study_Tutor_General
 | 8 | Config file | — | — |
 | 9 | Saved AI responses | 8 | — |
 | 10 | Learner model (SQLite) | 6 | Topic 7 (slide 44) |
-| 11 | The five tools | 7, 10 | Topic 7 (slides 7–9) |
+| 11 | The tools | 7, 10 | Topic 7 (slides 7–9) |
 | 12 | Agent loop | 11 | Topic 7 (slides 13–16) |
 | 13 | Search-again | 7, 12 | Topic 8 (slides 47–48) |
 | 14 | Trace file | 12 | Topic 7 (slides 14, 57) |
@@ -206,7 +206,7 @@ Keeping beliefs and facts apart means the tutor never learns something false fro
 
 **Done when** each student's database is separate, and the memory page (step 17) can read, edit and delete every row.
 
-### Step 11. The five tools: the tutor's buttons
+### Step 11. The tools: the tutor's buttons
 
 Each tool has a name, a short description and typed inputs, so the AI knows when and how to use it (Topic 7, slides 7–9).
 
