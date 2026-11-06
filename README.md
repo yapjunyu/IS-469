@@ -28,7 +28,7 @@ It is similar in spirit to Google's NotebookLM, which answers questions from a u
 8. It calls `update_mastery`. Wrong beliefs are stored as weak spots; facts are stored only if the student's files support them.
 9. Every tool call goes to the trace file and every AI response is saved to disk.
 
-The agent is a single tool-calling loop with four tools (`search_notes`, `make_quiz`, `grade_answer`, `update_mastery`) and a step cap per turn.
+The agent is a single tool-calling loop with these tools (`search_notes`, `make_quiz`, `grade_answer`, `update_mastery`, `remember_fact`) and a step cap per turn.
 
 ## Tech stack
 
@@ -38,7 +38,7 @@ The agent is a single tool-calling loop with four tools (`search_notes`, `make_q
 | File extraction | python-pptx for .pptx, PyMuPDF for .pdf; PDFs without selectable text are rejected |
 | Chunking | One passage per slide for decks; a few hundred tokens with overlap for documents, split at headings; size set in config |
 | Tutor LLM | Llama on Groq, model ID pinned in config, temperature 0 |
-| Judge / faithfulness checker | A model from a different family than Llama (TBC) |
+| Judge / faithfulness checker | `gpt-5.4-mini-2026-03-17` on OpenAI |
 | Embeddings | sentence-transformers |
 | Vector store | FAISS or Chroma; one index per notebook, keyed by file hash so each file is embedded once |
 | Keyword search | rank_bm25 |
@@ -150,7 +150,7 @@ A text question takes about 9 API calls and an image question about 6, so all 75
 
 > Setup commands will be added once the one-command launch is in place.
 
-1. Set your Groq API key and choose settings in the config file: model ID, temperature, search mode, chunk size, search-again switch and random seeds all live there.
+1. Copy `.env.example` to `.env` and fill in the Groq and OpenAI API keys, then choose settings in the config file: model ID, temperature, search mode, chunk size, search-again switch and random seeds all live there.
 2. Launch the app with a single command.
 3. Enter your name or ID, then upload your .pptx or PDF files into your notebook.
 

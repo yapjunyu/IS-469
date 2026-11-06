@@ -178,5 +178,11 @@ __pycache__/
 ~$*
 .DS_Store
 
+# personal progress notes
+agent/PROGRESS.md
+
+# local issue tracker (specs and tickets)
+.scratch/
+
 # Separate environment for jina-clip-v2 (see requirements-jina.txt)
 .venv-jina/

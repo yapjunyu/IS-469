@@ -18,7 +18,7 @@ The step-by-step plan from Section 5 of [`IS469_Project_Plan_Study_Tutor_General
 | 8 | Config file | — | — |
 | 9 | Saved AI responses | 8 | — |
 | 10 | Learner model (SQLite) | 6 | Topic 7 (slide 44) |
-| 11 | The four tools | 7, 10 | Topic 7 (slides 7–9) |
+| 11 | The tools | 7, 10 | Topic 7 (slides 7–9) |
 | 12 | Agent loop | 11 | Topic 7 (slides 13–16) |
 | 13 | Search-again | 7, 12 | Topic 8 (slides 47–48) |
 | 14 | Trace file | 12 | Topic 7 (slides 14, 57) |
@@ -122,15 +122,18 @@ Like the index at the back of a textbook: which passages contain which exact wor
 
 ### Step 6. Find the key concepts
 
-These concepts become the bars in the weak-spots panel and the topics a student can pick in quiz mode.
+These concepts become the bars in the weak-spots panel and the concepts a student can pick in quiz mode. One idea is one concept.
 
 **What to do**
-- When a file is uploaded, ask the LLM for its main concepts as a JSON list (e.g. "LoRA", "KV cache", "photosynthesis").
-- Merge duplicates across files (case-insensitive, trimmed; the LLM can also merge near-synonyms).
-- Store concepts in the student's learner model (step 10) with a starting mastery score.
-- Go through saved responses (step 9) so concept lists repeat across reruns.
+- When a file is uploaded, call `agent.ingest.extract_concepts(student_id, file, text)`. One LLM call returns the file's concepts as a JSON list (e.g. "LoRA", "KV cache", "photosynthesis"). The notebook's known concepts go in the prompt, so the LLM reuses an existing name instead of adding a synonym. A reply with no valid list stores nothing.
+- Concepts are stored in the student's learner model (step 10), one row per (concept, file), with names normalised (trimmed, lowercased). A concept never tested starts at mastery 0.5.
+- When a file is deleted, call `learner.remove_file(student_id, file)`. A concept another file still has stays.
+- The system prompt lists the notebook's concepts, and the concept-taking tools (step 11) accept only these.
+- The concept list comes from the files, not the student, so it is not shown on the memory page.
+- The call goes through saved responses (step 9), so concept lists repeat across reruns.
+- Shortcut: only the start of a long file is read, to stay under Groq's free-tier token limit.
 
-**Done when** uploading a file adds its concepts to the weak-spots panel without duplicates.
+**Done when** uploading a file adds its concepts to the concept list without duplicates, and deleting it removes only the concepts no other file has. The weak-spots panel (step 17) shows one bar per concept from `learner.concepts()`, with its mastery score, or 0.5 if not yet tested.
 
 ### Step 7. `search_notes`: the librarian
 
@@ -190,29 +193,34 @@ The plan requires model ID, temperature, search mode, chunk size, the search-aga
 
 ### Step 10. The tutor's notes on each student (SQLite)
 
-One SQLite database per student, plus a small vector store of session notes.
+One SQLite database per student. Session notes live in it too; the vector memory variant embeds them each turn (`agent/memory/vector.py`).
 
 | Store | Holds | Example |
 |---|---|---|
 | `mastery` | Score per concept, last updated | LoRA 40% |
 | `wrong_beliefs` | A misconception, its concept, when it was seen | "Alice thinks temperature 0 means random output" |
 | `facts` | True claims only, each with the chunk ID that supports it | — |
-| Session notes (vector store) | Short summaries of past sessions | "Struggled with top-p" |
+| `session_notes` | Short summaries of past sessions, written by reflection | "Struggled with top-p" |
 
 Keeping beliefs and facts apart means the tutor never learns something false from a student. A fact without a supporting chunk from the student's files is never stored.
 
 **Done when** each student's database is separate, and the memory page (step 17) can read, edit and delete every row.
 
-### Step 11. The four tools: the tutor's buttons
+### Step 11. The tools: the tutor's buttons
 
 Each tool has a name, a short description and typed inputs, so the AI knows when and how to use it (Topic 7, slides 7–9).
 
 | Tool | Inputs (suggested) | Returns |
 |---|---|---|
 | `search_notes` | `query: str` | Top passages with file and page |
-| `make_quiz` | `concept: str`, `n: int` (3–5) | Questions grounded in the student's files |
-| `grade_answer` | `question: str`, `answer: str` | Correct or not, plus a hint (not the answer) |
+| `make_quiz` | `concept: str`, `n: int` (1–5) | Questions grounded in the student's files, each with the ids of its passages; never answers |
+| `grade_answer` | `question: str`, `student_answer: str`, `passage_ids: list[str]` | Correct or not, plus a hint (not the answer), graded against those passages |
 | `update_mastery` | `concept: str`, `correct: bool`, optional `wrong_belief: str` | Updated score |
+| `remember_fact` | `concept: str`, `fact: str`, `passage_id: str` | Ok, or an error if the passage was not retrieved in this turn |
+
+`make_quiz`, `update_mastery` and `remember_fact` accept only a concept from the notebook's concept list (step 6). An unknown name returns an error that lists the valid concepts, so the LLM can retry. While a notebook has no concepts yet, any name is accepted (a shortcut until ingest always runs extraction).
+
+The memory-write check (a `run_turn` switch, on by default) lets `remember_fact` store a fact only if its passage was retrieved in this turn: returned by `search_notes` or `make_quiz`'s search, or fetched by `grade_answer`. With the check off, any fact is stored; this is the unsafe baseline for the poisoning test (step 25).
 
 **Done when** each tool works when called directly, and its schema is passed to the LLM.
 
@@ -220,15 +228,7 @@ Each tool has a name, a short description and typed inputs, so the AI knows when
 
 Read the student's notes, pick a tool, run it, look at the result, then pick again, until there is an answer.
 
-```text
-load learner model + recent session notes
-for step in range(step_cap):
-    reply = llm(messages, tools)
-    if reply has no tool call: break
-    result = run_tool(reply.tool_call)   # logged to trace (step 14)
-    messages.append(result)
-answer = final reply, or a fallback message if the cap was hit
-```
+The loop's steps are in the docstring of `agent/s3_loop.py`.
 
 The step cap means "give up after a set number of tries", so the loop can never go round forever. Tool errors are caught and returned to the LLM as results rather than crashing the turn.
 
@@ -246,15 +246,30 @@ If the librarian brings the wrong passages, the tutor says "not it", rephrases t
 
 ### Step 14. The trace file: CCTV for the agent
 
-Every tool call is written down. This is how we prove the agent used the right tools (Topic 7, slide 57).
+Every LLM call and every tool call is written down. This is how we prove the agent used the right tools (Topic 7, slide 57).
 
-One JSONL line per call:
+One JSONL line per event, in three kinds. Every row starts with `kind, ts, student, turn, step`:
+
+- `llm`: one per LLM call anywhere, labelled with its `purpose`. Only these rows carry tokens.
+- `tool`: one per tool call. `inputs` is the parsed arguments, or the raw string if the JSON was bad.
+- `final`: one per turn, always its last row, with the turn's totals. `steps` counts a forced answer and a regeneration as one step each.
+
+A search-then-answer turn:
 
 ```json
-{"ts": "...", "student": "<anon id>", "turn": 12, "step": 2, "tool": "search_notes",
- "inputs": {"query": "..."}, "result_summary": "...", "duration_ms": 340,
- "tokens": {"in": 812, "out": 45}, "ok": true, "error": null}
+{"kind": "llm", "ts": "2026-11-05T14:03:12.481+08:00", "student": "<anon id>", "turn": 12, "step": 1,
+ "purpose": "tutor", "model": "openai/gpt-oss-120b", "tokens": {"in": 812, "out": 45}, "cached": false}
+{"kind": "tool", "ts": "2026-11-05T14:03:12.822+08:00", "student": "<anon id>", "turn": 12, "step": 1,
+ "tool": "search_notes", "inputs": {"query": "..."}, "ok": true, "error": null, "duration_ms": 340,
+ "result_summary": "..."}
+{"kind": "llm", "ts": "2026-11-05T14:03:13.610+08:00", "student": "<anon id>", "turn": 12, "step": 2,
+ "purpose": "tutor", "model": "openai/gpt-oss-120b", "tokens": {"in": 1290, "out": 160}, "cached": false}
+{"kind": "final", "ts": "2026-11-05T14:03:13.611+08:00", "student": "<anon id>", "turn": 12, "step": 2,
+ "steps": 2, "cap_hit": false, "searches": 1, "tokens": {"in": 2102, "out": 205}, "duration_ms": 1480,
+ "faithfulness": {"supported": true, "reason": "..."}, "answer_preview": "..."}
 ```
+
+The full row format is in the docstring of `agent/s4_trace.py`.
 
 **Done when** every metric in step 22 can be computed from the trace alone.
 
