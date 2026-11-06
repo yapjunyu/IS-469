@@ -1,6 +1,7 @@
 """Step 12: the agent loop.
 
-memory 'learner': weak spots + wrong beliefs into the system prompt; 'none': only the concept list
+memory 'learner': weak spots + wrong beliefs into the system prompt; 'vector': the session notes most
+similar to the message; 'none': only the concept list
 for step in range(step_cap):
     reply = llm.chat(messages, tools)
     if no tool_calls: break
@@ -16,7 +17,7 @@ import time
 from agent.prompts import GUARD_PROMPT, REGENERATE_PROMPT, SYSTEM_PROMPT
 from agent.s2_tools import MODEL, TOOL_SCHEMAS, TurnContext, run_tool, stub_passages, stub_search
 from agent import s4_trace, s6_guard, s7_faithfulness
-from agent.memory import learner
+from agent.memory import learner, vector
 
 # 1. TurnContext: bundles the student_id and config switches to the current turn (all the loops tgt). Basically giving the turn context on which student it's doing + how many steps alrdy, etc.
 
@@ -33,7 +34,7 @@ from agent.memory import learner
 #   4f: write the final row (every LLM call already wrote its own llm row through s4_trace.traced_chat)
 
 def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_search,
-             passages_fn=stub_passages, search_again=True, guard=True, memory_check=True, faithfulness=True, memory="learner", step_cap=6):
+             passages_fn=stub_passages, search_again=True, guard=True, memory_check=True, faithfulness=True, memory="learner", embedder=None, step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int,
     "faithfulness": the judge's {"supported", "reason"} or None when off, "warning": bool}.
 
@@ -49,11 +50,16 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     faithfulness: judge the answer against every passage retrieved this turn; warning is true
     when it still fails after one regeneration.
     memory: "learner" puts the student's weak spots and wrong beliefs in the system prompt;
+    "vector" puts only the past session notes most similar to user_message there;
     "none" leaves the student out (the concept list stays, it describes the notebook).
-    The app calls memory.reflection.end_session at session end only with "learner".
+    The app calls memory.reflection.end_session at session end with "learner" and "vector",
+    since both read the session notes it writes.
+    embedder: a tutor.retrieval Embedder, needed only with memory "vector".
     """
-    if memory not in ("none", "learner"):
+    if memory not in ("none", "learner", "vector"):
         raise ValueError(f"unknown memory variant: {memory!r}")
+    if memory == "vector" and embedder is None:
+        raise ValueError('memory "vector" needs an embedder')
 
     t_start = time.perf_counter()
     ctx = TurnContext(student_id=student_id, turn=turn, search_fn=search_fn,
@@ -70,6 +76,8 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
         if beliefs := learner.wrong_beliefs(student_id):
             system += ("\nWrong beliefs this student showed (never treat them as true): " + "; "
                        .join(f"{b['concept']}: {b['belief']}" for b in beliefs))
+    if memory == "vector" and (notes := vector.similar_notes(student_id, user_message, embedder)):
+        system += "\nNotes from this student's past sessions: " + " | ".join(notes)
 
     messages = [
         {

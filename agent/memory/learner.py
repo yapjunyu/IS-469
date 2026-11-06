@@ -6,7 +6,6 @@ Tables:
   facts          true claims only, each with the id of the passage that supports it
   session_notes  what the student struggled with in one past session, written by reflection
   concepts       the notebook's concept list, one row per (concept, file); not on the memory page
-shortcut: session notes are not embedded yet, add with the vector memory variant (ticket 10)
 """
 
 import re

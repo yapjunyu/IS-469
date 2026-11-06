@@ -1,6 +1,6 @@
 """Step 24, learner-model memory: reflection at the end of a session.
 
-end_session(): the app calls it once when a session ends, only with memory "learner".
+end_session(): the app calls it once when a session ends, with memory "learner" or "vector".
 One LLM call (purpose "reflection") reads the session and replies with a session note and the
 concepts the student struggled with. The note is stored; each listed concept on the notebook's
 concept list gets one wrong mark, so it moves toward a weak spot.

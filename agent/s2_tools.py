@@ -57,7 +57,7 @@ class TurnContext:
     guard: bool = True
     memory_check: bool = True
     faithfulness: bool = True
-    memory: str = "learner"  # "none" or "learner", see run_turn
+    memory: str = "learner"  # "none", "learner" or "vector", see run_turn
     step_cap: int = 6
 
 # Concept-taking tools accept only names on the notebook's concept list; the error lists them so the LLM can retry

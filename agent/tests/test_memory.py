@@ -1,5 +1,6 @@
 import json
 
+import numpy as np
 import pytest
 from agent import s1_llm
 from agent.memory import learner, reflection
@@ -75,14 +76,14 @@ def test_no_topic_parameter_in_tool_schemas():
 
 
 
-def _system_prompt(monkeypatch, **switches):
+def _system_prompt(monkeypatch, message="hello", **switches):
     """The system prompt the tutor's first LLM call gets."""
     sent = []
     def chat(messages, model, **kw):
         sent.append(messages[0]["content"])
         return {"message": {"role": "assistant", "content": "hi"}, "usage": {"in": 1, "out": 1}, "cached": False}
     monkeypatch.setattr(s1_llm, "chat", chat)
-    turn("hello", "alice", 1, **switches)
+    turn(message, "alice", 1, **switches)
     return sent[0]
 
 
@@ -141,3 +142,41 @@ def test_session_notes_on_the_memory_page_and_deletable():
     assert note["note"] == "Struggled with rank in LoRA."
     learner.delete("alice", "session_notes", note["id"])
     assert learner.read_all("alice")["session_notes"] == []
+
+
+class FakeEmbedder:
+    """Embedder-shaped: one axis per topic word, so a note is similar to a message on the same topic."""
+    TOPICS = ("lora", "top-p", "cache")
+
+    def _vec(self, text):
+        return np.array([float(t in text.lower()) for t in self.TOPICS])
+
+    def __call__(self, texts):
+        return np.array([self._vec(t) for t in texts])
+
+    def embed_query(self, text):
+        return self._vec(text)
+
+
+def _vector_prompt(monkeypatch, message):
+    return _system_prompt(monkeypatch, message, memory="vector", embedder=FakeEmbedder())
+
+
+def test_memory_vector_puts_the_most_similar_session_notes_in_the_system_prompt(monkeypatch):
+    for note in ("Struggled with rank in LoRA.", "Mixed up top-p and temperature.", "Unsure where LoRA adapters go."):
+        learner.add_session_note("alice", note)
+    system = _vector_prompt(monkeypatch, "How does LoRA work?")
+    assert "rank in LoRA" in system and "LoRA adapters go" in system
+    assert "top-p" not in system
+
+
+def test_memory_vector_leaves_weak_spots_and_wrong_beliefs_out(monkeypatch):
+    _remembered_student()
+    system = _vector_prompt(monkeypatch, "How does LoRA work?")
+    assert "rank in LoRA" in system  # the retrieved note
+    assert "0.35" not in system and "retrains every weight" not in system
+
+
+def test_memory_vector_with_no_session_notes_runs_the_turn(monkeypatch):
+    system = _vector_prompt(monkeypatch, "How does LoRA work?")
+    assert system == _system_prompt(monkeypatch, "How does LoRA work?", memory="none")

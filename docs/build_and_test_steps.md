@@ -193,7 +193,7 @@ The plan requires model ID, temperature, search mode, chunk size, the search-aga
 
 ### Step 10. The tutor's notes on each student (SQLite)
 
-One SQLite database per student. Session notes live in it too; the vector memory variant (not built yet) will embed them.
+One SQLite database per student. Session notes live in it too; the vector memory variant embeds them each turn (`agent/memory/vector.py`).
 
 | Store | Holds | Example |
 |---|---|---|
