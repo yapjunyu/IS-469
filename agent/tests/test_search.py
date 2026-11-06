@@ -21,7 +21,8 @@ def run(monkeypatch, search_fn=fake_search, **switches):
         sent.append([dict(m) for m in messages])
         return next(replies)
     monkeypatch.setattr(s1_llm, "chat", chat)
-    return s3_loop.run_turn("What is LoRA?", "alice", 1, search_fn=search_fn, **switches), sent
+    return s3_loop.run_turn("What is LoRA?", "alice", 1, search_fn=search_fn,
+                            **{"faithfulness": False, **switches}), sent
 
 
 def tool_message(sent):

@@ -17,7 +17,13 @@ Concepts already in the notebook: {known}.
 If the file teaches one of these, use that exact name instead of a synonym."""
 
 SEARCH_AGAIN_PROMPT = ""    # "are these passages enough? yes/no + rephrased query"
-FAITHFULNESS_PROMPT = ""    # judge: is the answer supported by these passages?
+FAITHFULNESS_PROMPT = """You check a study tutor's answer against passages from the student's notes.
+The answer is supported if every claim about course content in it is stated in the passages.
+Greetings, questions to the student and saying the notes do not cover something need no support.
+Reply with a JSON object only: {"supported": true or false, "reason": "the unsupported claim, or why it passes"}."""
+
+REGENERATE_PROMPT = """(From the answer checker, not the student.) Your last answer is not supported by the notes: {reason}
+Rewrite it for the student using only what the passages above say. If the notes do not cover it, say so."""
 
 QUIZ_PROMPT = """Write {n} practice questions on the concept below, using only the passages given.
 Reply with a JSON list only: [{{"question": "...", "passage_ids": ["id of each passage the question uses"]}}].

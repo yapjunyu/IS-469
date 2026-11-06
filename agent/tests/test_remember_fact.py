@@ -59,8 +59,8 @@ def test_run_turn_offers_remember_fact_and_passes_the_check_switch(monkeypatch):
         tools_sent.append([t["function"]["name"] for t in tools or []])
         return next(replies)
     monkeypatch.setattr(s1_llm, "chat", chat)
-    s3_loop.run_turn("Remember that", "alice", 1)
+    s3_loop.run_turn("Remember that", "alice", 1, faithfulness=False)
     assert learner.read_all("alice")["facts"] == []  # check on by default: nothing searched, nothing stored
-    s3_loop.run_turn("Remember that", "alice", 2, memory_check=False)
+    s3_loop.run_turn("Remember that", "alice", 2, memory_check=False, faithfulness=False)
     assert len(learner.read_all("alice")["facts"]) == 1
     assert set(tools_sent[0]) == {"search_notes", "make_quiz", "grade_answer", "update_mastery", "remember_fact"}

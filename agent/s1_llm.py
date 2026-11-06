@@ -1,8 +1,10 @@
-"""Step 9: the only file that talks to Groq.
+"""Step 9: the only file that talks to an LLM provider.
 
-- Cache every successful response to disk, keyed by a hash of
-  (model, messages, tools, tool_choice, temperature, max_tokens).
-- On 429: the Groq SDK's own retries (max_retries) honour `retry-after`.
+- Route by model name: OpenAI model IDs (gpt-...) go to OpenAI, all others to Groq.
+- GPT-5 models reject a custom temperature and take max_completion_tokens instead of
+  max_tokens, so their request is adapted; reruns stay identical through the cache.
+- Cache every successful response to disk, keyed by a hash of the full request.
+- On 429: both SDKs' own retries (max_retries) honour `retry-after`.
 - On 400 `tool_use_failed`: retry; never append the bad call to history.
 - Return plain dicts (not SDK objects) so cache and trace can JSON them.
 """
@@ -11,31 +13,31 @@ import json
 from pathlib import Path
 
 import groq
+import openai
 from dotenv import load_dotenv
 
 load_dotenv()
 # same gitignored folder as src/tutor/llm.py; keys hash the full request, so no collisions
 # shortcut: path copied from src/tutor/llm.py, import it once `tutor` is installed as a package
 CACHE_DIR = Path(__file__).resolve().parents[1] / "data" / "llm_cache"
-_client = None
+_clients = {}
 
-# Create Groq connection 1st time then reuses it
-def _get_client():
-    global _client
-    if not _client:
-        _client = groq.Groq(max_retries = 5)
-    return _client
+# Create each provider's connection the 1st time, then reuse it (keys from GROQ_API_KEY / OPENAI_API_KEY in .env)
+def _get_client(provider):
+    if provider not in _clients:
+        _clients[provider] = (openai.OpenAI if provider == "openai" else groq.Groq)(max_retries=5)
+    return _clients[provider]
 
 # turns the whole request into a short, unique fingerprint that serves as the file name for its saved answer, so identical requests always find the same file.
 def _cache_key(request):
     text = json.dumps(request, sort_keys=True)
     return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
-# Calls Groq & handle error types that doesn't retry
-def _call_with_retry(request, attempts=3):
+# Calls the provider; retries Groq's 400 tool_use_failed (OpenAI has no such error, its 400s raise)
+def _call_with_retry(provider, request, attempts=3):
     for attempt in range(attempts):
         try:
-            return _get_client().chat.completions.create(**request)
+            return _get_client(provider).chat.completions.create(**request)
         except groq.BadRequestError as e:
             if "tool_use_failed" not in str(e) or attempt == attempts - 1:
                 raise
@@ -59,6 +61,12 @@ def chat(messages, model,
         request["tools"] = tools
         request["tool_choice"] = tool_choice
 
+    # shortcut: only gpt- IDs route to OpenAI, add o-series prefixes if the team ever uses them
+    provider = "openai" if model.startswith("gpt-") else "groq"
+    if model.startswith("gpt-5"):
+        del request["temperature"]
+        request["max_completion_tokens"] = request.pop("max_tokens")
+
     path = CACHE_DIR / f"{_cache_key(request)}.json"
 
     if path.exists():
@@ -66,7 +74,7 @@ def chat(messages, model,
         result["cached"] = True
         return result
 
-    response = _call_with_retry(request)
+    response = _call_with_retry(provider, request)
     result = {
         "message": response.choices[0].message.model_dump(exclude_none=True),
         "usage": {

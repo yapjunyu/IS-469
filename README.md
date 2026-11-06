@@ -38,7 +38,7 @@ The agent is a single tool-calling loop with these tools (`search_notes`, `make_
 | File extraction | python-pptx for .pptx, PyMuPDF for .pdf; PDFs without selectable text are rejected |
 | Chunking | One passage per slide for decks; a few hundred tokens with overlap for documents, split at headings; size set in config |
 | Tutor LLM | Llama on Groq, model ID pinned in config, temperature 0 |
-| Judge / faithfulness checker | A model from a different family than Llama (TBC) |
+| Judge / faithfulness checker | `gpt-5.4-mini-2026-03-17` on OpenAI |
 | Embeddings | sentence-transformers |
 | Vector store | FAISS or Chroma; one index per notebook, keyed by file hash so each file is embedded once |
 | Keyword search | rank_bm25 |

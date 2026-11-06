@@ -258,7 +258,7 @@ Every LLM call and every tool call is written down. This is how we prove the age
 
 One JSONL line per event, in three kinds. Every row starts with `kind, ts, student, turn, step`:
 
-- `llm`: one per LLM call anywhere. `purpose` is one of `tutor`, `forced_answer`, `concepts`, `quiz`, `grading` (later judge, search-again). Only these rows carry tokens.
+- `llm`: one per LLM call anywhere. `purpose` is one of `tutor`, `forced_answer`, `concepts`, `quiz`, `grading`, `judge`, `regenerate` (later search-again). Only these rows carry tokens.
 - `tool`: one per tool call. `inputs` is the parsed arguments, or the raw string if the JSON was bad.
 - `final`: one per turn, always its last row, with the turn's totals.
 
@@ -274,7 +274,7 @@ A search-then-answer turn:
  "purpose": "tutor", "model": "llama-3.3-70b-versatile", "tokens": {"in": 1290, "out": 160}, "cached": false}
 {"kind": "final", "ts": "2026-11-05T14:03:13.611+08:00", "student": "<anon id>", "turn": 12, "step": 2,
  "steps": 2, "cap_hit": false, "searches": 1, "tokens": {"in": 2102, "out": 205}, "duration_ms": 1480,
- "answer_preview": "..."}
+ "faithfulness": {"supported": true, "reason": "..."}, "answer_preview": "..."}
 ```
 
 The full row format is in the docstring of `agent/s4_trace.py`.

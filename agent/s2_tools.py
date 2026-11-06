@@ -54,6 +54,7 @@ class TurnContext:
     search_again: bool = True
     guard: bool = True
     memory_check: bool = True
+    faithfulness: bool = True
     step_cap: int = 6
 
 # Concept-taking tools accept only names on the notebook's concept list; the error lists them so the LLM can retry
@@ -76,12 +77,12 @@ def search_notes(ctx, query):
     ctx.passage_ids += [p["id"] for p in passages]
     return {"passages": passages}
 
-def _ask(ctx, purpose, prompt, passages, user_text, start):
-    """One LLM call over the passages. Returns the reply's JSON value starting at `start` ("[" or "{"), or None."""
+def ask(ctx, purpose, prompt, passages, user_text, start, model=MODEL):
+    """One LLM call over the passages (quiz, grading, judge). Returns the reply's JSON value starting at `start` ("[" or "{"), or None."""
     system = prompt + (GUARD_PROMPT if ctx.guard else "")
     messages = [{"role": "system", "content": system},
                 {"role": "user", "content": s6_guard.material(passages, ctx.guard) + "\n\n" + user_text}]
-    content = s4_trace.traced_chat(ctx, purpose, messages, MODEL)["message"].get("content") or ""
+    content = s4_trace.traced_chat(ctx, purpose, messages, model)["message"].get("content") or ""
     try:
         return json.loads(content[content.find(start):content.rfind("]" if start == "[" else "}") + 1])
     except ValueError:
@@ -95,7 +96,7 @@ def make_quiz(ctx, concept, n=3):
     passages = search_notes(ctx, concept)["passages"]
     if not passages:
         return {"error": f"No passages in the notes about {concept!r}"}
-    items = _ask(ctx, "quiz", QUIZ_PROMPT.format(n=n), passages, f"Concept: {concept}", "[")
+    items = ask(ctx, "quiz", QUIZ_PROMPT.format(n=n), passages, f"Concept: {concept}", "[")
     ids = [p["id"] for p in passages]
     questions = []
     # keep only the question and real source ids: any answer the LLM wrote must not reach the tutor
@@ -115,7 +116,7 @@ def grade_answer(ctx, question, student_answer, passage_ids):
     if not passages:
         return {"error": f"No passages found with ids {passage_ids}"}
     ctx.passage_ids += [p["id"] for p in passages]  # fetched from the notes this turn, so they count as retrieved
-    verdict = _ask(ctx, "grading", GRADE_PROMPT, passages,
+    verdict = ask(ctx, "grading", GRADE_PROMPT, passages,
                    f"Question: {question}\nStudent's answer: {student_answer}", "{")
     if not (isinstance(verdict, dict) and isinstance(verdict.get("correct"), bool)):
         return {"error": "The grading reply had no valid verdict"}

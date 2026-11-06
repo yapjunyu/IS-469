@@ -75,8 +75,8 @@ def call(name, args):
 def test_quiz_then_grade_writes_an_llm_row_for_each_call(monkeypatch, tmp_data):
     monkeypatch.setattr(s1_llm, "chat", scripted(call(*QUIZ[:2]), answer(QUIZ[2]), answer("Q1: What does LoRA add?"),
                                                   call(*GRADE[:2]), answer(GRADE[2]), answer("Correct!")))
-    s3_loop.run_turn("Quiz me on LoRA", "alice", 1, search_fn=fake_search, passages_fn=lookup)
-    out = s3_loop.run_turn("x", "alice", 2, search_fn=fake_search, passages_fn=lookup)
+    s3_loop.run_turn("Quiz me on LoRA", "alice", 1, search_fn=fake_search, passages_fn=lookup, faithfulness=False)
+    out = s3_loop.run_turn("x", "alice", 2, search_fn=fake_search, passages_fn=lookup, faithfulness=False)
     assert out["answer"] == "Correct!"
     assert [(r["turn"], r["purpose"]) for r in read_trace(tmp_data) if r["kind"] == "llm"] == [
         (1, "tutor"), (1, "quiz"), (1, "tutor"), (2, "tutor"), (2, "grading"), (2, "tutor")]
