@@ -8,5 +8,5 @@ With the switch off, return the first search result (fixed-pipeline baseline).
 
 
 def search_with_retries(query, search_fn, max_searches=3):
-    """Return the final list of chunks ({file, page, text, ...})."""
+    """Return the final list of passages ({id, file, page, text})."""
     raise NotImplementedError

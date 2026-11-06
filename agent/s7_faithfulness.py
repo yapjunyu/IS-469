@@ -4,6 +4,6 @@ Uses s4_trace.traced_chat with a judge model from a different family than the tu
 """
 
 
-def check(answer, chunks, judge_model):
+def check(answer, passages, judge_model):
     """Return {"supported": bool, "reason": str}."""
     raise NotImplementedError

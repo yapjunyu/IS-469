@@ -3,7 +3,7 @@
 Tables:
   mastery        score per concept (0 to 1), last updated
   wrong_beliefs  a misconception, its concept, when it was seen
-  facts          true claims only, each with the chunk id that supports it
+  facts          true claims only, each with the id of the passage that supports it
   concepts       the notebook's concept list, one row per (concept, file); not on the memory page
 shortcut: session-notes vector store not built yet, add when the memory page needs it
 """
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS facts (
     id       INTEGER PRIMARY KEY,
     concept  TEXT NOT NULL,
     fact     TEXT NOT NULL,
-    chunk_id TEXT NOT NULL
+    passage_id TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS concepts (
     concept TEXT NOT NULL,
@@ -57,6 +57,11 @@ def _db(student_id):
     conn.row_factory = sqlite3.Row
     try:
         conn.executescript(SCHEMA)
+        try:  # databases made before the glossary settled on "passage"
+            conn.execute("ALTER TABLE facts RENAME COLUMN chunk_id TO passage_id")
+        except sqlite3.OperationalError as e:
+            if "no such column" not in str(e):
+                raise
         with conn:          # commits, or rolls back on error
             yield conn
     finally:
@@ -95,16 +100,16 @@ def update_mastery(student_id, concept, correct, wrong_belief=None):
             )
         return round(new, 3)
 
-# Stores a true claim with chunk_id of passage.
+# Stores a true claim with the id of its supporting passage.
 # With no source, raises ValueError and stores nothing
-def add_fact(student_id, concept, fact, chunk_id):
-    """Store a true claim. No supporting chunk, no fact."""
-    if not chunk_id:
-        raise ValueError("a fact needs the chunk_id that supports it")
+def add_fact(student_id, concept, fact, passage_id):
+    """Store a true claim. No supporting passage, no fact."""
+    if not passage_id:
+        raise ValueError("a fact needs the passage_id that supports it")
     with _db(student_id) as conn:
         conn.execute(
-            "INSERT INTO facts (concept, fact, chunk_id) VALUES (?, ?, ?)",
-     (norm(concept), fact, chunk_id)
+            "INSERT INTO facts (concept, fact, passage_id) VALUES (?, ?, ?)",
+     (norm(concept), fact, passage_id)
         )
 
 # Returns up to 3 concepts scoring under 0.6 w/ weakest 1st.

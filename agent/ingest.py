@@ -13,7 +13,7 @@ from agent.s2_tools import TurnContext
 from agent.s3_loop import MODEL
 
 # shortcut: reads only the start of a file to stay under Groq's free-tier token limit, so concepts
-# late in a long PDF are missed; upgrade to per-chunk extraction on a paid tier
+# late in a long PDF are missed; upgrade to per-passage extraction on a paid tier
 MAX_CHARS = 12000
 
 

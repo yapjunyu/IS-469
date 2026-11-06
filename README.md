@@ -54,6 +54,8 @@ The agent is a single tool-calling loop with four tools (`search_notes`, `make_q
 
 > Setup commands will be added once the one-command launch is in place.
 
+Turn on the pre-commit checks (ruff and pytest) once per clone: `git config core.hooksPath .githooks`.
+
 1. Set your Groq API key and choose settings in the config file: model ID, temperature, search mode, chunk size, search-again switch and random seeds all live there.
 2. Launch the app with a single command.
 3. Enter your name or ID, then upload your .pptx or PDF files into your notebook.

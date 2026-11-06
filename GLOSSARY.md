@@ -10,7 +10,7 @@ _Avoid_: Workspace, library
 
 **Passage**:
 A short piece of an uploaded file, with the file and page or slide it came from. The unit that is searched and cited.
-_Avoid_: Chunk (in prose), snippet, document
+_Avoid_: Chunk (everywhere outside `src/tutor/retrieval/`, where `Chunk` is the pipeline stage before search), snippet, document
 
 **Concept**:
 A named idea taught in the notebook (e.g. "LoRA", "KV cache"), taken from a fixed list built from the uploaded files. Quizzes, mastery scores and weak spots all refer to the same concept list.
