@@ -5,7 +5,7 @@ compared at 100, 150 and 200 words, each with 15% overlap. Picked on dev: eviden
 
     .venv/bin/python eval/run_minilm_document_sizes.py
 
-Saves eval/results/minilm_document_sizes.csv and minilm_document_sizes_questions.csv.
+Saves eval/results_60_40/minilm_document_sizes.csv and minilm_document_sizes_questions.csv.
 """
 import sys
 from pathlib import Path

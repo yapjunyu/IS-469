@@ -61,14 +61,14 @@ All the champion settings are in [`src/tutor/pipeline.py`](src/tutor/pipeline.py
 | Stage | Champion |
 |---|---|
 | Slide chunking | One chunk per slide |
-| Document chunking | Fixed 200 words, 30-word overlap |
+| Document chunking | Recursive 200 words, 30-word overlap |
 | Embedder | Gemma 2 (`google/embeddinggemma-2`), with image chunks |
-| Search | Dense, top 3 chunks |
+| Search | Hybrid + rerank (`cross-encoder/ms-marco-MiniLM-L-6-v2`), top 3 chunks |
 | Answering model | `nvidia/nemotron-3.5-super-vl:free` through OpenRouter |
 
 The RAGAS judge is `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`, set in `eval/ragas_eval.py`. `K` and the answering model are defined in `src/tutor/rag.py`, and `pipeline.py` imports them.
 
-Results and reasons are in [`SUMMARY_minilm_chunking.md`](eval/results/SUMMARY_minilm_chunking.md) (chunking) and [`SUMMARY_jina_vs_gemma2.md`](eval/results/SUMMARY_jina_vs_gemma2.md) (embedder and search).
+Results and reasons are in [`SUMMARY_60_40.md`](eval/results_60_40/SUMMARY_60_40.md).
 
 ### Set up
 
@@ -90,7 +90,7 @@ echo 'OPENROUTER_API_KEY=your-key-here' > .env
 .venv/bin/python src/tutor/pipeline.py     # keeps asking until you press Enter on an empty line
 ```
 
-The first run downloads Gemma 2 and embeds the whole corpus, which took about 20 minutes on an Apple M2 with 16 GB of memory. The vectors are saved in `data/`, so later runs start quickly. If you see "I can't find this in your notes", the top 3 chunks did not contain the answer, or the topic is not in the corpus.
+The first run downloads Gemma 2 and the reranker, and embeds the whole corpus, which took about 20 minutes on an Apple M2 with 16 GB of memory. The vectors are saved in `data/`, so later runs start quickly. If you see "I can't find this in your notes", the top 3 chunks did not contain the answer, or the topic is not in the corpus.
 
 To call the pipeline from your own code, such as the agent's `search_notes` tool:
 
@@ -109,7 +109,7 @@ Run it with `src` on your Python path, for example `PYTHONPATH=src .venv/bin/pyt
 
 ### Rerun the evaluation
 
-Run these in order. They need no API key, and each one saves its results in `eval/results/`. Vectors are cached, so only the first run of each model is slow.
+Run these in order. They need no API key, and each one saves its results in `eval/results_60_40/`. Vectors are cached, so only the first run of each model is slow.
 
 ```bash
 .venv/bin/python eval/run_minilm_chunking.py            # chunking methods
@@ -118,6 +118,7 @@ Run these in order. They need no API key, and each one saves its results in `eva
 .venv/bin/python eval/run_text_embedders.py gemma2
 .venv/bin/python eval/run_image_embedders.py gemma2     # embedders, text and images
 .venv/bin/python eval/run_search.py                     # search methods
+.venv/bin/python eval/summarise_split.py                # combined CSVs
 ```
 
 Jina CLIP v2 does not load on transformers 5, so it has its own environment:
@@ -134,7 +135,7 @@ Jina CLIP v2 does not load on transformers 5, so it has its own environment:
 
 ### Score answers with RAGAS
 
-This needs your OpenRouter key. The default set is the 75 questions marked `llm_eval` in `eval/gold/gold.csv`.
+This needs your OpenRouter key. The default set is the 75 questions marked `llm_eval` in `eval/gold/gold_60_40.csv`.
 
 ```bash
 .venv/bin/python eval/run_generation.py --limit 3   # try a few first
@@ -143,7 +144,7 @@ This needs your OpenRouter key. The default set is the 75 questions marked `llm_
 .venv/bin/python eval/ragas_eval.py sample
 ```
 
-A text question takes about 9 API calls and an image question about 6, so all 75 take about 630. Free OpenRouter models are limited to 50 requests a day, or 1,000 a day once you add $10 of credit, and can also be rate-limited, so a run may need several days. Answers and judge replies are cached, so rerunning continues where it stopped. Check the `scored` counts in `eval/results/ragas_sample.json`, because a metric that fails is left out of its mean.
+A text question takes about 9 API calls and an image question about 6, so all 75 take about 630. Free OpenRouter models are limited to 50 requests a day, or 1,000 a day once you add $10 of credit, and can also be rate-limited, so a run may need several days. Answers and judge replies are cached, so rerunning continues where it stopped. Check the `scored` counts in `eval/results_60_40/ragas_sample.json`, because a metric that fails is left out of its mean.
 
 ## Getting started
 

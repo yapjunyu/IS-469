@@ -11,8 +11,7 @@ Or use it from code, with src on the Python path:
     result = ask("What is LoRA?", index)
     print(result.readable())                    # the answer, with its citations
 
-Why each setting won: eval/results/SUMMARY_minilm_chunking.md (chunking) and
-eval/results/SUMMARY_jina_vs_gemma2.md (embedder and search).
+Why each setting won: eval/results_60_40/SUMMARY_60_40.md.
 """
 import sys
 from pathlib import Path
@@ -26,12 +25,12 @@ from tutor.retrieval.chunk import chunk_pages  # noqa: E402
 from tutor.retrieval.clean import clean_pages  # noqa: E402
 from tutor.retrieval.embed import Embedder  # noqa: E402
 from tutor.retrieval.extract import extract, file_sha256  # noqa: E402
-from tutor.retrieval.search import DEFAULT_CHROMA_DIR, ChromaIndex  # noqa: E402
+from tutor.retrieval.search import DEFAULT_CHROMA_DIR, ChromaIndex, ChromaTextOnly, HybridRerankIndex  # noqa: E402
 
-# chunk_pages arguments per page kind: one chunk per slide; documents fixed 200 words, 30-word overlap
-CHUNKING = {"slide": dict(slide_method="slide"), "page": dict(method="fixed", chunk_size=200, chunk_overlap=30)}
-EMBEDDER = "gemma2"  # Gemma 2, with image chunks. Search is dense: cosine similarity in Chroma.
-STORE_TAG = "slide-fixed200-images"  # use a new tag whenever CHUNKING changes, see ChromaIndex
+# chunk_pages arguments per page kind: one chunk per slide; documents recursive 200 words, 30-word overlap
+CHUNKING = {"slide": dict(slide_method="slide"), "page": dict(method="recursive", chunk_size=200, chunk_overlap=30)}
+EMBEDDER = "gemma2"  # Gemma 2, with image chunks. Search is hybrid + rerank: see HybridRerankIndex.
+STORE_TAG = "slide-recursive200-images"  # use a new tag whenever CHUNKING changes, see ChromaIndex
 # Every corpus file except the two duplicate decks: the older Topic 5-6 copy and the Topic 8 .pptx
 # (their content repeats Topic6_Evaluation.pdf and Topic8_AgenticRAG_MITB.pdf).
 SKIP = {"Topic5-6_Inference_Evaluation_IS469.pdf", "Topic8_AgenticRAG_MITB.pptx"}
@@ -43,15 +42,16 @@ def corpus_files() -> list[Path]:
     return sorted(files, key=lambda p: p.name)
 
 
-def build_index(files: list[Path], embed=None, path=DEFAULT_CHROMA_DIR) -> ChromaIndex:
+def build_index(files: list[Path], embed=None, path=DEFAULT_CHROMA_DIR, reranker=None) -> HybridRerankIndex:
     """Extract, clean, chunk and embed any file that isn't stored yet, and return the search index."""
-    store = ChromaIndex(embed or Embedder(EMBEDDER), tag=STORE_TAG, path=path)
+    embed = embed or Embedder(EMBEDDER)
+    store = ChromaIndex(embed, tag=STORE_TAG, path=path)
     for file in files:
         digest = file_sha256(file)
         if not store.has_file(digest):
             pages = clean_pages(extract(file, images=True))
             store.add_file(chunk_pages(pages, digest, **CHUNKING[pages[0].kind]))
-    return store
+    return HybridRerankIndex(store.chunks, embed, dense=store, text_dense=ChromaTextOnly(store), model=reranker)
 
 
 def ask(question: str, index, llm=None) -> Answer:

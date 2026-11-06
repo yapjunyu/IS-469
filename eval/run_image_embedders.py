@@ -1,7 +1,7 @@
 """Compare Gemma 2 and Jina CLIP v2 on all questions, with image chunks in the index.
 
     slides     one chunk per slide, plus image chunks
-    documents  fixed 200 words, 30-word overlap, plus image chunks
+    documents  recursive 200 words, 30-word overlap, plus image chunks
     search     dense, top 3
 
 Image questions get two scores:
@@ -15,7 +15,7 @@ compete for the top 3. The winner is picked on dev, all questions: evidence reca
     .venv-jina/bin/python eval/run_image_embedders.py jinaclip2   # its own environment: requirements-jina.txt
     .venv/bin/python eval/run_image_embedders.py --compare
 
-Saves eval/results/image_embedder_<model>.csv and _questions.csv. --compare prints paired gains.
+Saves eval/results_60_40/image_embedder_<model>.csv and _questions.csv. --compare prints paired gains.
 """
 import argparse
 import csv
@@ -38,7 +38,7 @@ from tutor.retrieval.search import DenseIndex  # noqa: E402
 
 MODELS = ("gemma2", "jinaclip2")
 SLIDES = mc.SLIDE_METHODS["slide"]
-DOCUMENTS = mc.DOCUMENT_METHODS["fixed"]
+DOCUMENTS = mc.DOCUMENT_METHODS["recursive"]
 FORMATS = {"all": lambda corpus: True, "slides": lambda corpus: corpus == "slides",
            "documents": lambda corpus: corpus == "longdoc"}
 GROUPS = {"all": lambda q: True, "text_q": lambda q: q["evidence_type"] == "text",

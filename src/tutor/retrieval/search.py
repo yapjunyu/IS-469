@@ -1,27 +1,32 @@
 """Search: find the chunks that best answer a question (plan step 7).
 
-Three methods, compared on the same gold questions:
+Four methods, compared on the same gold questions:
   dense          meaning: embeddings + cosine similarity (Topic 8, slides 13-15)
   bm25           exact words: BM25 keyword scores, built on TF-IDF (Topic 1; slide 35)
   hybrid         run dense and BM25, merge the two rankings with RRF (slide 35)
+  hybrid_rerank  hybrid over text, reranked by a cross-encoder (slides 28-32); pictures keep their
+                 dense positions, because a cross-encoder can't read them. The chosen method.
 
 Every index has the same method, search(query, k) -> list[Passage], so they can be
 swapped with one setting (see make_index).
 """
 import re
 from dataclasses import asdict, replace
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable
 
 import numpy as np
 from rank_bm25 import BM25Okapi
 
+from tutor.retrieval.embed import _as_text
 from tutor.retrieval.types import Chunk, Passage
 
 # Takes a list of texts and returns one embedding vector per text (one row each).
 EmbedFn = Callable[[list[str]], np.ndarray]
 
-SEARCH_MODES = ("dense", "bm25", "hybrid")
+SEARCH_MODES = ("dense", "bm25", "hybrid", "hybrid_rerank")
+RERANKER = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 
 def make_index(mode: str, chunks: list[Chunk], embed: EmbedFn, candidates: int = 20):
@@ -32,6 +37,8 @@ def make_index(mode: str, chunks: list[Chunk], embed: EmbedFn, candidates: int =
         return BM25Index(chunks)
     if mode == "hybrid":
         return HybridIndex(chunks, embed, candidates)
+    if mode == "hybrid_rerank":
+        return HybridRerankIndex(chunks, embed, candidates)
     raise ValueError(f"unknown search mode: {mode!r}")
 
 
@@ -115,16 +122,27 @@ class ChromaIndex:
         return [_stored_chunk(i, text, meta)
                 for i, text, meta in zip(rows["ids"], rows["documents"], rows["metadatas"])]
 
-    def search(self, query: str, k: int = 5) -> list[Passage]:
+    def search(self, query: str, k: int = 5, text_only: bool = False) -> list[Passage]:
         stored = self.collection.count()
         if stored == 0:
             return []
         q = _normalise([self.embed.embed_query(query)])[0]
+        filters = {"where": {"image_path": ""}} if text_only else {}  # a missing image is stored as ""
         found = self.collection.query(query_embeddings=[q.tolist()], n_results=min(k, stored),
-                                      include=["documents", "metadatas", "distances"])
+                                      include=["documents", "metadatas", "distances"], **filters)
         rows = zip(found["ids"][0], found["documents"][0], found["metadatas"][0], found["distances"][0])
         return [Passage(**asdict(_stored_chunk(i, text, meta)), score=1 - distance)
                 for i, text, meta, distance in rows]
+
+
+class ChromaTextOnly:
+    """A ChromaIndex that only searches text chunks, for HybridRerankIndex."""
+
+    def __init__(self, store: ChromaIndex):
+        self.store = store
+
+    def search(self, query: str, k: int = 5) -> list[Passage]:
+        return self.store.search(query, k, text_only=True)
 
 
 def _file_key(chunk: Chunk) -> str:
@@ -218,3 +236,39 @@ class HybridIndex:
     def search(self, query: str, k: int = 5) -> list[Passage]:
         return rrf([self.dense.search(query, self.candidates),
                     self.bm25.search(query, self.candidates)], k)
+
+
+# hybrid_rerank: the chosen method
+@lru_cache(maxsize=None)
+def _cross_encoder(name: str = RERANKER):
+    from sentence_transformers import CrossEncoder  # imported here: slow, and only this index needs it
+    return CrossEncoder(name)
+
+
+class HybridRerankIndex:
+    """Hybrid search over text, reranked by a cross-encoder that reads the question and each chunk's text
+    together. It can't score pictures, so each picture stays where dense search ranked it, and the
+    other places go to the reranked text."""
+
+    def __init__(self, chunks: list[Chunk], embed: EmbedFn, candidates: int = 20,
+                 dense=None, text_dense=None, model=None):
+        # `dense` and `text_dense` let a saved index (ChromaIndex, ChromaTextOnly) stand in for in-memory ones
+        self.dense = dense if dense is not None else DenseIndex(chunks, embed)
+        self.text = HybridIndex([c for c in chunks if not c.image_path], embed, candidates, dense=text_dense)
+        self.candidates = candidates
+        self.model = model
+        self.scores: dict[str, np.ndarray] = {}  # reranker scores per question, which is the slow part
+
+    def _reranked_text(self, query: str, k: int) -> list[Passage]:
+        found = self.text.search(query, max(k, self.candidates))
+        top, rest = found[:self.candidates], found[self.candidates:]
+        if query not in self.scores:
+            model = self.model or _cross_encoder()
+            self.scores[query] = model.predict([(query, _as_text(p.text)) for p in top])
+        order = sorted(range(len(top)), key=lambda i: -self.scores[query][i])
+        return ([top[i] for i in order] + rest)[:k]
+
+    def search(self, query: str, k: int = 5) -> list[Passage]:
+        text = iter(self._reranked_text(query, k))
+        picked = (p if p.image_path else next(text, None) for p in self.dense.search(query, k))
+        return [p for p in picked if p]

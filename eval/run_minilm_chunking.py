@@ -8,7 +8,7 @@ Everything except the chunking stays fixed: MiniLM, dense search, no image chunk
 Slides and documents share one index, so all 6 combinations are run. Each format is scored on its
 own text questions. The winner for a format is picked on dev (evidence recall@3, then MRR).
 
-Saves eval/results/minilm_chunking.csv and minilm_chunking_questions.csv.
+Saves eval/results_60_40/minilm_chunking.csv and minilm_chunking_questions.csv.
 """
 import random
 import sys
