@@ -1,5 +1,4 @@
 """The notebook module: real Chroma in a temp folder, a generated PDF, fake models and a scripted LLM."""
-import hashlib
 import json
 import os
 import subprocess
@@ -17,6 +16,7 @@ from agent import s1_llm
 from agent.memory import learner
 from agent.tests.test_loop import SEARCH_CALL, reply, turn
 from tutor import notebook
+from tutor.pipeline import EMBEDDER, STORE_TAG
 from tutor.retrieval import embed, search
 from tutor.retrieval.extract import FileRejected
 
@@ -97,12 +97,12 @@ def test_added_file_is_reported_and_its_concepts_join_the_concept_list(tmp_path)
     assert learner.concepts("alice") == ["adapters", "lora"]
 
 
-def test_search_returns_passages_with_their_source_and_no_picture(tmp_path):
-    path = make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small")
-    notebook.add_file("alice", path)
+def test_search_returns_passages_with_their_file_page_and_text(tmp_path):
+    notebook.add_file("alice", make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small"))
     [found] = notebook.search("alice", "What is LoRA?")
-    assert found == {"id": f"{hashlib.sha256(path.read_bytes()).hexdigest()[:12]}:0000", "file": "notes.pdf",
-                     "page": 1, "page_end": 1, "kind": "slide", "text": "LoRA adapters are small", "image_path": None}
+    assert found.pop("id")
+    assert found == {"file": "notes.pdf", "page": 1, "page_end": 1, "kind": "slide",
+                     "text": "LoRA adapters are small", "image_path": None}
 
 
 def test_search_returns_the_top_3(tmp_path):
@@ -268,12 +268,13 @@ def test_adding_the_saved_copy_itself_is_harmless(tmp_data, tmp_path):
     assert saved.read_bytes() == (tmp_path / "notes.pdf").read_bytes()
 
 
-def test_a_saved_copy_not_yet_indexed_gets_indexed(tmp_data):
-    saved = tmp_data / "uploads" / "alice" / "notes.pdf"
-    saved.parent.mkdir(parents=True)
-    make_pdf(saved, "LoRA adapters are small")
-    assert notebook.add_file("alice", saved)["status"] == "added"
-    assert notebook.search("alice", "LoRA")[0]["text"] == "LoRA adapters are small"
+def test_a_crash_between_indexing_and_saving_is_put_right_by_adding_again(tmp_data, tmp_path):
+    path = make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small")
+    notebook.add_file("alice", path)
+    (tmp_data / "uploads" / "alice" / "notes.pdf").unlink()  # passages stored, file not saved: what the crash leaves
+    assert notebook.add_file("alice", path)["status"] == "added"
+    assert notebook.files("alice") == ["notes.pdf"]
+    assert len(notebook.search("alice", "LoRA")) == 1
 
 
 def test_same_name_with_new_content_is_turned_away_until_replacing_exists(tmp_data, tmp_path):
@@ -309,7 +310,7 @@ def test_each_student_has_one_collection_in_their_own_folder_named_apart_from_th
     for student in ("alice", "bob"):
         notebook.add_file(student, make_pdf(tmp_path / f"{student}.pdf", "LoRA adapters are small"))
         client = chromadb.PersistentClient(path=str(tmp_data / "chroma" / student))
-        assert [c.name for c in client.list_collections()] == [f"slide-recursive200-images-{student}_gemma2"]
+        assert [c.name for c in client.list_collections()] == [f"{STORE_TAG}-{student}_{EMBEDDER}"]
 
 
 # models
@@ -327,7 +328,7 @@ def test_the_embedder_and_reranker_load_once_however_much_is_added_and_searched(
 
 def test_a_turn_through_the_notebook_gives_the_llm_a_real_passage(monkeypatch, tmp_path):
     notebook.add_file("alice", make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small"))
-    replies = iter([reply(SEARCH_CALL), reply({"role": "assistant", "content": "LoRA adapters are small."}),
+    replies = iter([reply(SEARCH_CALL), reply({"role": "assistant", "content": "They are tiny."}),
                     reply({"role": "assistant", "content": '{"supported": true, "reason": "stated"}'})])
     sent = []
 
