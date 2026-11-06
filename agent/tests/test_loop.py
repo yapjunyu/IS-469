@@ -1,6 +1,7 @@
 """Tests with a fake LLM and fake search_notes: step cap, tool dispatch, trace rows."""
 from agent import s1_llm, s3_loop
 from agent.memory import learner
+from agent.s2_tools import TurnContext
 import json
 
 SEARCH_CALL = {"role": "assistant", "tool_calls": [{"id": "c1", "type": "function",
@@ -32,6 +33,11 @@ EXTRA_CALLS_OFF = {"faithfulness": False, "search_again": False}
 def turn(*args, **switches):
     """run_turn with the extra-call checks off unless the test switches one on."""
     return s3_loop.run_turn(*args, **{**EXTRA_CALLS_OFF, **switches})
+
+
+def tool_ctx(**fields):
+    """A TurnContext for alice, for run_tool tests, with the extra-call checks off unless the test switches one on."""
+    return TurnContext(**{"student_id": "alice", **EXTRA_CALLS_OFF, **fields})
 
 
 def read_trace(tmp_data):

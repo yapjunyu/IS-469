@@ -14,6 +14,8 @@ Issues and specs for this repo live as markdown files in `.scratch/`.
 
 Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed).
 
+Each acceptance checkbox names what a test can observe: a return value, a trace row and its field, a stored record. A requirement in the ticket body ("every attempt is traced") gets its own checkbox naming where it shows ("the tool row lists each rephrased query").
+
 ## When a skill says "fetch the relevant ticket"
 
 Read the file at the referenced path. The user will normally pass the path or the issue number directly.

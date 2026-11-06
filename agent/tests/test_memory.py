@@ -3,7 +3,8 @@ import json
 import pytest
 from agent import s1_llm
 from agent.memory import  learner
-from agent.s2_tools import TOOL_SCHEMAS, TurnContext, run_tool
+from agent.s2_tools import TOOL_SCHEMAS, run_tool
+from agent.tests.test_loop import tool_ctx
 
 def test_score_moves_with_answers():
     assert learner.update_mastery("alice", "LoRA", True) == 0.65      # 0.5 + 0.3 * (1 - 0.5)
@@ -32,7 +33,7 @@ def test_bad_student_id_rejected():
 
 
 def test_update_mastery_tool():
-    ctx = TurnContext(student_id="alice")
+    ctx = tool_ctx()
     out = run_tool("update_mastery", '{"concept": "LoRA", "correct": false}', ctx)
     assert out == {"ok": True, "concept": "LoRA", "mastery": 0.35}
     assert "error" in run_tool("update_mastery", '{"concept": "LoRA", "correct": "false"}', ctx)
@@ -62,7 +63,7 @@ def test_concept_tools_accept_only_listed_concepts(monkeypatch, tool, args):
         return {"message": {"role": "assistant", "content": '[{"question": "Q?", "passage_ids": ["stub-1"]}]'},
                 "usage": {"in": 1, "out": 1}, "cached": False}
     monkeypatch.setattr(s1_llm, "chat", chat)
-    ctx = TurnContext(student_id="alice")
+    ctx = tool_ctx()
     bad = run_tool(tool, json.dumps({"concept": "low-rank adaptation", **args}), ctx)
     assert "kv cache" in bad["error"] and "lora" in bad["error"]
     assert llm_calls == []

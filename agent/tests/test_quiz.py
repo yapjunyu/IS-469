@@ -4,8 +4,8 @@ import json
 import pytest
 
 from agent import s1_llm
-from agent.s2_tools import TurnContext, run_tool
-from agent.tests.test_loop import read_trace, reply, scripted, turn
+from agent.s2_tools import run_tool
+from agent.tests.test_loop import read_trace, reply, scripted, tool_ctx, turn
 from agent.tests.test_search import PASSAGES, fake_search
 
 
@@ -28,7 +28,7 @@ def test_quiz_returns_questions_and_passage_ids_but_no_answers(monkeypatch):
         {"question": "What does LoRA add?", "answer": "low-rank matrices", "passage_ids": ["p1"]},
         {"question": "What is r?", "model_answer": "the rank", "passage_ids": ["p2", "made-up"]},
         {"question": "Why low rank?", "passage_ids": ["made-up"]}]))
-    ctx = TurnContext(student_id="alice", search_fn=fake_search, search_again=False)
+    ctx = tool_ctx(search_fn=fake_search)
     out = run_tool("make_quiz", '{"concept": "LoRA", "n": 3}', ctx)
     assert out == {"questions": [{"question": "What does LoRA add?", "passage_ids": ["p1"]},
                                  {"question": "What is r?", "passage_ids": ["p2"]},
@@ -42,7 +42,7 @@ def lookup(student_id, ids):
 
 def test_grading_sends_the_llm_exactly_the_given_passages(monkeypatch):
     sent = fake_chat(monkeypatch, '{"correct": false, "hint": "Reread what LoRA adds to the model."}')
-    ctx = TurnContext(student_id="alice", passages_fn=lookup)
+    ctx = tool_ctx(passages_fn=lookup)
     out = run_tool("grade_answer", json.dumps({"question": "What does LoRA add?", "student_answer": "more layers",
                                                "passage_ids": ["p1"]}), ctx)
     assert out == {"correct": False, "hint": "Reread what LoRA adds to the model."}
@@ -59,7 +59,7 @@ GRADE = ("grade_answer", {"question": "What does LoRA add?", "student_answer": "
 def test_guard_on_wraps_passages_in_markers_off_sends_plain_json(monkeypatch, tool, args, llm_reply):
     sent = fake_chat(monkeypatch, llm_reply, llm_reply)
     for guard in (True, False):
-        ctx = TurnContext(student_id="alice", search_fn=fake_search, passages_fn=lookup, guard=guard, search_again=False)
+        ctx = tool_ctx(search_fn=fake_search, passages_fn=lookup, guard=guard)
         assert "error" not in run_tool(tool, json.dumps(args), ctx)
     on, off = (next(m["content"] for m in s if m["role"] == "user") for s in sent)
     assert '<document id="p1" file="lec3.pdf" page="12">\nLoRA adds low-rank matrices.\n</document>' in on

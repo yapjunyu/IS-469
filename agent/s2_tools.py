@@ -79,7 +79,7 @@ def search_notes(ctx, query):
         ctx.searches += 1
         queries.append(q)
         return _fields(ctx.search_fn(ctx.student_id, q))
-    passages = s5_search_again.search_with_retries(ctx, query, search) if ctx.search_again else search(query)
+    passages = s5_search_again.search_with_retries(ctx, query, search, ask) if ctx.search_again else search(query)
     # only the passages the tutor gets count as retrieved, not those of rejected attempts
     ctx.passage_ids += [p["id"] for p in passages]
     # queries first, so the tool row's result_summary shows every attempt; the tutor is sent only the passages
