@@ -20,6 +20,8 @@ Each acceptance checkbox names what a test can observe: a return value, a trace 
 
 Read the file at the referenced path. The user will normally pass the path or the issue number directly.
 
+Before starting, match every *What to build* requirement to a checkbox. For a requirement with no checkbox, ask the user how it should behave, then add the box to the ticket.
+
 ## Wayfinding operations
 
 Used by `/wayfinder`. The **map** is a file with one **child** file per ticket.

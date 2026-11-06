@@ -4,12 +4,10 @@
   file's concepts as a JSON list; the known concepts go in the prompt so the LLM reuses them.
 - learner.remove_file(): the app calls it when a file is deleted.
 """
-import json
-
 from agent import s4_trace
 from agent.memory import learner
 from agent.prompts import CONCEPTS_PROMPT
-from agent.s2_tools import TurnContext
+from agent.s2_tools import TurnContext, reply_json
 from agent.s3_loop import MODEL
 
 # shortcut: reads only the start of a file to stay under Groq's free-tier token limit, so concepts
@@ -19,10 +17,7 @@ MAX_CHARS = 12000
 
 def _parse(content):
     """The JSON list of names in the reply, or [] if there is no valid one."""
-    try:
-        names = json.loads(content[content.find("["):content.rfind("]") + 1])
-    except ValueError:
-        return []
+    names = reply_json(content, "[")
     return names if isinstance(names, list) and all(isinstance(n, str) for n in names) else []
 
 

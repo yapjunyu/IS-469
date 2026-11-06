@@ -228,15 +228,7 @@ The memory-write check (a `run_turn` switch, on by default) lets `remember_fact`
 
 Read the student's notes, pick a tool, run it, look at the result, then pick again, until there is an answer.
 
-```text
-load learner model + recent session notes
-for step in range(step_cap):
-    reply = llm(messages, tools)
-    if reply has no tool call: break
-    result = run_tool(reply.tool_call)   # logged to trace (step 14)
-    messages.append(result)
-answer = final reply, or a fallback message if the cap was hit
-```
+The loop's steps are in the docstring of `agent/s3_loop.py`.
 
 The step cap means "give up after a set number of tries", so the loop can never go round forever. Tool errors are caught and returned to the LLM as results rather than crashing the turn.
 
@@ -258,7 +250,7 @@ Every LLM call and every tool call is written down. This is how we prove the age
 
 One JSONL line per event, in three kinds. Every row starts with `kind, ts, student, turn, step`:
 
-- `llm`: one per LLM call anywhere. `purpose` is one of `tutor`, `forced_answer`, `concepts`, `quiz`, `grading`, `judge`, `regenerate`, `search_again`, `reflection`. Only these rows carry tokens.
+- `llm`: one per LLM call anywhere, labelled with its `purpose`. Only these rows carry tokens.
 - `tool`: one per tool call. `inputs` is the parsed arguments, or the raw string if the JSON was bad.
 - `final`: one per turn, always its last row, with the turn's totals. `steps` counts a forced answer and a regeneration as one step each.
 

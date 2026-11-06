@@ -5,12 +5,10 @@ One LLM call (purpose "reflection") reads the session and replies with a session
 concepts the student struggled with. The note is stored; each listed concept on the notebook's
 concept list gets one wrong mark, so it moves toward a weak spot.
 """
-import json
-
 from agent import s4_trace
 from agent.memory import learner
 from agent.prompts import REFLECTION_PROMPT
-from agent.s2_tools import MODEL, TurnContext
+from agent.s2_tools import MODEL, TurnContext, reply_json
 
 
 def end_session(student_id, history):
@@ -20,11 +18,7 @@ def end_session(student_id, history):
     transcript = "\n".join(f"{m['role']}: {m['content']}" for m in history if m.get("content"))
     messages = [{"role": "system", "content": REFLECTION_PROMPT.format(known=", ".join(known) or "none")},
                 {"role": "user", "content": transcript}]
-    content = s4_trace.traced_chat(ctx, "reflection", messages, MODEL)["message"].get("content") or ""
-    try:
-        reply = json.loads(content[content.find("{"):content.rfind("}") + 1])
-    except ValueError:
-        return None
+    reply = reply_json(s4_trace.traced_chat(ctx, "reflection", messages, MODEL)["message"].get("content") or "", "{")
     if not (isinstance(reply, dict) and isinstance(reply.get("note"), str) and reply["note"].strip()):
         return None
     learner.add_session_note(student_id, reply["note"])

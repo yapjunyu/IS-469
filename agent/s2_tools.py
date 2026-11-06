@@ -86,16 +86,20 @@ def search_notes(ctx, query):
     # queries first, so the tool row's result_summary shows every attempt; the tutor is sent only the passages
     return {"queries": queries, "passages": passages}
 
+def reply_json(content, start):
+    """The JSON value in an LLM reply, from the first `start` ("[" or "{") to its last closing bracket, or None."""
+    try:
+        return json.loads(content[content.find(start):content.rfind("]" if start == "[" else "}") + 1])
+    except ValueError:
+        return None
+
+
 def ask(ctx, purpose, prompt, passages, user_text, start, model=MODEL):
     """One LLM call over the passages (quiz, grading, judge, search_again). Returns the reply's JSON value starting at `start` ("[" or "{"), or None."""
     system = prompt + (GUARD_PROMPT if ctx.guard else "")
     messages = [{"role": "system", "content": system},
                 {"role": "user", "content": s6_guard.material(passages, ctx.guard) + "\n\n" + user_text}]
-    content = s4_trace.traced_chat(ctx, purpose, messages, model)["message"].get("content") or ""
-    try:
-        return json.loads(content[content.find(start):content.rfind("]" if start == "[" else "}") + 1])
-    except ValueError:
-        return None
+    return reply_json(s4_trace.traced_chat(ctx, purpose, messages, model)["message"].get("content") or "", start)
 
 
 def make_quiz(ctx, concept, n=3):

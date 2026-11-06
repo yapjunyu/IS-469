@@ -8,7 +8,7 @@ Mark every deliberate shortcut with a one-line comment: `# shortcut: <the limit>
 
 ## LLM calls
 
-`agent/s1_llm.py` is the only module that talks to a provider. Every other LLM call goes through `s4_trace.traced_chat(ctx, purpose, ...)`, which writes the call's `llm` trace row and adds its tokens to the turn. A new LLM caller (quiz, grading, judge, search-again) picks a short `purpose` name and passes the turn's `ctx`.
+`agent/s1_llm.py` is the only module that talks to a provider. Every other LLM call goes through `s4_trace.traced_chat(ctx, purpose, ...)`, which writes the call's `llm` trace row and adds its tokens to the turn. A new LLM caller (quiz, grading, judge, search-again) picks a short `purpose` name and passes the turn's `ctx`. It reads a JSON reply through `s2_tools.reply_json`, then checks the value's shape itself.
 
 ## Trace format
 
