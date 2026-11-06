@@ -148,11 +148,15 @@ A text question takes about 9 API calls and an image question about 6, so all 75
 
 ## Getting started
 
-> Setup commands will be added once the one-command launch is in place.
+1. Install the requirements: `python -m pip install -r requirements.txt`.
+2. Copy `.env.example` to `.env` and fill in the OpenCode and OpenAI API keys (Groq only for a Groq model, such as the one the agent walkthrough notebook pins). A workspace owner or admin must also select **Global** under Settings › Privacy › Regions on OpenCode, because DeepSeek V4.1 Flash is blocked in Go's default regions.
+3. Launch the app from the repo root, with your environment active:
 
-1. Copy `.env.example` to `.env` and fill in the OpenCode and OpenAI API keys (Groq only for a Groq model, such as the one the agent walkthrough notebook pins), then choose settings in the config file: model ID, temperature, search mode, chunk size, search-again switch and random seeds all live there.
-2. Launch the app with a single command.
-3. Enter your name or ID, then upload your .pptx or PDF files into your notebook.
+   ```bash
+   streamlit run app.py
+   ```
+
+4. Enter your name, then upload your .pptx or PDF files into your notebook. The same name reopens the same notebook next time.
 
 AI responses are cached to disk, so reruns of the evaluation are free, repeatable and don't hit API rate limits.
 
