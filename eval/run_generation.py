@@ -1,13 +1,13 @@
 """Answer gold questions with the champion setup, ready for ragas_eval.py.
 
-One chunk per slide, documents fixed 200 words with 30-word overlap, Gemma 2 with image chunks, dense
-search, top 3 chunks. Any retrieved pictures go to the LLM with the text, as in rag.py.
+One chunk per slide, documents recursive 200 words with 30-word overlap, Gemma 2 with image chunks,
+hybrid + rerank search, top 3 chunks. Any retrieved pictures go to the LLM with the text, as in rag.py.
 
     .venv/bin/python eval/run_generation.py --limit 3   # try a few first
-    .venv/bin/python eval/run_generation.py             # the 75 questions marked llm_eval in gold.csv
+    .venv/bin/python eval/run_generation.py             # the 75 questions marked llm_eval in gold_60_40.csv
     .venv/bin/python eval/run_generation.py --all       # every gold question
 
-Saves eval/results/generation_sample.json, or generation_all.json with --all.
+Saves eval/results_60_40/generation_sample.json, or generation_all.json with --all.
 """
 import argparse
 import json
@@ -25,7 +25,7 @@ from tutor.retrieval.chunk import chunk_pages  # noqa: E402
 from tutor.retrieval.clean import clean_pages  # noqa: E402
 from tutor.retrieval.embed import Embedder  # noqa: E402
 from tutor.retrieval.extract import extract, file_sha256  # noqa: E402
-from tutor.retrieval.search import DenseIndex  # noqa: E402
+from tutor.retrieval.search import HybridRerankIndex  # noqa: E402
 
 
 def main():
@@ -38,7 +38,7 @@ def main():
     for f in common.corpus_files():
         pages = clean_pages(extract(f, images=True))
         chunks += chunk_pages(pages, file_sha256(f), **CHUNKING[pages[0].kind])
-    index = DenseIndex(chunks, common.CachedImageEmbed(Embedder(EMBEDDER)))
+    index = HybridRerankIndex(chunks, common.CachedImageEmbed(Embedder(EMBEDDER)))
 
     questions = ev.load_gold(common.GOLD)
     if not args.all:

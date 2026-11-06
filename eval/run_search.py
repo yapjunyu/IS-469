@@ -1,7 +1,7 @@
 """Step 3: compare the search methods in search.py, with the chunking and embedder winners fixed.
 
     slides     one chunk per slide, plus image chunks
-    documents  fixed 200 words, 30-word overlap, plus image chunks
+    documents  recursive 200 words, 30-word overlap, plus image chunks
     embedder   Gemma 2
 
     dense          embeddings + cosine similarity
@@ -15,66 +15,35 @@ picked on dev, all questions: evidence recall@3, then MRR. Paired gains are prin
 
     .venv/bin/python eval/run_search.py
 
-Saves eval/results/search.csv and search_questions.csv.
+Saves eval/results_60_40/search.csv and search_questions.csv.
 """
 import sys
 import time
 from pathlib import Path
 from statistics import mean
 
-from sentence_transformers import CrossEncoder
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "eval")]
 
 import eval_retrieval as ev  # noqa: E402  (load_gold, evaluate, summarise, write_csv)
 import common  # noqa: E402  (corpus_files, GOLD, OUT, CachedImageEmbed)
-import run_image_embedders as ie  # noqa: E402  (FORMATS, GROUPS, without_also_gold)
+import run_image_embedders as ie  # noqa: E402  (SLIDES, DOCUMENTS, FORMATS, GROUPS, without_also_gold)
 import run_minilm_chunking as mc  # noqa: E402  (K, paired_gain)
-from tutor.pipeline import CHUNKING, EMBEDDER  # noqa: E402
+from tutor.pipeline import EMBEDDER  # noqa: E402
 from tutor.retrieval.chunk import chunk_pages  # noqa: E402
 from tutor.retrieval.clean import clean_pages  # noqa: E402
-from tutor.retrieval.embed import Embedder, _as_text  # noqa: E402
+from tutor.retrieval.embed import Embedder  # noqa: E402
 from tutor.retrieval.extract import extract, file_sha256  # noqa: E402
-from tutor.retrieval.search import DenseIndex, HybridIndex  # noqa: E402
+from tutor.retrieval.search import DenseIndex, HybridIndex, HybridRerankIndex  # noqa: E402
 
 CANDIDATES = 20  # chunks each of dense and BM25 hand to RRF, and text chunks the reranker reads
-RERANKER = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-
-
-class ImagesAtDensePositions:
-    """Walk the dense ranking: an image stays where it is, and a text chunk is swapped for the next
-    chunk of the text ranking."""
-
-    def __init__(self, dense, text):
-        self.dense, self.text = dense, text
-
-    def search(self, query: str, k: int = 5) -> list:
-        text = iter(self.text.search(query, k))
-        picked = (p if p.image_path else next(text, None) for p in self.dense.search(query, k))
-        return [p for p in picked if p]
-
-
-class Reranked:
-    """Rerank the top candidates of a text ranking; anything below them keeps its order."""
-
-    def __init__(self, text, model):
-        self.text, self.model, self.scores = text, model, {}
-
-    def search(self, query: str, k: int = 5) -> list:
-        found = self.text.search(query, max(k, CANDIDATES))
-        top, rest = found[:CANDIDATES], found[CANDIDATES:]
-        if query not in self.scores:  # the evaluation asks for each question's ranking several times
-            self.scores[query] = self.model.predict([(query, _as_text(p.text)) for p in top])
-        order = sorted(range(len(top)), key=lambda i: -self.scores[query][i])
-        return ([top[i] for i in order] + rest)[:k]
 
 
 def main():
     chunks = []
     for f in common.corpus_files():
         pages = clean_pages(extract(f, images=True))
-        chunks += chunk_pages(pages, file_sha256(f), **CHUNKING[pages[0].kind])
+        chunks += chunk_pages(pages, file_sha256(f), **(ie.SLIDES if pages[0].kind == "slide" else ie.DOCUMENTS))
     questions = ev.load_gold(common.GOLD)
     images = [q for q in questions if q["evidence_type"] == "image"]
     print(f"{len(chunks)} chunks, {len(questions)} questions, {len(images)} on images\n", flush=True)
@@ -83,8 +52,7 @@ def main():
     dense = DenseIndex(chunks, embed)
     dense_s = embed.take_used_s()  # embedding time, counted in full even when vectors were saved
     hybrid = HybridIndex(chunks, embed, CANDIDATES, dense=dense)  # reuses the dense vectors
-    text_hybrid = HybridIndex([c for c in chunks if not c.image_path], embed, CANDIDATES)
-    rerank = ImagesAtDensePositions(dense, Reranked(text_hybrid, CrossEncoder(RERANKER)))
+    rerank = HybridRerankIndex(chunks, embed, CANDIDATES, dense=dense)
     indexes = {"dense": (dense, dense_s), "hybrid": (hybrid, dense_s), "hybrid_rerank": (rerank, dense_s)}
 
     summary, per_question, scored = [], [], {}

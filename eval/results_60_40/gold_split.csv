@@ -1,0 +1,15 @@
+group,value,dev,test,total,dev_share
+collection,cloud,44,23,67,0.657
+collection,datasci,16,10,26,0.615
+collection,genai,45,32,77,0.584
+collection,is212,35,27,62,0.565
+collection,softdev,21,15,36,0.583
+evidence_type,image,35,23,58,0.603
+evidence_type,text,126,84,210,0.6
+format,documents,37,25,62,0.597
+format,slides,124,82,206,0.602
+format_and_evidence,documents image,8,5,13,0.615
+format_and_evidence,documents text,29,20,49,0.592
+format_and_evidence,slides image,27,18,45,0.6
+format_and_evidence,slides text,97,64,161,0.602
+overall,all,161,107,268,0.601

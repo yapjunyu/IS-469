@@ -1,6 +1,6 @@
 """Score a saved generation run with RAGAS (run eval/run_generation.py first).
 
-Reads eval/results/generation_<name>.json (question, retrieved text and pictures, answer, reference
+Reads eval/results_60_40/generation_<name>.json (question, retrieved text and pictures, answer, reference
 answer) and asks a judge LLM to score each question on four metrics:
 
   faithfulness         is the answer supported by the retrieved text and pictures? (1 or 0)
@@ -29,7 +29,7 @@ from ragas.llms import llm_factory
 from ragas.metrics.collections import ContextPrecision, ContextRecall, FactualCorrectness, MultiModalFaithfulness
 
 ROOT = Path(__file__).resolve().parents[1]
-RESULTS = ROOT / "eval" / "results"
+RESULTS = ROOT / "eval" / "results_60_40"
 JUDGE_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"  # reads pictures; a different model from rag.py
 JUDGE_MAX_TOKENS = 8192  # the judge reasons before it replies, and the reasoning counts towards this limit
 OPENROUTER_URL = "https://openrouter.ai/api/v1"  # the OpenAI API, which RAGAS expects

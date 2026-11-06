@@ -11,8 +11,8 @@ from tutor.pipeline import corpus_files  # noqa: F401  (the eval scripts call co
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / "data" / "embed_cache"
 BATCH = {"text": 64, "image": 16}  # vectors saved to disk after each batch, so a stopped run can resume
-GOLD = ROOT / "eval" / "gold" / "gold.csv"
-OUT = ROOT / "eval" / "results"
+GOLD = ROOT / "eval" / "gold" / "gold_60_40.csv"
+OUT = ROOT / "eval" / "results_60_40"
 
 
 class CachedEmbed:

@@ -13,7 +13,7 @@ class FakeIndex:
 
 def test_champion_settings():
     assert CHUNKING == {"slide": {"slide_method": "slide"},
-                        "page": {"method": "fixed", "chunk_size": 200, "chunk_overlap": 30}}
+                        "page": {"method": "recursive", "chunk_size": 200, "chunk_overlap": 30}}
     assert EMBEDDER == "gemma2" and K == 3
 
 

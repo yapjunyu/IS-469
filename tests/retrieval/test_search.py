@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from tutor.retrieval.search import BM25Index, ChromaIndex, DenseIndex, HybridIndex, make_index, rrf
+from tutor.retrieval.search import (BM25Index, ChromaIndex, ChromaTextOnly, DenseIndex, HybridIndex,
+                                    HybridRerankIndex, make_index, rrf)
 from tutor.retrieval.types import Chunk, Passage
 
 WORDS = ["lora", "bm25", "agent"]
@@ -134,3 +135,59 @@ def test_hybrid_can_use_chroma_as_its_dense_half(tmp_path):
     store.add_file(CHUNKS)
     index = HybridIndex(store.chunks, fake_embed, candidates=4, dense=store)
     assert {p.page for p in index.search("LoRA and HyDE", k=2)} == {2, 4}
+
+
+# hybrid_rerank
+class FakeReranker:
+    """Scores a chunk by how often it mentions "agent", so it can overturn the first ranking."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def predict(self, pairs):
+        self.calls += 1
+        return np.array([text.lower().count("agent") for _, text in pairs], dtype=float)
+
+
+class FixedDense:
+    """A dense ranking set by hand, with a picture second."""
+
+    def __init__(self, chunks):
+        self.chunks = chunks
+
+    def search(self, query, k=5):
+        return [Passage(id=c.id, file=c.file, page=c.page, page_end=c.page_end, text=c.text, kind=c.kind,
+                        image_path=c.image_path, score=0.5) for c in self.chunks[:k]]
+
+
+PICTURE = Chunk(id="h:9", file="deck.pptx", page=9, page_end=9, text="", kind="slide", image_path="fig.png")
+
+
+def test_rerank_reorders_text_and_a_picture_keeps_its_dense_position():
+    dense = FixedDense([CHUNKS[0], PICTURE, CHUNKS[1], CHUNKS[2]])
+    index = HybridRerankIndex(CHUNKS + [PICTURE], fake_embed, dense=dense, model=FakeReranker())
+    found = index.search("lora adapters", k=3)
+    assert found[1].image_path == "fig.png"
+    assert found[0].page == 3  # the reranker lifts the agent chunk over what hybrid ranked first
+
+
+def test_rerank_scores_each_question_once():
+    model = FakeReranker()
+    index = HybridRerankIndex(CHUNKS, fake_embed, model=model)
+    index.search("lora", k=3)
+    index.search("lora", k=5)
+    assert model.calls == 1
+
+
+def test_chroma_text_only_skips_pictures(tmp_path):
+    class Embed(FakeEmbed):
+        supports_images = True
+        key = "fake"
+
+        def embed_images(self, paths):
+            return np.ones((len(paths), len(WORDS)))
+
+    store = ChromaIndex(Embed(), tag="t", path=tmp_path)
+    store.add_file(CHUNKS + [PICTURE])
+    found = ChromaTextOnly(store).search("lora", k=5)
+    assert found and not any(p.image_path for p in found)

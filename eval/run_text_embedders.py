@@ -1,7 +1,7 @@
 """Compare embedders on text questions, with the chunking fixed at the MiniLM winners.
 
     slides     one chunk per slide
-    documents  fixed 200 words, 30-word overlap
+    documents  recursive 200 words, 30-word overlap
     search     dense, top 3, no image chunks
 
 Each model runs in its own process, because two large models may not fit in memory together. Each
@@ -12,7 +12,7 @@ format is scored on its own text questions. The winner is picked on dev: evidenc
     .venv-jina/bin/python eval/run_text_embedders.py jinaclip2   # its own environment: requirements-jina.txt
     .venv/bin/python eval/run_text_embedders.py --compare
 
-Saves eval/results/text_embedder_<model>.csv and _questions.csv. --compare prints paired gains.
+Saves eval/results_60_40/text_embedder_<model>.csv and _questions.csv. --compare prints paired gains.
 """
 import argparse
 import csv
@@ -35,7 +35,7 @@ from tutor.retrieval.search import DenseIndex  # noqa: E402
 
 MODELS = ("minilm", "gemma2", "jinaclip2")
 SLIDES = mc.SLIDE_METHODS["slide"]
-DOCUMENTS = mc.DOCUMENT_METHODS["fixed"]
+DOCUMENTS = mc.DOCUMENT_METHODS["recursive"]
 
 
 def run(key: str):
