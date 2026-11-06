@@ -27,7 +27,7 @@ from agent.memory import  learner
 from agent.prompts import GRADE_PROMPT, GUARD_PROMPT, QUIZ_PROMPT
 
 # shortcut: hardcoded, move to config.yaml once the team agrees on it
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "openai/gpt-oss-120b"  # a Groq model id: only "gpt-..." names route to OpenAI
 
 
 # shortcut: stub, the app passes the retrieval teammate's search(student_id, query) once it lands
@@ -94,8 +94,10 @@ def reply_json(content, start):
         return None
 
 
-def ask(ctx, purpose, prompt, passages, user_text, start, model=MODEL):
-    """One LLM call over the passages (quiz, grading, judge, search_again). Returns the reply's JSON value starting at `start` ("[" or "{"), or None."""
+def ask(ctx, purpose, prompt, passages, user_text, start, model=None):
+    """One LLM call over the passages (quiz, grading, judge, search_again). Returns the reply's JSON value starting at `start` ("[" or "{"), or None.
+    model: None uses MODEL as it is at call time, so setting s2_tools.MODEL switches these calls too."""
+    model = model or MODEL
     system = prompt + (GUARD_PROMPT if ctx.guard else "")
     messages = [{"role": "system", "content": system},
                 {"role": "user", "content": s6_guard.material(passages, ctx.guard) + "\n\n" + user_text}]

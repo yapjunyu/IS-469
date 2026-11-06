@@ -258,12 +258,12 @@ A search-then-answer turn:
 
 ```json
 {"kind": "llm", "ts": "2026-11-05T14:03:12.481+08:00", "student": "<anon id>", "turn": 12, "step": 1,
- "purpose": "tutor", "model": "llama-3.3-70b-versatile", "tokens": {"in": 812, "out": 45}, "cached": false}
+ "purpose": "tutor", "model": "openai/gpt-oss-120b", "tokens": {"in": 812, "out": 45}, "cached": false}
 {"kind": "tool", "ts": "2026-11-05T14:03:12.822+08:00", "student": "<anon id>", "turn": 12, "step": 1,
  "tool": "search_notes", "inputs": {"query": "..."}, "ok": true, "error": null, "duration_ms": 340,
  "result_summary": "..."}
 {"kind": "llm", "ts": "2026-11-05T14:03:13.610+08:00", "student": "<anon id>", "turn": 12, "step": 2,
- "purpose": "tutor", "model": "llama-3.3-70b-versatile", "tokens": {"in": 1290, "out": 160}, "cached": false}
+ "purpose": "tutor", "model": "openai/gpt-oss-120b", "tokens": {"in": 1290, "out": 160}, "cached": false}
 {"kind": "final", "ts": "2026-11-05T14:03:13.611+08:00", "student": "<anon id>", "turn": 12, "step": 2,
  "steps": 2, "cap_hit": false, "searches": 1, "tokens": {"in": 2102, "out": 205}, "duration_ms": 1480,
  "faithfulness": {"supported": true, "reason": "..."}, "answer_preview": "..."}
