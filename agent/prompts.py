@@ -38,7 +38,7 @@ are supported if the "Student's record" says them.
 (what the student asked, in what order, what an earlier answer said) are supported only if it says the same;
 one it does not show, or shows differently, is unsupported.
 It is never support for a claim about course content, even one an earlier answer made.
-Reply with a JSON object only: {"supported": true or false, "reason": "the unsupported claim, or why it passes"}."""
+Reply with a JSON object only: {"reason": "the unsupported claim, or why it passes", "supported": true or false}."""
 
 REGENERATE_PROMPT = """(From the answer checker, not the student.) Your last answer has claims the notes do not support: {reason}
 Answer the student's last message again. If you need passages, search the notes or grade with the tools first.
