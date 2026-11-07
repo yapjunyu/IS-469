@@ -20,6 +20,11 @@ def wrap_passages(passages):
     return "\n".join(_wrap(p) for p in passages)
 
 
+def text_fields(passages):
+    """The fields of each passage that are sent as text: not a picture's local path."""
+    return [{k: p[k] for k in ("id", "file", "page", "text")} for p in passages]
+
+
 def material(passages, guard):
     """Passages as an LLM sees them: inside markers with the guard on, plain JSON with it off."""
-    return wrap_passages(passages) if guard else json.dumps({"passages": passages})
+    return wrap_passages(passages) if guard else json.dumps({"passages": text_fields(passages)})

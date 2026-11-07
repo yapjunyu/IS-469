@@ -6,6 +6,7 @@ for step in range(step_cap):
     reply = llm.chat(messages, tools)
     if no tool_calls: break
     for each tool_call: run_tool, append `role: tool` message, write a tool row
+    pictures in the tool results: one user message after them, holding the turn's newest pictures
 if cap hit: one last llm.chat(..., tool_choice="none") to force an answer
 faithfulness on: the judge checks the answer; on a fail, regenerate once, then return it with a warning
 write the final trace row (see s4_trace for the row format)
@@ -16,7 +17,7 @@ import re
 import time
 
 from agent.prompts import GUARD_PROMPT, REGENERATE_PROMPT, SYSTEM_PROMPT
-from agent.s2_tools import MODEL, TOOL_SCHEMAS, TurnContext, run_tool, stub_passages, stub_search
+from agent.s2_tools import MODEL, TOOL_SCHEMAS, TurnContext, picture_parts, run_tool, stub_passages, stub_search
 from agent import s4_trace, s6_guard, s7_faithfulness
 from agent.memory import learner, vector
 
@@ -45,7 +46,7 @@ def _cited(answer, passage_ids):
 
 
 def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_search,
-             passages_fn=stub_passages, search_again=True, guard=True, memory_check=True, faithfulness=True, memory="learner", embedder=None, step_cap=6):
+             passages_fn=stub_passages, search_again=True, guard=True, memory_check=True, faithfulness=True, images=True, memory="learner", embedder=None, step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int,
     "faithfulness": the judge's {"supported", "reason"} or None when off, "warning": bool}.
 
@@ -58,7 +59,7 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     turn: the app's turn number, written on every trace row.
     history: earlier {"role": "user"/"assistant", "content": ...} messages, so quiz
     answers can be graded against the question asked last turn.
-    search_fn: search(student_id, query) -> [{id, file, page, text}, ...].
+    search_fn: search(student_id, query) -> [{id, file, page, text}, ...], plus image_path if a passage has a picture.
     passages_fn: get_passages(student_id, ids) -> the passages with those ids, same shape.
     search_again: rephrase and search again, up to 3 searches, while an LLM check says the passages
     are not enough; off uses the first result, the fixed-pipeline baseline.
@@ -66,6 +67,9 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     off is the unsafe baseline for the poisoning test.
     faithfulness: judge the answer against every passage retrieved this turn; warning is true
     when it still fails after one regeneration.
+    images: every LLM call over passages also receives their pictures, at most 3 per request, newest kept;
+    off leaves pictures and passages with no text out, the text-only baseline. Pictures never reach
+    the answer, the trace or history, so a follow-up question searches again.
     memory: "learner" puts the student's weak spots and wrong beliefs in the system prompt;
     "vector" puts only the past session notes most similar to user_message there;
     "none" leaves the student out (the concept list stays, it describes the notebook).
@@ -81,7 +85,7 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     t_start = time.perf_counter()
     ctx = TurnContext(student_id=student_id, turn=turn, search_fn=search_fn,
                       passages_fn=passages_fn, search_again=search_again, guard=guard,
-                      memory_check=memory_check, faithfulness=faithfulness, memory=memory, step_cap=step_cap)
+                      memory_check=memory_check, faithfulness=faithfulness, images=images, memory=memory, step_cap=step_cap)
     system = SYSTEM_PROMPT + (GUARD_PROMPT if guard else "")
     concepts = learner.concepts(student_id)
     if concepts:
@@ -109,6 +113,7 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     ]
 
     answer, cap_hit = None, False
+    found, picture_message = [], None  # every passage the tools gave the tutor this turn, oldest first
     for step in range(1, step_cap+1):
         ctx.step = step
         msg = s4_trace.traced_chat(ctx, "tutor", messages, MODEL, tools=TOOL_SCHEMAS)["message"]
@@ -128,13 +133,25 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
             except (json.JSONDecodeError, TypeError):
                 inputs = args  # bad JSON: keep the raw string so the trace shows what the LLM sent
 
+            # the trace keeps text only: not even the picture's local path
+            summary = {**result, "passages": s6_guard.text_fields(result["passages"])} if "passages" in result else result
             s4_trace.log_row(ctx, "tool", tool=name, inputs=inputs, ok="error" not in result,
                              error=result.get("error"),
                              duration_ms=round((time.perf_counter() - t0) * 1000),
-                             result_summary=json.dumps(result)[:200])
+                             result_summary=json.dumps(summary)[:200])
 
             content = s6_guard.material(result["passages"], guard) if "passages" in result else json.dumps(result)
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": content})
+            found += result.get("passages", [])
+
+        # only after all of a step's tool results: providers reject a user message between them.
+        # One message, rebuilt each step, so old pictures can't push a request over the cap.
+        if picture_message:
+            messages.remove(picture_message)
+        parts = picture_parts(found)
+        picture_message = {"role": "user", "content": parts} if parts else None
+        if picture_message:
+            messages.append(picture_message)
     else:
         # cap hit: one last call with tools off, so it must answer from what it has
         ctx.step, cap_hit = step_cap + 1, True

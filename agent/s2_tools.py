@@ -16,23 +16,29 @@
 - remember_fact stores a fact in the learner model. With the memory-write check on, its passage id
   must be one retrieved this turn (by search_notes, make_quiz's search or grade_answer's lookup);
   off stores anything, the unsafe baseline for the poisoning test.
+- picture_parts turns passages' pictures into message parts, for ask and the loop. With the images
+  switch off, _fields drops every picture and every passage with no text, so no LLM receives them.
 """
 
+import base64
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable
 
 from agent import s4_trace, s5_search_again, s6_guard
 from agent.memory import  learner
-from agent.prompts import GRADE_PROMPT, GUARD_PROMPT, QUIZ_PROMPT
+from agent.prompts import GRADE_PROMPT, GUARD_PROMPT, PICTURES_PROMPT, QUIZ_PROMPT
 
 # shortcut: hardcoded, move to config.yaml once the team agrees on it
 MODEL = "opencode-go/deepseek-v4.1-flash"  # the prefix routes it to OpenCode Go, see s1_llm
+# shortcut: hardcoded, move to config.yaml once the team agrees on it
+MAX_PICTURES = 3  # per LLM request, to bound image tokens
 
 
 # shortcut: stub, the app passes the retrieval teammate's search(student_id, query) once it lands
 def stub_search(student_id, query):
-    """The search function's shape: a list of passages, each with id, file, page and text."""
+    """The search function's shape: a list of passages, each with id, file, page and text, and image_path if it has a picture."""
     return [{"id": "stub-1", "file": "stub.pdf", "page": 1, "text": f"Stub passage about {query}."}]
 
 
@@ -58,6 +64,7 @@ class TurnContext:
     guard: bool = True
     memory_check: bool = True
     faithfulness: bool = True
+    images: bool = True
     memory: str = "learner"  # "none", "learner" or "vector", see run_turn
     step_cap: int = 6
 
@@ -71,8 +78,28 @@ def _check_concept(ctx, concept):
         return {"error": f"Unknown concept {concept!r}. Use one of: {', '.join(known)}"}
 
 # keep only the fields an LLM needs, whatever else retrieval returns (scores etc.)
-def _fields(passages):
-    return [{k: p[k] for k in ("id", "file", "page", "text")} for p in passages]
+def _fields(ctx, passages):
+    keys = ("id", "file", "page", "text", "image_path") if ctx.images else ("id", "file", "page", "text")
+    return [{k: p[k] for k in keys if k in p} for p in passages if ctx.images or p["text"].strip()]
+
+
+def picture_parts(passages):
+    """Message parts for the newest MAX_PICTURES pictures among passages (later is newer), each named
+    by its passage id, or [] if there are none. A picture file that no longer exists is skipped."""
+    parts, sent = [], set()
+    for p in reversed(passages):
+        if len(sent) == MAX_PICTURES:
+            break
+        if not p.get("image_path") or p["id"] in sent:
+            continue
+        try:
+            png = base64.b64encode(Path(p["image_path"]).read_bytes()).decode()
+        except OSError:
+            continue
+        sent.add(p["id"])
+        parts[:0] = [{"type": "text", "text": f"Picture from passage {p['id']}:"},
+                     {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{png}"}}]  # extract.py saves only PNGs
+    return [{"type": "text", "text": PICTURES_PROMPT}, *parts] if parts else []
 
 
 def search_notes(ctx, query):
@@ -80,7 +107,7 @@ def search_notes(ctx, query):
     def search(q):
         ctx.searches += 1
         queries.append(q)
-        return _fields(ctx.search_fn(ctx.student_id, q))
+        return _fields(ctx, ctx.search_fn(ctx.student_id, q))
     passages = s5_search_again.search_with_retries(ctx, query, search, ask) if ctx.search_again else search(query)
     # only the passages the tutor gets count as retrieved, not those of rejected attempts
     ctx.passage_ids += [p["id"] for p in passages]
@@ -100,8 +127,11 @@ def ask(ctx, purpose, prompt, passages, user_text, start, model=None):
     model: None uses MODEL as it is at call time, so setting s2_tools.MODEL switches these calls too."""
     model = model or MODEL
     system = prompt + (GUARD_PROMPT if ctx.guard else "")
+    passages = _fields(ctx, passages)
+    text = s6_guard.material(passages, ctx.guard) + "\n\n" + user_text
+    pictures = picture_parts(passages)
     messages = [{"role": "system", "content": system},
-                {"role": "user", "content": s6_guard.material(passages, ctx.guard) + "\n\n" + user_text}]
+                {"role": "user", "content": [{"type": "text", "text": text}, *pictures] if pictures else text}]
     return reply_json(s4_trace.traced_chat(ctx, purpose, messages, model)["message"].get("content") or "", start)
 
 
@@ -129,7 +159,7 @@ def make_quiz(ctx, concept, n=3):
 def grade_answer(ctx, question, student_answer, passage_ids):
     if not (isinstance(passage_ids, list) and passage_ids and all(isinstance(i, str) for i in passage_ids)):
         return {"error": "passage_ids must be the non-empty list of ids make_quiz gave for this question"}
-    passages = _fields(ctx.passages_fn(ctx.student_id, passage_ids))
+    passages = _fields(ctx, ctx.passages_fn(ctx.student_id, passage_ids))
     if not passages:
         return {"error": f"No passages found with ids {passage_ids}"}
     ctx.passage_ids += [p["id"] for p in passages]  # fetched from the notes this turn, so they count as retrieved

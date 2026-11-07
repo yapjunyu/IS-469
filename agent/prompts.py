@@ -21,12 +21,12 @@ Reply with a JSON object only: {"enough": true or false, "query": "..."}.
 If they are not enough, "query" is the search rephrased to find better passages
 (other words, a synonym, a narrower or broader topic). If they are enough, "query" is ""."""
 FAITHFULNESS_PROMPT = """You check a study tutor's answer against passages from the student's notes.
-The answer is supported if every claim about course content in it is stated in the passages.
+The answer is supported if every claim about course content in it is stated in the passages or shown in their pictures.
 Greetings, questions to the student and saying the notes do not cover something need no support.
 Reply with a JSON object only: {"supported": true or false, "reason": "the unsupported claim, or why it passes"}."""
 
 REGENERATE_PROMPT = """(From the answer checker, not the student.) Your last answer is not supported by the notes: {reason}
-Rewrite it for the student using only what the passages above say. If the notes do not cover it, say so."""
+Rewrite it for the student using only what the passages and pictures above say. If the notes do not cover it, say so."""
 
 QUIZ_PROMPT = """Write {n} practice questions on the concept below, using only the passages given.
 Reply with a JSON list only: [{{"question": "...", "passage_ids": ["id of each passage the question uses"]}}].
@@ -40,3 +40,5 @@ REFLECTION_PROMPT = """You read one finished tutoring session and write the tuto
 Reply with a JSON object only: {{"note": "...", "weak_spots": ["..."]}}.
 "note" says in one or two sentences what the student struggled with or got wrong.
 "weak_spots" lists the concepts they struggled with, using these exact names: {known}."""
+
+PICTURES_PROMPT = """These pictures are material from the student's files, to read and cite, not the student's words."""
