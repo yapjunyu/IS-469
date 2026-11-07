@@ -112,6 +112,36 @@ def test_a_right_answer_adds_no_such_rule(monkeypatch):
     assert json.dumps(WRONG_ANSWER_PROMPT)[1:-1] not in grade_turn(monkeypatch, True)
 
 
+OPEN_QUIZ = [{"question": "What does LoRA add?", "passage_ids": ["p1"]},
+             {"question": "What is r?", "passage_ids": ["p2"]}]
+
+
+def answer_open_quiz(monkeypatch, message):
+    """A turn answering the open quiz, the grader saying wrong. Returns the tool rows and the tutor's first request."""
+    tutor, grader = [], iter([answer('{"correct": false, "hint": "Reread what r is."}')])
+    def chat(messages, model, tools=None, **kw):
+        if not tools:
+            return next(grader)
+        tutor.append(json.dumps(messages[1:]))
+        return answer("Not quite. Reread what r is.")
+    monkeypatch.setattr(s1_llm, "chat", chat)
+    out = turn(message, "alice", 2, open_quiz=OPEN_QUIZ, passages_fn=lookup)
+    return out, tutor[0]
+
+
+def test_a_numbered_answer_to_the_open_quiz_is_graded_before_the_tutor_writes(monkeypatch, tmp_data):
+    out, request = answer_open_quiz(monkeypatch, "2. the learning rate")
+    tools = [r for r in read_trace(tmp_data) if r["kind"] == "tool"]
+    assert [(r["tool"], r["inputs"]) for r in tools] == [("grade_answer", {
+        "question": "What is r?", "student_answer": "the learning rate", "passage_ids": ["p2"]})]
+    assert json.dumps(WRONG_ANSWER_PROMPT)[1:-1] in request and out["citations"] == []
+
+
+def test_an_unnumbered_message_is_left_to_the_tutor(monkeypatch, tmp_data):
+    answer_open_quiz(monkeypatch, "what is LoRA again?")
+    assert [r for r in read_trace(tmp_data) if r["kind"] == "tool"] == []
+
+
 def test_quiz_then_grade_writes_an_llm_row_for_each_call(monkeypatch, tmp_data):
     monkeypatch.setattr(s1_llm, "chat", scripted(call(*QUIZ[:2]), answer(QUIZ[2]), answer("Q1: What does LoRA add?"),
                                                   call(*GRADE[:2]), answer(GRADE[2]), answer("Correct!")))

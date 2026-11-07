@@ -2,6 +2,7 @@
 
 memory 'learner': weak spots + wrong beliefs into the system prompt; 'vector': the session notes most
 similar to the message; 'none': only the concept list
+a numbered answer to the open quiz: grade_answer runs first, at step 0, as if the tutor had called it
 for step in range(step_cap):
     reply = llm.chat(messages, tools)
     if no tool_calls: break
@@ -47,6 +48,22 @@ def _cited(answer, passage_ids):
     return sorted(first, key=first.get)
 
 
+# shortcut: only a leading number with punctuation ("2.", "Q2:", "question 2 -") counts, widen it if live runs show other forms
+QUIZ_ANSWER = re.compile(r"\s*(?:q(?:uestion)?\s*)?(\d+)\s*[.):-]\s*", re.I)
+
+
+def _graded_quiz_answer(user_message, open_quiz):
+    """An assistant message calling grade_answer for a numbered answer to the open quiz, or None."""
+    found = open_quiz and QUIZ_ANSWER.match(user_message)
+    if not found or not 1 <= int(found[1]) <= len(open_quiz):
+        return None
+    question = open_quiz[int(found[1]) - 1]
+    args = {"question": question["question"], "student_answer": user_message[found.end():].strip() or user_message,
+            "passage_ids": question["passage_ids"]}
+    return {"role": "assistant", "content": "", "tool_calls": [
+        {"id": "quiz-answer", "type": "function", "function": {"name": "grade_answer", "arguments": json.dumps(args)}}]}
+
+
 def run_turn(user_message, student_id, turn, *, history=None, open_quiz=None, search_fn=stub_search,
              passages_fn=stub_passages, search_again=True, guard=True, memory_check=True, faithfulness=True, images=True, memory="learner", embedder=None, step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int,
@@ -63,7 +80,8 @@ def run_turn(user_message, student_id, turn, *, history=None, open_quiz=None, se
     history: earlier {"role": "user"/"assistant", "content": ...} messages, so quiz
     answers can be graded against the question asked last turn.
     open_quiz: the "quiz" an earlier turn returned, still open: listed in the system prompt with each
-    question's passage ids, so an answer to it is graded with grade_answer.
+    question's passage ids, so an answer to it is graded with grade_answer. A message starting with a
+    question number ("2. ...", "Q2: ...") is graded by code at step 0, before the tutor's first call.
     search_fn: search(student_id, query) -> [{id, file, page, text}, ...], plus image_path if a passage has a picture.
     passages_fn: get_passages(student_id, ids) -> the passages with those ids, same shape.
     search_again: rephrase and search again, up to 3 searches, while an LLM check says the passages
@@ -126,8 +144,13 @@ def run_turn(user_message, student_id, turn, *, history=None, open_quiz=None, se
     answer, cap_hit, verdict, regenerated = None, False, None, False
     picture_message = None
     purpose = "tutor"  # "regenerate" for the first call after the judge fails the answer
+    # a numbered answer to the open quiz is graded by code at step 0: the tutor skipped grade_answer too often
+    pending = _graded_quiz_answer(user_message, open_quiz)
     while True:
-        if ctx.step >= step_cap:
+        if pending:
+            msg, pending = pending, None
+            messages.append(msg)
+        elif ctx.step >= step_cap:
             # cap hit: one last call with tools off, so it must answer from what it has
             ctx.step, cap_hit = ctx.step + 1, True
             msg = s4_trace.traced_chat(ctx, "forced_answer" if purpose == "tutor" else purpose, messages, MODEL,

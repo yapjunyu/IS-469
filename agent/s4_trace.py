@@ -2,6 +2,7 @@
 
 Every row starts with the same fields, in this order:
     kind, ts (ISO 8601, local time with offset), student, turn, step
+    (step 0: work before the tutor's first call, the grading of a numbered answer to the open quiz)
 Then, by kind:
 - llm:   purpose, model, tokens {in, out}, cached
          One per LLM call anywhere. purpose is one of: tutor, forced_answer, concepts,
