@@ -100,7 +100,7 @@ with st.sidebar:
     st.subheader("Quiz")
     concepts = learner.concepts(student)
     concept = st.selectbox("Concept", concepts, disabled=not concepts)
-    quiz = f"Quiz me on {concept}" if st.button("Start quiz", disabled=not concepts) else None
+    quiz_message = f"Quiz me on {concept}" if st.button("Start quiz", disabled=not concepts) else None
 
 if not notebook.files(student):
     st.info("Upload a .pptx or PDF in the sidebar to start chatting.")
@@ -128,7 +128,7 @@ for entry in state.messages:
                     st.image(passage["image_path"])
 
 # chat_input pins itself to the bottom of the page, so calling it first only means a new message is known before drawing
-message = st.chat_input("Ask about your notes", submit_mode="disable") or quiz or state.pop("resend", None)
+message = st.chat_input("Ask about your notes", submit_mode="disable") or quiz_message or state.pop("resend", None)
 if message:
     state.failed = None
     with st.chat_message("user"):

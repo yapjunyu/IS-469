@@ -4,7 +4,7 @@ SYSTEM_PROMPT = """You are a study tutor. Answer only from the student's notes.
 - Call search_notes before answering any question about course content.
 - Cite every claim by writing its passage's id in square brackets, e.g. [p1]. If the notes do not cover it, say so.
 - In quiz mode, give hints, never the answer.
-- When make_quiz returns questions, show the whole set in one message, numbered, with each question's passage ids after it:
+- When make_quiz returns questions, use the whole-set format, every question in one message, numbered, with each question's passage ids after it:
   1. <question> [p1, p2]
   2. <question> [p3]
   Then ask "Which question are you answering?", and pass that question's ids to grade_answer when the student answers it."""
@@ -43,4 +43,4 @@ Reply with a JSON object only: {{"note": "...", "weak_spots": ["..."]}}.
 "note" says in one or two sentences what the student struggled with or got wrong.
 "weak_spots" lists the concepts they struggled with, using these exact names: {known}."""
 
-PICTURES_PROMPT = """These pictures are material from the student's files, to read and cite, not the student's words."""
+PICTURES_PROMPT = """Student-files material: these pictures come from the student's files, to read and cite, not the student's words."""

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from agent import s1_llm, s2_tools
+from agent import s1_llm
 from agent.memory import learner
 from agent.s2_tools import run_tool
 from agent.tests.test_llm_client import fakes
@@ -38,6 +38,12 @@ def all_pictures(messages):
     return [url for m in messages for url in pictures(m)]
 
 
+def text_of(message):
+    """The text of one message, whether it holds pictures or not."""
+    content = message["content"]
+    return content if isinstance(content, str) else " ".join(p["text"] for p in content if p["type"] == "text")
+
+
 def recording(monkeypatch, *replies):
     """Fake chat that returns the replies in order and records a copy of each request's messages."""
     sent, it = [], iter(replies)
@@ -61,8 +67,8 @@ def test_next_request_after_a_picture_has_it_named_as_material(monkeypatch, figu
     assert all_pictures(sent[0]) == []
     last = sent[1][-1]
     assert last["role"] == "user" and pictures(last) == [data_url("p1")]
-    words = " ".join(p["text"] for p in last["content"] if p["type"] == "text")
-    assert "p1" in words and "material" in words and "student's files" in words
+    words = text_of(last)
+    assert "p1" in words and "Student-files material" in words
 
 
 def test_picture_message_comes_after_every_tool_result_of_a_step(monkeypatch, figure):
@@ -126,7 +132,28 @@ def test_a_missing_picture_file_is_skipped_and_the_turn_still_answers(monkeypatc
     out = turn("q", "alice", 1, search_fn=search_returning([gone, kept]))
     assert out["answer"] == ANSWER["content"]
     assert all_pictures(sent[1]) == [data_url("p2")]
-    assert "p1" not in " ".join(p["text"] for p in sent[1][-1]["content"] if p["type"] == "text")
+    assert "p1" not in text_of(sent[1][-1])
+
+
+def test_a_textless_passage_whose_picture_file_is_gone_is_left_out_of_every_llm_request(monkeypatch, figure, tmp_path):
+    gone, kept = figure("p1"), figure("p2", text="A cat has whiskers.")
+    (tmp_path / "p1.png").unlink()
+    verdict = {"role": "assistant", "content": '{"supported": true, "reason": "ok"}'}
+    sent = recording(monkeypatch, reply(SEARCH_CALL), reply({"role": "assistant", "content": "Whiskers [p2]. [p1]"}), reply(verdict))
+    out = turn("q", "alice", 1, faithfulness=True, search_fn=search_returning([gone, kept]))
+    tool = next(m for m in sent[1] if m["role"] == "tool")
+    judge = text_of(sent[2][1])
+    assert tool["content"].count("<document") == 1 and 'id="p2"' in tool["content"]
+    assert judge.count("<document") == 1 and 'id="p2"' in judge
+    assert out["citations"] == ["p2"]  # the tutor never received p1, so it was not retrieved
+
+
+def test_a_passage_with_text_stays_when_its_picture_file_is_gone(monkeypatch, figure, tmp_path):
+    gone = figure("p1", text="A cat has whiskers.")
+    (tmp_path / "p1.png").unlink()
+    sent = recording(monkeypatch, reply(SEARCH_CALL), reply(ANSWER))
+    turn("q", "alice", 1, search_fn=search_returning([gone]))
+    assert "A cat has whiskers." in next(m for m in sent[1] if m["role"] == "tool")["content"]
 
 
 def test_only_missing_picture_files_send_no_picture_message(monkeypatch, figure, tmp_path):
@@ -199,6 +226,21 @@ def test_judge_call_receives_the_pictures_the_tutor_last_saw(monkeypatch, figure
     assert sorted(all_pictures(sent[2])) == sorted(picture_in_only_user_message(sent[3]))
 
 
+def test_tutor_and_judge_hold_the_same_pictures_after_a_search_then_a_grade_on_others(monkeypatch, figure):
+    held = {p: figure(p) for p in ("p1", "p2", "p3", "p4", "p5")}
+    grade = {"role": "assistant", "tool_calls": [{"id": "c2", "type": "function", "function": {"name": "grade_answer",
+             "arguments": '{"question": "q", "student_answer": "a", "passage_ids": ["p4", "p5"]}'}}]}
+    graded = {"role": "assistant", "content": '{"correct": false, "hint": "Reread."}'}
+    verdict = {"role": "assistant", "content": '{"supported": true, "reason": "ok"}'}
+    sent = recording(monkeypatch, reply(SEARCH_CALL), reply(grade), reply(graded), reply(ANSWER), reply(verdict))
+    turn("q", "alice", 1, faithfulness=True, search_fn=search_returning([held["p1"], held["p2"], held["p3"]]),
+         passages_fn=lambda s, ids: [held[i] for i in ids])
+    newest_three = sorted(data_url(p) for p in ("p3", "p4", "p5"))
+    tutor, judge = sent[3], sent[4]
+    assert sorted(all_pictures(tutor)) == newest_three
+    assert sorted(picture_in_only_user_message(judge)) == newest_three
+
+
 def test_regenerate_call_still_holds_the_picture(monkeypatch, figure):
     fail = {"role": "assistant", "content": '{"supported": false, "reason": "no"}'}
     ok = {"role": "assistant", "content": '{"supported": true, "reason": "ok"}'}
@@ -210,22 +252,26 @@ def test_regenerate_call_still_holds_the_picture(monkeypatch, figure):
 
 def test_switch_off_judge_gets_no_picture_and_no_textless_passage(monkeypatch, figure):
     verdict = {"role": "assistant", "content": '{"supported": true, "reason": "ok"}'}
-    sent = recording(monkeypatch, reply(verdict))
-    ctx = tool_ctx(images=False)
-    s2_tools.ask(ctx, "judge", "prompt", [figure("p1"), figure("p2", text="Whiskers.")], "Answer", "{")
-    assert sent[0][1]["content"].count("<document") == 1 and "p1" not in sent[0][1]["content"]
+    sent = recording(monkeypatch, reply(SEARCH_CALL), reply(ANSWER), reply(verdict))
+    out = turn("q", "alice", 1, images=False, faithfulness=True,
+               search_fn=search_returning([figure("p1"), figure("p2", text="Whiskers.")]))
+    assert out["faithfulness"]["supported"] is True
+    judge = sent[2]
+    assert all_pictures(judge) == []
+    assert judge[1]["content"].count("<document") == 1 and 'id="p2"' in judge[1]["content"]
 
 
-def test_ask_keeps_the_newest_three_pictures(monkeypatch, figure):
-    sent = recording(monkeypatch, reply({"role": "assistant", "content": "{}"}))
-    s2_tools.ask(tool_ctx(), "quiz", "prompt", [figure(p) for p in ("p1", "p2", "p3", "p4")], "text", "{")
+def test_a_call_over_passages_keeps_the_newest_three_pictures(monkeypatch, figure):
+    sent = recording(monkeypatch, reply({"role": "assistant", "content": "[]"}))
+    run_tool("make_quiz", '{"concept": "cats"}',
+             tool_ctx(search_fn=search_returning([figure(p) for p in ("p1", "p2", "p3", "p4")])))
     assert picture_in_only_user_message(sent[0]) == [data_url(p) for p in ("p2", "p3", "p4")]
 
 
 def test_picture_bytes_are_part_of_the_llm_cache_key(monkeypatch, figure, tmp_path):
     clients = fakes(monkeypatch)
     passage = figure("p1")
-    ask = lambda: s2_tools.ask(tool_ctx(), "quiz", "prompt", [passage], "text", "{")
+    ask = lambda: run_tool("make_quiz", '{"concept": "cats"}', tool_ctx(search_fn=lambda s, q: [passage]))
 
     ask()
     assert len(clients["opencode"].requests) == 1
