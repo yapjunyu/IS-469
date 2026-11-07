@@ -6,6 +6,7 @@ for step in range(step_cap):
     reply = llm.chat(messages, tools)
     if no tool_calls: break
     for each tool_call: run_tool, append `role: tool` message, write a tool row
+        grade_answer with correct false: its tool message also carries the rule against stating the answer
     pictures among the passages the tools retrieved: one user message after the results, holding the turn's newest pictures
 if cap hit: one last llm.chat(..., tool_choice="none") to force an answer
 faithfulness on: the judge checks the answer; on a fail, regenerate once back in the loop (tools on, same step cap),
@@ -17,7 +18,7 @@ import json
 import re
 import time
 
-from agent.prompts import GUARD_PROMPT, REGENERATE_PROMPT, SYSTEM_PROMPT
+from agent.prompts import GUARD_PROMPT, REGENERATE_PROMPT, SYSTEM_PROMPT, WRONG_ANSWER_PROMPT
 from agent.s2_tools import MODEL, TOOL_SCHEMAS, TurnContext, picture_parts, run_tool, stub_passages, stub_search
 from agent import s4_trace, s6_guard, s7_faithfulness
 from agent.memory import learner, vector
@@ -166,6 +167,9 @@ def run_turn(user_message, student_id, turn, *, history=None, open_quiz=None, se
                              result_summary=json.dumps(summary)[:200])
 
             content = s6_guard.material(result["passages"], guard) if "passages" in result else json.dumps(result)
+            if name == "grade_answer" and result.get("correct") is False:
+                # in this step's request, since the system prompt's rule alone lets the reply give the answer away
+                content += "\n" + WRONG_ANSWER_PROMPT
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": content})
 
         # only after all of a step's tool results: providers reject a user message between them.

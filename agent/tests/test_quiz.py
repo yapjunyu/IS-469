@@ -7,6 +7,7 @@ from agent import s1_llm
 from agent.s2_tools import run_tool
 from agent.tests.test_loop import read_trace, reply, scripted, tool_ctx, turn
 from agent.tests.test_search import PASSAGES, fake_search
+from agent.prompts import WRONG_ANSWER_PROMPT
 
 
 def answer(content):
@@ -90,6 +91,25 @@ def test_a_quiz_is_returned_and_listed_with_its_ids_when_passed_back_open(monkey
     later = turn("It adds layers", "alice", 2, open_quiz=out["quiz"], search_fn=fake_search, passages_fn=lookup)
     assert later["quiz"] is None  # no new quiz this turn: the app keeps the open one
     assert "What does LoRA add? [p1]" in sent[-1] and "What does LoRA add?" not in sent[0]
+
+
+def grade_turn(monkeypatch, correct):
+    """A turn that grades one answer with the given verdict. Returns every message sent on the tutor call after it."""
+    sent = []
+    replies = iter([call(*GRADE[:2]), answer(json.dumps({"correct": correct, "hint": "Reread what LoRA adds."})),
+                    answer("Not quite. Reread what LoRA adds.")])
+    monkeypatch.setattr(s1_llm, "chat", lambda messages, model, **kw: sent.append([dict(m) for m in messages])
+                        or next(replies))
+    turn("It adds layers", "alice", 1, passages_fn=lookup)
+    return json.dumps(sent[-1][1:])  # all but the system prompt: the rule must come after the grading result
+
+
+def test_a_wrong_answer_puts_the_no_answer_rule_in_the_next_request(monkeypatch):
+    assert json.dumps(WRONG_ANSWER_PROMPT)[1:-1] in grade_turn(monkeypatch, False)  # as escaped in the JSON dump
+
+
+def test_a_right_answer_adds_no_such_rule(monkeypatch):
+    assert json.dumps(WRONG_ANSWER_PROMPT)[1:-1] not in grade_turn(monkeypatch, True)
 
 
 def test_quiz_then_grade_writes_an_llm_row_for_each_call(monkeypatch, tmp_data):

@@ -45,6 +45,9 @@ GRADE_PROMPT = """Grade the student's answer to the question below, using only t
 Reply with a JSON object only: {"correct": true or false, "hint": "..."}.
 The hint points the student to what to reread. It never states or paraphrases the answer."""
 
+WRONG_ANSWER_PROMPT = """(From the grader, not the student.) The student's answer is wrong. Reply with the hint only:
+never state the answer, paraphrase it, or quote the part of a passage that holds it."""
+
 REFLECTION_PROMPT = """You read one finished tutoring session and write the tutor's notes for next time.
 Reply with a JSON object only: {{"note": "...", "weak_spots": ["..."]}}.
 "note" says in one or two sentences what the student struggled with or got wrong.
