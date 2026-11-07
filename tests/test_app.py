@@ -741,6 +741,127 @@ def test_a_score_for_a_concept_no_longer_on_the_list_is_not_shown():
     assert not any("gone" in line for line in panel_text(at))
 
 
+# the Memory view
+
+def open_view(at, view):
+    at.sidebar.radio[0].set_value(view)
+    return at.run()
+
+
+def test_a_sidebar_control_switches_views_and_the_chat_survives_the_trip(monkeypatch):
+    sent = script_llm(monkeypatch, "LoRA is small.", "Later answer.")
+    at = say(chat_ready(), "What is LoRA?")
+    at = open_view(at, "Memory")
+    assert not at.chat_input and not shown(at)
+    at = open_view(at, "Chat")
+    assert at.chat_input
+    assert shown(at) == [("user", "What is LoRA?"), ("assistant", "LoRA is small.")]
+    say(at, "Later question")
+    assert history_sent(sent[1]) == [("user", "What is LoRA?"), ("assistant", "LoRA is small."), ("user", "Later question")]
+
+
+def remember_one_of_each(student="jun-yu"):
+    learner.update_mastery(student, "LoRA", correct=True, wrong_belief="LoRA retrains the whole model")
+    learner.add_fact(student, "LoRA", "LoRA adds small matrices", "abc-1")
+    learner.add_session_note(student, "Struggled with LoRA rank")
+
+
+def memory_rows(at):
+    return [t.value for t in at.main.text]
+
+
+def test_the_view_shows_mastery_wrong_beliefs_facts_and_session_notes():
+    remember_one_of_each()
+    at = open_view(chat_ready(), "Memory")
+    assert [s.value for s in at.main.subheader] == ["Mastery scores", "Wrong beliefs", "Facts", "Session notes"]
+    assert memory_rows(at) == ["lora: 0.65",  # 0.5 + 0.3 * (1 - 0.5)
+                               "lora: LoRA retrains the whole model",
+                               "lora: LoRA adds small matrices",
+                               "Struggled with LoRA rank"]
+
+
+def delete_row(at, row_text):
+    """Click the delete control beside the row showing this text."""
+    row = memory_rows(at).index(row_text)
+    at.main.button[row].click()
+    return at.run()
+
+
+def test_each_row_has_a_delete_control_and_a_deleted_row_leaves_the_store_and_the_screen():
+    remember_one_of_each()
+    at = open_view(chat_ready(), "Memory")
+    assert [b.label for b in at.main.button] == ["Delete"] * 4
+    expected = {"lora: 0.65": "mastery", "lora: LoRA retrains the whole model": "wrong_beliefs",
+                "lora: LoRA adds small matrices": "facts", "Struggled with LoRA rank": "session_notes"}
+    for row_text, table in expected.items():
+        assert learner.read_all("jun-yu")[table]
+        at = delete_row(at, row_text)
+        assert learner.read_all("jun-yu")[table] == []
+        assert row_text not in memory_rows(at)
+    assert not at.main.button
+
+
+def test_no_control_edits_an_entry():
+    remember_one_of_each()
+    at = open_view(chat_ready(), "Memory")
+    for kind in ("text_input", "text_area", "number_input", "slider", "select_slider", "selectbox", "multiselect",
+                 "checkbox", "toggle", "radio", "chat_input"):
+        assert not getattr(at.main, kind), kind
+    assert {b.label for b in at.main.button} == {"Delete"}
+
+
+def test_a_deleted_wrong_belief_is_absent_from_the_system_prompt_on_the_next_turn(monkeypatch):
+    sent = script_llm(monkeypatch, "First.", "Second.")
+    learner.update_mastery("jun-yu", "LoRA", correct=False, wrong_belief="LoRA retrains the whole model")
+    learner.update_mastery("jun-yu", "KV cache", correct=False, wrong_belief="KV cache stores weights")
+    at = say(chat_ready(), "What is LoRA?")
+    assert "LoRA retrains the whole model" in sent[0][0]["content"]
+    at = delete_row(open_view(at, "Memory"), "lora: LoRA retrains the whole model")
+    say(open_view(at, "Chat"), "And now?")
+    assert "LoRA retrains the whole model" not in sent[1][0]["content"]
+    assert "KV cache stores weights" in sent[1][0]["content"]  # the prompt still carries the belief that wasn't deleted
+
+
+def test_another_students_entries_never_appear_and_a_delete_leaves_them_alone():
+    remember_one_of_each("bob")  # the same row ids as jun-yu's, as each student has their own database
+    learner.update_mastery("bob", "bobs concept", correct=True)
+    learner.add_session_note("jun-yu", "Jun Yu's own note")
+    at = open_view(chat_ready(), "Memory")
+    assert memory_rows(at) == ["Jun Yu's own note"]
+    bobs = learner.read_all("bob")
+    at = delete_row(at, "Jun Yu's own note")
+    assert memory_rows(at) == []
+    assert learner.read_all("bob") == bobs
+
+
+def test_the_view_is_reachable_with_no_files_because_memory_can_outlive_them():
+    remember_one_of_each()
+    at = open_view(enter_name(open_app(), "Jun Yu"), "Memory")
+    assert "Struggled with LoRA rank" in memory_rows(at)
+    assert not at.info  # the prompt to upload locks chat, not this view
+
+
+def test_a_delete_that_fails_says_so_and_the_row_stays(monkeypatch):
+    remember_one_of_each()
+    at = open_view(chat_ready(), "Memory")
+
+    def locked(*args):
+        raise RuntimeError("database is locked")
+
+    monkeypatch.setattr(learner, "delete", locked)
+    at = delete_row(at, "Struggled with LoRA rank")
+    assert not at.exception
+    assert "database is locked" in at.error[0].value
+    assert "Struggled with LoRA rank" in memory_rows(at)
+
+
+def test_start_quiz_is_unavailable_in_the_memory_view_where_it_could_not_show_a_reply():
+    learner.add_concepts("jun-yu", "notes.pdf", ["LoRA"])
+    at = chat_ready()
+    assert not buttons(at, "Start quiz")[0].disabled
+    assert buttons(open_view(at, "Memory"), "Start quiz")[0].disabled
+
+
 # running it
 
 def test_the_readme_documents_the_launch_command_and_streamlit_is_pinned():
