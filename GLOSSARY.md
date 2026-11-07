@@ -74,6 +74,10 @@ _Avoid_: Test, question set
 The LLM, from a different model family than the tutor, that runs the faithfulness check.
 _Avoid_: Grader (that is `grade_answer`), checker, critic
 
+**Scorer**:
+The LLM that marks the tutor's answers during evaluation, from a family different from both the tutor and the judge. It never runs in the app.
+_Avoid_: Judge (that is the in-app faithfulness check), grader, evaluator
+
 **Faithfulness**:
 Whether every claim about course content in the tutor's final answer is stated in the passages retrieved that turn or shown in their pictures. Claims about the student's own record (weak spots, wrong beliefs, the concept list) are checked against that record. It checks the answer matches the notes, not that the notes are right.
 _Avoid_: Correctness, accuracy, groundedness

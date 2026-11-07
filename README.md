@@ -179,6 +179,23 @@ All results come from one frozen system (feature freeze before testing starts). 
 
 The LLM judge comes from a different model family than the tutor, is validated against 30 hand-marked answers, and has answer order swapped to control for position bias. No BLEU/ROUGE.
 
+### Run the agent evaluation
+
+These test the agent (`run_turn`) on one `eval-gold` notebook holding every file in `corpora/`, with the app's defaults and one switch flipped per experiment. They need `OPENCODE_API_KEY` and `OPENAI_API_KEY`. Answers are scored by the Scorer, `claude-haiku-5-5` on OpenCode Go. The runners only use rows of `eval/agent/*.csv` marked `checked=1`, and they resume where they stopped.
+
+```bash
+.venv/Scripts/python.exe eval/agent_common.py build          # once: index every corpora file (slow on CPU)
+.venv/Scripts/python.exe eval/run_agent_test.py              # scorecard, search-again on vs off
+.venv/Scripts/python.exe eval/run_agent_generation.py        # 75 llm_eval questions, search-again on vs off
+.venv/Scripts/python.exe eval/ragas_eval.py --agent agent_search_again_on
+.venv/Scripts/python.exe eval/ragas_eval.py --agent agent_search_again_off
+.venv/Scripts/python.exe eval/run_injection.py               # guard on vs off
+.venv/Scripts/python.exe eval/run_poisoning.py               # memory-write check on vs off
+.venv/Scripts/python.exe eval/summarise_agent.py             # eval/results_agent/RESULTS.md
+```
+
+Add `--limit 3` to any runner to try a few items first.
+
 ## Guardrails
 
 - Every claim cites a passage; faithfulness is checked by a different model family. Answers are worded as "according to your notes", since grounded is not the same as correct.

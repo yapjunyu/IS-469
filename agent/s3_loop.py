@@ -68,13 +68,17 @@ def run_turn(user_message, student_id, turn, *, history=None, open_quiz=None, se
              passages_fn=stub_passages, search_again=True, guard=True, memory_check=True, faithfulness=True, images=True, memory="learner", embedder=None, step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int,
     "faithfulness": the judge's {"supported", "reason"} or None when off, "warning": bool,
-    "quiz": the questions of this turn's last successful make_quiz, each {"question", "passage_ids"}, or None}.
+    "quiz": the questions of this turn's last successful make_quiz, each {"question", "passage_ids"}, or None,
+    "tool_calls": list}.
 
     answer: the tutor's text with its passage ids left in, because the next turn's grade_answer
     needs them in history. The app removes them for display only.
     citations: the ids of the passages retrieved this turn that the final answer names, in order
     of first appearance, without repeats. Empty on a turn that called grade_answer or where make_quiz
     passed its checks: the ids in quiz questions and hints would point at the answer.
+    tool_calls: every tool call of the turn, in the order it ran, as {"tool": name, "inputs": the
+    parsed arguments (the raw string when the JSON was bad, as the trace keeps it), "result": the
+    tool's full result}. Empty when no tool ran. For evaluation: the trace keeps only 200 characters.
 
     turn: the app's turn number, written on every trace row.
     history: earlier {"role": "user"/"assistant", "content": ...} messages, so quiz
@@ -143,6 +147,7 @@ def run_turn(user_message, student_id, turn, *, history=None, open_quiz=None, se
 
     answer, cap_hit, verdict, regenerated = None, False, None, False
     picture_message = None
+    tool_calls = []
     purpose = "tutor"  # "regenerate" for the first call after the judge fails the answer
     # a numbered answer to the open quiz is graded by code at step 0: the tutor skipped grade_answer too often
     pending = _graded_quiz_answer(user_message, open_quiz)
@@ -181,6 +186,7 @@ def run_turn(user_message, student_id, turn, *, history=None, open_quiz=None, se
                 inputs = json.loads(args)
             except (json.JSONDecodeError, TypeError):
                 inputs = args  # bad JSON: keep the raw string so the trace shows what the LLM sent
+            tool_calls.append({"tool": name, "inputs": inputs, "result": result})
 
             # the trace keeps text only: not even the picture's local path
             summary = {**result, "passages": s6_guard.text_fields(result["passages"])} if "passages" in result else result
@@ -211,4 +217,4 @@ def run_turn(user_message, student_id, turn, *, history=None, open_quiz=None, se
                      faithfulness=verdict, message_preview=user_message[:100], answer_preview=answer[:100])
     citations = [] if ctx.hide_citations else _cited(answer, ctx.passage_ids)
     return {"answer": answer, "citations": citations, "steps": ctx.step, "faithfulness": verdict, "warning": warning,
-            "quiz": ctx.quiz}
+            "quiz": ctx.quiz, "tool_calls": tool_calls}
