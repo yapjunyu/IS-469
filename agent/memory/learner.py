@@ -116,10 +116,13 @@ def add_fact(student_id, concept, fact, passage_id):
 # Returns up to 3 concepts scoring under 0.6 w/ weakest 1st.
 # will be placed in system prompt so agent knows what topics to target
 def weak_concepts(student_id, limit=3, below=0.6):
-    """Lowest scores first, for the system prompt."""
+    """Lowest scores first, for the system prompt. Only concepts on the notebook's list, so a removed file's
+    scores neither reach the tutor nor crowd out current ones. A student with no list at all isn't filtered."""
     with _db(student_id) as conn:
         rows = conn.execute(
-            "SELECT concept, score FROM mastery WHERE score < ? ORDER BY score LIMIT ?",
+            "SELECT concept, score FROM mastery WHERE score < ? "
+            "AND (concept IN (SELECT concept FROM concepts) OR NOT EXISTS (SELECT 1 FROM concepts)) "
+            "ORDER BY score LIMIT ?",
             (below, limit)
         ).fetchall()
     return [dict(r) for r in rows]

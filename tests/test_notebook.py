@@ -358,7 +358,7 @@ def test_pictures_stay_if_another_notebook_holds_the_same_file_under_another_nam
     assert saved_pictures(path)
 
 
-@pytest.mark.parametrize("name", ["ghost.pdf", "../bob/notes.pdf", "..\bob\notes.pdf", "../../outside.pdf", "..", ".", ""])
+@pytest.mark.parametrize("name", ["ghost.pdf", "../bob/notes.pdf", r"..\bob\notes.pdf", "../../outside.pdf", "..", ".", ""])
 def test_removing_a_name_not_in_the_notebook_touches_nothing(name, tmp_data, tmp_path):
     path = make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small")
     outside = tmp_data / "outside.pdf"
@@ -384,6 +384,45 @@ def test_removing_the_last_file_empties_the_notebook_and_adding_it_again_brings_
     assert notebook.search("alice", "LoRA")[0]["text"] == "LoRA adapters are small"
     assert learner.concepts("alice") == ["adapters", "lora"]
     assert [m["concept"] for m in learner.read_all("alice")["mastery"]] == ["lora"]
+
+
+def tutor_prompt(monkeypatch, student):
+    """The system prompt a turn with the app's memory switch sends the tutor."""
+    sent = []
+
+    def chat(messages, model, **kw):
+        sent.append(messages[0]["content"])
+        return reply({"role": "assistant", "content": "Fine."})
+
+    monkeypatch.setattr(s1_llm, "chat", chat)
+    turn("Hello", student, 1, search_fn=notebook.search, passages_fn=notebook.get_passages, memory="learner")
+    return sent[0]
+
+
+def test_a_removed_files_concepts_leave_the_weak_spots_to_a_current_one_and_return_with_the_file(monkeypatch, tmp_path):
+    gone = make_pdf(tmp_path / "gone.pdf", "LoRA adapters are small")
+    removed = ["alpha", "beta", "gamma"]
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply(*removed))
+    notebook.add_file("alice", gone)
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply("delta"))
+    notebook.add_file("alice", make_pdf(tmp_path / "kept.pdf", "BM25 ranks by keyword"))
+    for concept in removed:
+        for _ in range(3):
+            learner.update_mastery("alice", concept, correct=False)  # 0.5 * 0.7 ** 3 = 0.17
+    learner.update_mastery("alice", "delta", correct=False)  # 0.5 * 0.7 = 0.35
+
+    prompt = tutor_prompt(monkeypatch, "alice")
+    assert all(f"{c} 0.17" in prompt for c in removed) and "delta 0.35" not in prompt  # the limit of 3 crowds it out
+
+    notebook.remove_file("alice", "gone.pdf")
+    prompt = tutor_prompt(monkeypatch, "alice")
+    assert not any(c in prompt for c in removed) and "delta 0.35" in prompt
+    assert {m["concept"] for m in learner.read_all("alice")["mastery"]} == {*removed, "delta"}  # the scores stay
+
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply(*removed))
+    notebook.add_file("alice", gone)
+    prompt = tutor_prompt(monkeypatch, "alice")
+    assert all(f"{c} 0.17" in prompt for c in removed) and "delta 0.35" not in prompt
 
 
 def test_removing_then_adding_retries_concepts_that_could_not_be_listed(monkeypatch, tmp_path):

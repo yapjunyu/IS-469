@@ -80,7 +80,8 @@ def add_file(student: str, path) -> dict:
     try:
         names = extract_concepts(student, path.name, "\n\n".join(p.text for p in pages))
     except Exception:  # wraps a provider call that can fail in many ways, and the file is already searchable
-        names = []  # re-adding can't retry this, as the file is now held, but removing then re-adding does
+        # shortcut: re-adding can't retry a failed extraction because the file is now held, only removing then re-adding does, add a retry control if students need one
+        names = []
     return {"status": "replaced" if replacing else "added", "file": path.name, "concepts_found": bool(names)}
 
 
@@ -101,6 +102,7 @@ def remove_file(student: str, filename: str) -> None:
         if fact["passage_id"].startswith(digest[:12]):
             learner.delete(student, "facts", fact["id"])
     # pictures are stored per file fingerprint and shared, so they stay while any other saved file has this content
+    # shortcut: hashes every student's saved files on each removal, keep a fingerprint per file if that gets slow
     pictures = extraction.IMAGE_DIR / digest[:12]
     if pictures.exists() and not any(p != saved and file_sha256(p) == digest for p in UPLOADS_DIR.glob("*/*")):
         shutil.rmtree(pictures)

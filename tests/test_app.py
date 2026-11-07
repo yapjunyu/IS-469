@@ -170,6 +170,49 @@ def test_a_rejected_new_version_shows_why_and_the_old_file_stays(tmp_path):
     assert at.chat_input
 
 
+def a_pdf(tmp_path, name, *slides):
+    return name, make_pdf(tmp_path / "built.pdf", *slides).read_bytes(), "application/pdf"
+
+
+def in_the_uploader_together(at, *files):
+    at.file_uploader[0].set_value(list(files))  # the real uploader keeps every upload, so older ones are handed back too
+    return at.run()
+
+
+def test_a_new_version_clears_the_older_notices_about_that_file_and_keeps_its_own(tmp_path):
+    old, new = a_pdf(tmp_path, "notes.pdf", "LoRA adapters are small"), a_pdf(tmp_path, "notes.pdf", "BM25 ranks by keyword")
+    copy = ("copy.pdf", old[1], "application/pdf")
+    at = in_the_uploader_together(enter_name(open_app(), "Jun Yu"), old, copy, new)
+    for _ in range(2):  # the run that indexes them, and a later one
+        assert len(at.sidebar.success) == 1 and "replaced" in at.sidebar.success[0].value
+        assert not at.sidebar.info
+        at.run()
+
+
+def test_a_third_version_leaves_one_notice(tmp_path):
+    versions = [a_pdf(tmp_path, "notes.pdf", text) for text in ("LoRA one", "LoRA two", "LoRA three")]
+    at = in_the_uploader_together(enter_name(open_app(), "Jun Yu"), *versions)
+    assert len(at.sidebar.success) == 1 and "replaced" in at.sidebar.success[0].value
+
+
+def test_a_new_version_leaves_notices_about_other_files(tmp_path):
+    other = a_pdf(tmp_path, "other.pdf", "An agent calls tools")
+    old, new = a_pdf(tmp_path, "notes.pdf", "LoRA adapters are small"), a_pdf(tmp_path, "notes.pdf", "BM25 ranks by keyword")
+    at = in_the_uploader_together(enter_name(open_app(), "Jun Yu"), other, old, new)
+    assert ["other.pdf" in s.value for s in at.sidebar.success] == [True, False]
+
+
+def test_a_new_version_differing_only_in_capitals_clears_the_notices_and_removing_it_clears_its_own(tmp_path):
+    old, new = a_pdf(tmp_path, "notes.pdf", "LoRA adapters are small"), a_pdf(tmp_path, "Notes.PDF", "BM25 ranks by keyword")
+    copy = ("copy.pdf", old[1], "application/pdf")
+    at = in_the_uploader_together(enter_name(open_app(), "Jun Yu"), old, copy, new)
+    assert len(at.sidebar.success) == 1 and "replaced" in at.sidebar.success[0].value
+    assert not at.sidebar.info
+    at = remove(at, "Notes.PDF")
+    assert not at.sidebar.success and not at.sidebar.info
+    assert files_listed(at) == []
+
+
 # removing a file
 
 def remove(at, name="notes.pdf"):
