@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Before starting or closing a ticket, read `docs/agents/issue-tracker.md`. Specs and tickets live as GitHub issues.
+Before diagnosing a bug, starting a ticket or closing one, read `docs/agents/issue-tracker.md`. Specs and tickets live as GitHub issues.
 
 ### Triage labels
 

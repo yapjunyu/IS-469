@@ -4,6 +4,8 @@ SYSTEM_PROMPT = """You are a study tutor. Answer only from the student's notes.
 - Call search_notes before answering any question about course content.
 - Cite every claim by writing its passage's id in square brackets, e.g. [p1]. If the notes do not cover it, say so.
 - In quiz mode, give hints, never the answer.
+- Write quiz questions only by calling make_quiz, never on your own.
+- When the student answers a quiz question, call grade_answer with that question's passage ids. Never grade from memory.
 - When make_quiz returns questions, use the whole-set format, every question in one message, numbered, with each question's passage ids after it:
   1. <question> [p1, p2]
   2. <question> [p3]
@@ -25,11 +27,17 @@ If they are not enough, "query" is the search rephrased to find better passages
 FAITHFULNESS_PROMPT = """You check a study tutor's answer against passages from the student's notes.
 The answer is supported if every claim about course content in it is stated in the passages or shown in their pictures.
 A passage with no text is its picture: citing it for what the picture shows is fine, and nothing it shows needs to be in text too.
+<no-documents/> means no passages were retrieved: then every claim about course content is unsupported,
+even one that cites the notes or that nothing contradicts.
 Greetings, questions to the student and saying the notes do not cover something need no support.
+Claims about the student's own record (concepts, weak spots and scores, wrong beliefs, past session notes, open quiz)
+are supported if the "Student's record" says them.
 Reply with a JSON object only: {"supported": true or false, "reason": "the unsupported claim, or why it passes"}."""
 
-REGENERATE_PROMPT = """(From the answer checker, not the student.) Your last answer is not supported by the notes: {reason}
-Rewrite it for the student using only what the passages and pictures above say. If the notes do not cover it, say so."""
+REGENERATE_PROMPT = """(From the answer checker, not the student.) Your last answer has claims the notes do not support: {reason}
+Answer the student's last message again. If you need passages, search the notes or grade with the tools first.
+Use only what the passages, their pictures and the student's record say. If the notes do not cover something, say so.
+Write it as a fresh answer: do not apologise, say "correction", or mention the checker or your earlier answer."""
 
 QUIZ_PROMPT = """Write {n} practice questions on the concept below, using only the passages given.
 Reply with a JSON list only: [{{"question": "...", "passage_ids": ["id of each passage the question uses"]}}].
@@ -38,6 +46,9 @@ Do not include answers."""
 GRADE_PROMPT = """Grade the student's answer to the question below, using only the passages given.
 Reply with a JSON object only: {"correct": true or false, "hint": "..."}.
 The hint points the student to what to reread. It never states or paraphrases the answer."""
+
+WRONG_ANSWER_PROMPT = """(From the grader, not the student.) The student's answer is wrong. Reply with the hint only:
+never state the answer, paraphrase it, or quote the part of a passage that holds it."""
 
 REFLECTION_PROMPT = """You read one finished tutoring session and write the tutor's notes for next time.
 Reply with a JSON object only: {{"note": "...", "weak_spots": ["..."]}}.

@@ -59,6 +59,8 @@ class TurnContext:
     searches: int = 0
     passages: list = field(default_factory=list)  # every passage retrieved this turn, oldest first: the tutor's and judge's one record
     hide_citations: bool = False  # make_quiz passed its checks or grade_answer ran, so the answer's passage ids could point at the answer
+    quiz: list | None = None  # the questions of this turn's last successful make_quiz, returned so the app keeps the quiz open
+    record: str = ""  # the student's record in the tutor's system prompt, the judge's support for claims about it
     search_fn: Callable = stub_search
     passages_fn: Callable = stub_passages
     search_again: bool = True
@@ -162,7 +164,10 @@ def make_quiz(ctx, concept, n=3):
             # no valid source id: grade against every passage the quiz was made from
             questions.append({"question": q["question"], "passage_ids": got or ids})
     questions = questions[:n]
-    return {"questions": questions} if questions else {"error": "The quiz reply had no valid questions"}
+    if not questions:
+        return {"error": "The quiz reply had no valid questions"}
+    ctx.quiz = questions
+    return {"questions": questions}
 
 def grade_answer(ctx, question, student_answer, passage_ids):
     ctx.hide_citations = True  # before the checks: a failed call is still a quiz question being answered
@@ -232,7 +237,8 @@ TOOL_SCHEMAS = [
              "n": {"type": "integer", "description": "Number of questions, 1 to 5."}},
             ["concept"]),
     _schema("grade_answer",
-            "Grade the student's answer to a quiz question. Returns correct or not and a hint, never the answer.",
+            "Grade the student's answer to a quiz question. Call it for every answer to a quiz question, "
+            "never grade from memory. Returns correct or not and a hint, never the answer.",
             {"question": {"type": "string"}, "student_answer": {"type": "string"},
              "passage_ids": {"type": "array", "items": {"type": "string"},
                              "description": "The passage ids make_quiz gave for this question."}},
