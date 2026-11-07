@@ -24,6 +24,7 @@ If they are not enough, "query" is the search rephrased to find better passages
 (other words, a synonym, a narrower or broader topic). If they are enough, "query" is ""."""
 FAITHFULNESS_PROMPT = """You check a study tutor's answer against passages from the student's notes.
 The answer is supported if every claim about course content in it is stated in the passages or shown in their pictures.
+A passage with no text is its picture: citing it for what the picture shows is fine, and nothing it shows needs to be in text too.
 Greetings, questions to the student and saying the notes do not cover something need no support.
 Reply with a JSON object only: {"supported": true or false, "reason": "the unsupported claim, or why it passes"}."""
 
