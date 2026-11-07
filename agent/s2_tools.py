@@ -61,6 +61,7 @@ class TurnContext:
     hide_citations: bool = False  # make_quiz passed its checks or grade_answer ran, so the answer's passage ids could point at the answer
     quiz: list | None = None  # the questions of this turn's last successful make_quiz, returned so the app keeps the quiz open
     record: str = ""  # the student's record in the tutor's system prompt, the judge's support for claims about it
+    session: str = ""  # the session's earlier turns and this turn's message, the judge's support for claims about the session
     search_fn: Callable = stub_search
     passages_fn: Callable = stub_passages
     search_again: bool = True

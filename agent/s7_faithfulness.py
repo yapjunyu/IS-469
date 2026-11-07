@@ -2,10 +2,11 @@
 
 The judge is a model from a different family than the tutor (an AI marking its own homework is
 too generous). It reads the final answer, every passage retrieved in the turn with their pictures, and the student's record
-the tutor was given (concepts, weak spots, wrong beliefs, session notes, open quiz), through
+the tutor was given (concepts, weak spots, wrong beliefs, session notes, open quiz), and the session so far
+with this turn's message (support for claims about the session only), through
 s4_trace.traced_chat (purpose "judge"), so its calls write llm rows and count toward the turn.
 """
-from agent import s2_tools
+from agent import s2_tools, s6_guard
 from agent.prompts import FAITHFULNESS_PROMPT
 
 # shortcut: hardcoded, move to config.yaml once the team agrees on it
@@ -19,8 +20,10 @@ def check(ctx, answer):
     record = f"Student's record:\n{ctx.record}\n\n" if ctx.record else ""
     # said outright: with nothing to read, the judge passed course claims that nothing contradicted (#18)
     no_passages_note = "<no-documents/> No passages were retrieved this turn.\n\n" if not passages else ""
+    # outside every <document> marker, and unable to fake one: earlier answers must not support new course claims (#22)
+    session = f"<session>\n{s6_guard.unmark(ctx.session)}\n</session>\n\n" if ctx.session else ""
     verdict = s2_tools.ask(ctx, "judge", FAITHFULNESS_PROMPT, passages,
-                           f"{no_passages_note}{record}Answer to check:\n{answer}", "{", model=JUDGE_MODEL)
+                           f"{no_passages_note}{record}{session}Answer to check:\n{answer}", "{", model=JUDGE_MODEL)
     if not (isinstance(verdict, dict) and isinstance(verdict.get("supported"), bool)):
         # fail closed: an unreadable verdict must not let an unchecked answer through without a warning
         return {"supported": False, "reason": "The judge's reply had no valid verdict"}

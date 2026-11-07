@@ -75,7 +75,7 @@ The LLM, from a different model family than the tutor, that runs the faithfulnes
 _Avoid_: Grader (that is `grade_answer`), checker, critic
 
 **Faithfulness**:
-Whether every claim about course content in the tutor's final answer is stated in the passages retrieved that turn or shown in their pictures. Claims about the student's own record (weak spots, wrong beliefs, the concept list) are checked against that record. It checks the answer matches the notes, not that the notes are right.
+Whether every claim about course content in the tutor's final answer is stated in the passages retrieved that turn or shown in their pictures. Claims about the student's own record (weak spots, wrong beliefs, the concept list) are checked against that record, and claims about the session itself (what the student asked, what an earlier answer said) against the session so far, which never supports a course-content claim. It checks the answer matches the notes, not that the notes are right.
 _Avoid_: Correctness, accuracy, groundedness
 
 **Regenerate**:

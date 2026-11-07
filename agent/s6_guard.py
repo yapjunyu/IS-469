@@ -10,9 +10,14 @@ import re
 TEXT_FIELDS = ("id", "file", "page", "text")  # what an LLM receives of a passage as text
 
 
+def unmark(text):
+    """The text with any <document> or <session> marker in it escaped, so it can't open or close one."""
+    return re.sub(r"<(/?(?:document|session))", r"&lt;\1", text, flags=re.I)
+
+
 def _wrap(p):
     # a passage must not open or close a marker itself, or it could pose as text outside one
-    text = re.sub(r"<(/?document)", r"&lt;\1", p["text"], flags=re.I)
+    text = unmark(p["text"])
     attrs = " ".join(f'{k}="{html.escape(str(p[k]))}"' for k in ("id", "file", "page"))
     return f"<document {attrs}>\n{text}\n</document>"
 
