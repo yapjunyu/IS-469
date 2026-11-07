@@ -22,11 +22,13 @@ PASSAGE = {"id": "notes-p3", "file": "notes.pdf", "page": 3, "text": "LoRA train
 
 @pytest.fixture
 def eval_dirs(monkeypatch, tmp_path):
-    """The eval's cache, results and input CSVs in the temp folder."""
-    monkeypatch.setattr(ac, "CACHE", tmp_path / "llm_cache_eval")
-    monkeypatch.setattr(ac, "OUT", tmp_path / "results_agent")
+    """The eval's input CSVs in the temp folder too (its cache and results already are, see tests/conftest.py)."""
     monkeypatch.setattr(ac, "AGENT", tmp_path / "agent")
     return tmp_path
+
+
+def test_every_test_writes_the_evals_cache_and_results_to_the_temp_folder(tmp_path):
+    assert ac.CACHE.is_relative_to(tmp_path) and ac.OUT.is_relative_to(tmp_path)
 
 
 def provider(monkeypatch, tutor, judge='{"supported": true, "reason": "ok"}', scorer=None):
@@ -96,6 +98,13 @@ def test_each_arm_has_its_own_llm_cache_and_trace_file_and_the_app_trace_is_unto
     assert not (eval_dirs / "llm_cache").exists()  # the app's cache
 
 
+def test_a_turn_that_replays_cached_replies_says_so_so_its_latency_is_not_taken_as_real(monkeypatch, eval_dirs):
+    provider(monkeypatch, answers("Hi!"))
+    first = ac.run("exp", "on", "hello", **EXTRA_CALLS_OFF)
+    rerun = ac.run("exp", "on", "hello", **EXTRA_CALLS_OFF)  # as after a crash mid-item
+    assert (first["cached_replies"], rerun["cached_replies"]) == (0, 1)
+
+
 # Scoring rules, on hand-made recorded turns
 
 def turn(calls=(), answer="", citations=(), warning=False, passages=()):
@@ -123,6 +132,13 @@ def test_quiz_answer_verdict_must_match_and_use_the_quiz_passages():
     assert at.score(req, graded, [], ["a", "b"])[:2] == (True, True)
     assert at.score(req, graded, [], ["b"])[:2] == (False, False)  # graded against passages the quiz never used
     assert at.score({**req, "expected_correct": "0"}, graded, [], ["a"])[0] is False  # wrong verdict
+
+
+def test_quiz_answer_is_judged_on_its_last_grade_alone():
+    req = {"type": "quiz_answer", "expected_correct": "1", "quiz_question": "q", "reference": "r"}
+    regraded = turn([call("grade_answer", {"passage_ids": ["a"]}, {"correct": True, "hint": ""}),
+                     call("grade_answer", {"passage_ids": ["z"]}, {"correct": True, "hint": ""})])
+    assert at.score(req, regraded, [], ["a"])[:2] == (False, False)  # the verdict that counts used the wrong passages
 
 
 def test_content_needs_a_search_a_citation_and_no_warning_and_a_gold_passage_read():
@@ -180,7 +196,7 @@ def test_a_scorer_reply_that_is_not_the_json_asked_for_raises(monkeypatch, eval_
 
 # The runner
 
-HEADER = "id,type,message,expected_tool,expected_concept,quiz_question,quiz_file,quiz_page,expected_correct,notes,checked"
+HEADER = "id,type,message,expected_tool,expected_concept,quiz_question,quiz_file,quiz_page,expected_correct,gold_id,notes,checked"
 
 
 def scorecard(monkeypatch, eval_dirs, *rows):
@@ -200,7 +216,7 @@ def tutor_messages(requests):
 
 def test_an_unchecked_row_is_never_run_and_the_skip_is_reported(monkeypatch, eval_dirs, capsys):
     requests = provider(monkeypatch, answers("Hi!"))
-    rows = scorecard(monkeypatch, eval_dirs, "ot-01,off_topic,Hello there,,,,,,,,1", "ot-02,off_topic,Unchecked,,,,,,,,")
+    rows = scorecard(monkeypatch, eval_dirs, "ot-01,off_topic,Hello there,,,,,,,,,1", "ot-02,off_topic,Unchecked,,,,,,,,,")
     assert {(r["id"], r["arm"]) for r in rows} == {("ot-01", "search_again_on"), ("ot-01", "search_again_off")}
     assert "Unchecked" not in tutor_messages(requests)
     assert "skipping 1 unchecked" in capsys.readouterr().out
@@ -208,9 +224,9 @@ def test_an_unchecked_row_is_never_run_and_the_skip_is_reported(monkeypatch, eva
 
 def test_a_finished_item_and_arm_is_not_run_again(monkeypatch, eval_dirs):
     requests = provider(monkeypatch, answers("Hi!"))
-    scorecard(monkeypatch, eval_dirs, "ot-01,off_topic,Hello there,,,,,,,,1")
+    scorecard(monkeypatch, eval_dirs, "ot-01,off_topic,Hello there,,,,,,,,,1")
     asked = len(requests)
-    rows = scorecard(monkeypatch, eval_dirs, "ot-01,off_topic,Hello there,,,,,,,,1")
+    rows = scorecard(monkeypatch, eval_dirs, "ot-01,off_topic,Hello there,,,,,,,,,1")
     assert len(requests) == asked and len(rows) == 2
 
 
@@ -226,7 +242,7 @@ def test_each_item_starts_from_an_empty_learner_model_with_its_concept_list(monk
         return {"role": "assistant", "content": "Hi!"}
 
     provider(monkeypatch, tutor)
-    scorecard(monkeypatch, eval_dirs, "ot-01,off_topic,Hello there,,,,,,,,1", "ot-02,off_topic,Hi again,,,,,,,,1")
+    scorecard(monkeypatch, eval_dirs, "ot-01,off_topic,Hello there,,,,,,,,,1", "ot-02,off_topic,Hi again,,,,,,,,,1")
     empty = {"mastery": [], "wrong_beliefs": [], "facts": [], "session_notes": []}
     assert seen == [(empty, ["lora"])] * 4  # two items, two arms
 
@@ -235,8 +251,57 @@ def test_a_quiz_me_row_must_name_a_concept_in_the_notebook(monkeypatch, eval_dir
     learner.add_concepts(ac.STUDENT, "notes.pdf", ["LoRA"])
     provider(monkeypatch, answers("Here is your quiz."))
     with pytest.raises(ValueError, match="qm-02"):
-        scorecard(monkeypatch, eval_dirs, "qm-01,quiz_me,Quiz me on LoRA.,make_quiz,lora,,,,,,1",
-                  "qm-02,quiz_me,Quiz me on prompting.,make_quiz,prompting,,,,,,1")
+        scorecard(monkeypatch, eval_dirs, "qm-01,quiz_me,Quiz me on LoRA.,make_quiz,lora,,,,,,,1",
+                  "qm-02,quiz_me,Quiz me on prompting.,make_quiz,prompting,,,,,,,1")
+
+
+def quiz_answer_row(gold_id="pm-17", correct="0"):
+    return (f"qa-01,quiz_answer,Independent and negotiable.,grade_answer,invest criteria,What does INVEST stand for?,"
+            f"notes.pdf,3,{correct},{gold_id},,1")
+
+
+def grades_wrong(request):
+    """The tutor grades the answer against notes-p3, the grader says wrong, and the tutor replies."""
+    if "tools" not in request:
+        return {"role": "assistant", "content": '{"correct": false, "hint": "Think of I."}'}
+    if any(m["role"] == "tool" for m in request["messages"]):
+        return {"role": "assistant", "content": "Not quite. Think of I."}
+    return {"role": "assistant", "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "grade_answer",
+            "arguments": '{"question": "What does INVEST stand for?", "student_answer": "Independent and negotiable.", '
+                         '"passage_ids": ["notes-p3"]}'}}]}
+
+
+@pytest.fixture
+def quiz_notes(monkeypatch):
+    """notes.pdf page 3 holds PASSAGE, for the quiz's history and grade_answer's lookup."""
+    monkeypatch.setattr(ac, "passages_at", lambda file, page: [PASSAGE] if (file, page) == ("notes.pdf", 3) else [])
+    monkeypatch.setattr(notebook, "get_passages", lambda student, ids: [p for p in [PASSAGE] if p["id"] in ids])
+
+
+def test_a_quiz_answer_row_must_name_a_gold_question(monkeypatch, eval_dirs, quiz_notes):
+    provider(monkeypatch, grades_wrong)
+    with pytest.raises(ValueError, match="qa-01"):
+        scorecard(monkeypatch, eval_dirs, quiz_answer_row(gold_id="no-such-question"))
+
+
+def test_a_quiz_answer_turn_has_the_quiz_in_history_as_the_app_keeps_it(monkeypatch, eval_dirs, quiz_notes):
+    requests = provider(monkeypatch, grades_wrong, scorer='{"yes": false, "reason": "Only a hint."}')
+    scorecard(monkeypatch, eval_dirs, quiz_answer_row())
+    request, quiz = requests[0]["messages"][1:3]  # history, between the system prompt and the student's answer
+    assert request["role"] == "user" and "invest criteria" in request["content"]
+    # the tutor's whole-set quiz format (agent/prompts.py), its passage ids in square brackets
+    assert quiz["role"] == "assistant" and "What does INVEST stand for? [notes-p3]" in quiz["content"]
+
+
+def test_the_scorers_tokens_are_on_each_result_row_and_in_no_trace(monkeypatch, eval_dirs, quiz_notes):
+    provider(monkeypatch, grades_wrong, scorer='{"yes": false, "reason": "Only a hint."}')
+    rows = scorecard(monkeypatch, eval_dirs, quiz_answer_row(), "ot-01,off_topic,Hello there,,,,,,,,,1")
+    assert {(r["id"], r["arm"]): r["scorer_tokens"] for r in rows} == {
+        ("qa-01", "search_again_on"): {"in": 10, "out": 5}, ("qa-01", "search_again_off"): {"in": 10, "out": 5},
+        ("ot-01", "search_again_on"): {"in": 0, "out": 0}, ("ot-01", "search_again_off"): {"in": 0, "out": 0}}
+    assert all(r["success"] for r in rows if r["id"] == "qa-01")  # graded wrong on the quiz's passage, only a hint
+    for path in (eval_dirs / "results_agent").glob("trace_*.jsonl"):
+        assert ac.SCORER not in {r.get("model") for r in trace(path)}
 
 
 def test_injection_canary_is_found_in_answer_tools_or_memory_case_blind():
