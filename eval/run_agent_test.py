@@ -12,7 +12,7 @@ Saves eval/results_agent/agent_test.jsonl (one row per request and arm; a rerun 
 Task success, per type:
   content      search_notes ran, the answer cites a passage, and there is no faithfulness warning
   quiz_me      make_quiz ran with the expected concept and returned 3 to 5 questions
-  quiz_answer  grade_answer ran on the quiz's passages, its verdict matches the planted answer, and after a wrong answer
+  quiz_answer  the last grade_answer ran on the quiz's passages, its verdict matches the planted answer, and after a wrong answer
                the reply does not give the answer away (the Scorer checks, see issue #17)
   remember     remember_fact stored a fact that cites a passage the tutor read this turn
   off_topic    no search_notes call and no fact stored
@@ -44,13 +44,13 @@ def content_requests():
 
 
 def quiz_history(row):
-    """The two messages before a quiz answer: the request and the tutor's question, with its passage ids
-    in the text, as the app keeps them in history for grade_answer."""
+    """The two messages before a quiz answer: the request and the tutor's quiz, with its passage ids in square
+    brackets in the text, as the app keeps the tutor's answer in history for grade_answer (agent/prompts.py)."""
     ids = [p["id"] for p in ac.passages_at(row["quiz_file"], int(row["quiz_page"]))]
     assert ids, f"{row['id']}: no passage at {row['quiz_file']} page {row['quiz_page']}"
-    concept = row["expected_concept"] or "this topic"
-    return ids, [{"role": "user", "content": f"Quiz me on {concept}."},
-                 {"role": "assistant", "content": f"Question 1: {row['quiz_question']} (passages: {', '.join(ids)})"}]
+    return ids, [{"role": "user", "content": f"Quiz me on {row['expected_concept']}."},
+                 {"role": "assistant", "content": f"1. {row['quiz_question']} [{', '.join(ids)}]\n\n"
+                                                  "Which question are you answering?"}]
 
 
 def gold_hit(q, passages):
@@ -72,11 +72,10 @@ def score(req, out, facts, quiz_ids):
         sizes = [len(c["result"].get("questions", [])) for c in quizzes]
         return any(3 <= n <= 5 for n in sizes), bool(quizzes), ""
     if t == "quiz_answer":
-        grades = calls.get("grade_answer", [])
-        tool_ok = any(set(c["inputs"].get("passage_ids") or []) <= set(quiz_ids) and c["inputs"].get("passage_ids")
-                      for c in grades)
-        verdicts = [c["result"]["correct"] for c in grades if "correct" in c["result"]]
-        right = bool(verdicts) and verdicts[-1] == (req["expected_correct"] == "1")
+        last = calls.get("grade_answer", [None])[-1]  # passages and verdict both from the grade that stands
+        ids = last["inputs"].get("passage_ids") if last else None
+        tool_ok = bool(ids) and set(ids) <= set(quiz_ids)
+        right = bool(last) and last["result"].get("correct") == (req["expected_correct"] == "1")
         leak, why = False, ""
         if right and req["expected_correct"] == "0":
             leak, why = ac.scorer_yes(LEAK_PROMPT, f"Question: {req['quiz_question']}\nCorrect answer: "
@@ -102,9 +101,10 @@ def main():
     for r in requests:
         if r["type"] == "quiz_me" and learner.norm(r["expected_concept"]) not in concepts:
             raise ValueError(f"{r['id']}: {r['expected_concept']!r} is not in {ac.STUDENT}'s concept list")
-    for r in requests:  # quiz answers are graded against the gold reference answer
-        source = r.get("notes", "").removeprefix("from gold ").split(";")[0]
-        r["reference"] = gold[source]["reference_answer"] if source in gold else ""
+        if r["type"] == "quiz_answer":  # graded against its gold question's reference answer
+            if r["gold_id"] not in gold:
+                raise ValueError(f"{r['id']}: gold question {r['gold_id']!r} is not in the gold set")
+            r["reference"] = gold[r["gold_id"]]["reference_answer"]
     if args.limit:
         seen = {}
         requests = [r for r in requests if seen.setdefault(r["type"], []).append(r) or len(seen[r["type"]]) <= args.limit]
@@ -118,13 +118,15 @@ def main():
             quiz_ids, history = quiz_history(req) if req["type"] == "quiz_answer" else ([], None)
             out = ac.run("agent_test", arm, req["message"], history=history, **switches)
             facts = learner.read_all(ac.STUDENT)["facts"]
+            ac.SCORER_TOKENS.update({"in": 0, "out": 0})
             success, tool_ok, note = score(req, out, facts, quiz_ids)
             results.add({"id": req["id"], "arm": arm, "type": req["type"], "message": req["message"],
                          "answer": out["answer"], "citations": out["citations"], "warning": out["warning"],
                          "faithfulness": out["faithfulness"], "facts": facts,
                          "tools": [{"tool": c["tool"], "inputs": c["inputs"], "error": c["result"].get("error")}
                                    for c in out["tool_calls"]],
-                         **{k: out[k] for k in ("steps", "cap_hit", "searches", "tokens", "duration_ms")},
+                         **{k: out[k] for k in ("steps", "cap_hit", "searches", "tokens", "duration_ms", "cached_replies")},
+                         "scorer_tokens": dict(ac.SCORER_TOKENS),
                          "success": success, "tool_ok": tool_ok, "note": note})
             print(f"{req['id']:7} {arm:17} success={success!s:5} tool_ok={tool_ok!s:5} steps={out['steps']} "
                   f"searches={out['searches']} tokens={sum(out['tokens'].values())} {out['duration_ms'] / 1000:.0f}s {note}",
