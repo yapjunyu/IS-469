@@ -639,6 +639,16 @@ def test_with_no_citations_every_passage_id_is_removed():
     assert notebook.display_answer(answer, []) == "Q1: Why?\nQ2: How? or.\nSee for more."
 
 
+def test_a_bracket_that_also_holds_other_text_keeps_its_own_closing_bracket():
+    assert notebook.display_answer(f"Says so [Lecture3.pdf, {CITED_A}].", [CITED_A]) == "Says so [Lecture3.pdf, [1]]."
+    assert notebook.display_answer(f"Says so ({CITED_A}, page 3).", [CITED_A]) == "Says so ([1], page 3)."
+    assert notebook.display_answer(f"Says so [Lecture3.pdf, {QUIZ_ID}].", [CITED_A]) == "Says so [Lecture3.pdf,]."
+
+
+def test_mismatched_brackets_around_an_id_stay():
+    assert notebook.display_answer(f"Says so [{CITED_A}).", [CITED_A]) == "Says so [[1])."
+
+
 def test_brackets_and_numbers_that_are_not_passage_ids_stay():
     answer = "See [Figure 2] at 12:30, and [1] in the paper, about [a1b2:0007]."
     assert notebook.display_answer(answer, []) == answer

@@ -2,11 +2,16 @@
 from pathlib import Path
 
 from agent import s1_llm
+from agent.memory import learner
 from agent.tests.test_loop import SEARCH_CALL, reply, turn
 
+REAL_ID = "a1b2c3d4e5f6:0007"
 PASSAGES = [{"id": "p1", "file": "lec3.pdf", "page": 12, "text": "LoRA adds low-rank matrices."},
             {"id": "p2", "file": "lec4.pdf", "page": 2, "text": "BM25 ranks by keyword."},
-            {"id": "p3", "file": "lec5.pdf", "page": 7, "text": "Adapters are small."}]
+            {"id": "p3", "file": "lec5.pdf", "page": 7, "text": "Adapters are small."},
+            {"id": REAL_ID, "file": "lec6.pdf", "page": 1, "text": "Reranking reorders."}]
+QUIZ_CALL = {"role": "assistant", "tool_calls": [{"id": "c1", "type": "function",
+             "function": {"name": "make_quiz", "arguments": '{"concept": "LoRA"}'}}]}
 
 
 def answer(text):
@@ -22,7 +27,7 @@ def run(monkeypatch, *replies, **switches):
         return next(it)
 
     monkeypatch.setattr(s1_llm, "chat", chat)
-    return turn("What is LoRA?", "alice", 1, search_fn=lambda student, query: PASSAGES, **switches), sent
+    return turn("What is LoRA?", "alice", 1, **{"search_fn": lambda student, query: PASSAGES, **switches}), sent
 
 
 def cited(monkeypatch, text):
@@ -66,11 +71,26 @@ def test_the_answer_keeps_its_ids(monkeypatch):
 
 
 def test_a_turn_that_calls_make_quiz_returns_no_citations(monkeypatch):
-    quiz_call = {"role": "assistant", "tool_calls": [{"id": "c1", "type": "function",
-                 "function": {"name": "make_quiz", "arguments": '{"concept": "LoRA"}'}}]}
-    out, _ = run(monkeypatch, reply(quiz_call), answer('[{"question": "What does LoRA add?", "passage_ids": ["p1"]}]'),
+    out, _ = run(monkeypatch, reply(QUIZ_CALL), answer('[{"question": "What does LoRA add?", "passage_ids": ["p1"]}]'),
                  answer("1. What does LoRA add? [p1]"))
     assert out["answer"] == "1. What does LoRA add? [p1]" and out["citations"] == []
+
+
+def test_a_make_quiz_rejected_for_an_unknown_concept_keeps_the_answers_citations(monkeypatch):
+    learner.add_concepts("alice", "lec3.pdf", ["BM25"])
+    out, _ = run(monkeypatch, reply(QUIZ_CALL), reply(SEARCH_CALL), answer("LoRA adds [p1]."))
+    assert out["citations"] == ["p1"]
+
+
+def test_a_make_quiz_that_found_no_passages_keeps_the_answers_citations(monkeypatch):
+    results = iter([[], PASSAGES])
+    out, _ = run(monkeypatch, reply(QUIZ_CALL), reply(SEARCH_CALL), answer("LoRA adds [p1]."),
+                 search_fn=lambda student, query: next(results))
+    assert out["citations"] == ["p1"]
+
+
+def test_a_bare_real_format_id_followed_by_a_colon_is_cited(monkeypatch):
+    assert cited(monkeypatch, f"{REAL_ID}: reranking reorders.") == [REAL_ID]
 
 
 def test_the_walkthrough_notebook_keeps_no_output_in_the_old_shape():

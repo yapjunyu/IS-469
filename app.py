@@ -103,20 +103,22 @@ if not notebook.files(student):
 
 # the messages shown, each {"role", "content"}; an answer's content keeps its passage IDs for the next turn's history, and it also
 # has "shown", its displayed text, "citations", the passages it cited as they were that turn, and "warning"
-# shortcut: a removed file's passages stay readable on answers already in this chat, look them up on each rerun if that should change
 state.setdefault("messages", [])
 state.setdefault("turn", 1)
 state.setdefault("failed", None)  # the turn that failed last, {"message", "error"}; neither messages nor turn counted it
 
+held = notebook.files(student)
 for entry in state.messages:
     with st.chat_message(entry["role"]):
         st.markdown(entry.get("shown", entry["content"]))
         if entry.get("warning"):
             st.warning(WARNING)
         for n, passage in enumerate(entry.get("citations", []), start=1):
+            if passage["file"] not in held:  # removed since: nothing from it stays behind, and the others keep their numbers
+                continue
             with st.expander(f"[{n}] {Passage(**passage).citation()}"):
                 st.text(passage["text"])  # not markdown: it's the file's own text, and untrusted
-                # removing or replacing a file deletes its pictures, while this answer stays on screen
+                # a new version of a file keeps its name but deletes its pictures, while this answer stays on screen
                 if passage["image_path"] and Path(passage["image_path"]).exists():
                     st.image(passage["image_path"])
 

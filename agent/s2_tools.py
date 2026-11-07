@@ -51,7 +51,7 @@ class TurnContext:
     tokens: dict = field(default_factory=lambda: {"in": 0, "out": 0})
     searches: int = 0
     passage_ids: list = field(default_factory=list)  # every passage retrieved this turn
-    quiz_called: bool = False  # make_quiz was called, so the answer's passage ids are for grading, not citations
+    quiz_called: bool = False  # make_quiz passed its checks, so the answer's passage ids are for grading, not citations
     search_fn: Callable = stub_search
     passages_fn: Callable = stub_passages
     search_again: bool = True
@@ -106,13 +106,13 @@ def ask(ctx, purpose, prompt, passages, user_text, start, model=None):
 
 
 def make_quiz(ctx, concept, n=3):
-    ctx.quiz_called = True
     if err := _check_concept(ctx, concept):
         return err
     n = max(1, min(n, 5))
     passages = search_notes(ctx, concept)["passages"]
     if not passages:
         return {"error": f"No passages in the notes about {concept!r}"}
+    ctx.quiz_called = True
     items = ask(ctx, "quiz", QUIZ_PROMPT.format(n=n), passages, f"Concept: {concept}", "[")
     ids = [p["id"] for p in passages]
     questions = []

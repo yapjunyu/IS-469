@@ -139,8 +139,9 @@ def _passage(passage) -> dict:
     return {k: getattr(passage, k) for k in ("id", "file", "page", "page_end", "kind", "text", "image_path")}
 
 
-# one or more passage IDs, with the brackets around them and the space before them
-_ID_GROUP = re.compile(rf"(\s*)(?:[\[(]\s*)?{PASSAGE_ID}(?:\s*[,;]\s*{PASSAGE_ID})*(?:\s*[\])])?")
+_IDS = rf"{PASSAGE_ID}(?:\s*[,;]\s*{PASSAGE_ID})*"
+# one or more passage IDs, bare or alone inside a matching pair of brackets, with the space before them
+_ID_GROUP = re.compile(rf"(\s*)(?:\[\s*{_IDS}\s*\]|\(\s*{_IDS}\s*\)|{_IDS})")
 
 
 def display_answer(answer: str, citation_ids: list[str]) -> str:

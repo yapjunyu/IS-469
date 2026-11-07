@@ -37,10 +37,10 @@ from agent.memory import learner, vector
 def _cited(answer, passage_ids):
     """The ids among passage_ids that the answer names, in order of first appearance."""
     first = {}
-    for i in set(passage_ids):
-        # the lookarounds keep p1 from matching inside p10 or a longer id
-        if found := re.search(rf"(?<![\w:-]){re.escape(i)}(?![\w:-])", answer):
-            first[i] = found.start()
+    for passage_id in set(passage_ids):
+        # the same boundaries as PASSAGE_ID, and they keep p1 from matching inside p10
+        if found := re.search(rf"\b{re.escape(passage_id)}\b", answer):
+            first[passage_id] = found.start()
     return sorted(first, key=first.get)
 
 
@@ -52,8 +52,8 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     answer: the tutor's text with its passage ids left in, because the next turn's grade_answer
     needs them in history. The app removes them for display only.
     citations: the ids of the passages retrieved this turn that the final answer names, in order
-    of first appearance, without repeats. Empty on a turn that calls make_quiz: the ids after quiz
-    questions are for grading, and showing them as sources would point at the answer.
+    of first appearance, without repeats. Empty on a turn where make_quiz passed its checks: the ids
+    after quiz questions are for grading, and showing them would point at the answer.
 
     turn: the app's turn number, written on every trace row.
     history: earlier {"role": "user"/"assistant", "content": ...} messages, so quiz

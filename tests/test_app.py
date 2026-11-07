@@ -435,8 +435,10 @@ QUIZ_CALL = {"role": "assistant", "tool_calls": [{"id": "c1", "type": "function"
 
 
 def fake_notes(monkeypatch):
-    """The notebook's search and lookup return these three passages. Tutor replies are scripted by the test."""
+    """The notebook holds their files, and its search and lookup return these three passages. Tutor replies are scripted by the test."""
     passages = [LECTURE, SLIDES, UNUSED]
+    seed_file("jun-yu", "Lecture3.pdf")
+    seed_file("jun-yu", "Week5.pptx")
     monkeypatch.setattr(notebook, "search", lambda student, query: passages)
     monkeypatch.setattr(notebook, "get_passages", lambda student, ids: [p for i in ids for p in passages if p["id"] == i])
 
@@ -474,12 +476,34 @@ def test_opening_a_citation_with_a_picture_shows_the_picture(monkeypatch, tmp_da
     assert len(citation.image) == 1
 
 
-def test_a_cited_picture_whose_file_was_removed_leaves_the_chat_working(monkeypatch, tmp_data):
+def test_removing_a_cited_file_takes_its_citation_away_and_the_chat_still_renders(monkeypatch, tmp_data):
     notebook.add_file("jun-yu", figure_pdf(tmp_data / "paper.pdf", "LoRA adapters, see the figure"))
     seed_file("jun-yu", "other.pdf")  # so removing paper.pdf doesn't lock the chat
     [picture] = [p for p in notebook.search("jun-yu", "LoRA") if p["image_path"]]
     script_llm(monkeypatch, SEARCH_CALL, f"See the figure [{picture['id']}].")
-    at = remove(say(enter_name(open_app(), "Jun Yu"), "What is LoRA?"), "paper.pdf")
+    at = say(enter_name(open_app(), "Jun Yu"), "What is LoRA?")
+    assert at.chat_message[1].expander
+    at = remove(at, "paper.pdf")
+    assert not at.exception and not at.chat_message[1].expander
+    assert shown(at)[-1] == ("assistant", "See the figure [1].")
+
+
+def test_a_citation_left_after_another_file_goes_keeps_its_number(monkeypatch):
+    fake_notes(monkeypatch)
+    script_llm(monkeypatch, SEARCH_CALL, RAW_ANSWER)
+    at = say(chat_ready(), "What is LoRA?")
+    (notebook.UPLOADS_DIR / "jun-yu" / "Week5.pptx").unlink()
+    at = at.run()
+    assert [e.label for e in at.chat_message[1].expander] == ["[2] Lecture3.pdf, page 12"]
+
+
+def test_a_cited_picture_lost_to_a_new_version_of_its_file_leaves_the_citation_without_it(monkeypatch, tmp_data):
+    notebook.add_file("jun-yu", figure_pdf(tmp_data / "paper.pdf", "LoRA adapters, see the figure"))
+    [picture] = [p for p in notebook.search("jun-yu", "LoRA") if p["image_path"]]
+    script_llm(monkeypatch, SEARCH_CALL, f"See the figure [{picture['id']}].")
+    at = say(enter_name(open_app(), "Jun Yu"), "What is LoRA?")
+    notebook.add_file("jun-yu", figure_pdf(tmp_data / "paper.pdf", "LoRA adapters, a new version"))
+    at = at.run()
     assert not at.exception and not Path(picture["image_path"]).exists()
     [citation] = at.chat_message[1].expander
     assert citation.label == "[1] paper.pdf, page 1" and not citation.image
