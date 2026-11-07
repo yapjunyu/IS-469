@@ -98,7 +98,8 @@ async def main():
     results_dir = AGENT_RESULTS if args.agent else RESULTS
 
     load_dotenv(ROOT / ".env")
-    rows = [r for r in json.loads((results_dir / f"generation_{args.run}.json").read_text(encoding="utf-8"))["rows"] if r["response"]][:args.limit]
+    encoding = "utf-8" if args.agent else None  # each as its runner writes it: run_generation.py uses the locale's
+    rows = [r for r in json.loads((results_dir / f"generation_{args.run}.json").read_text(encoding=encoding))["rows"] if r["response"]][:args.limit]
     judge = make_judge(args.agent)
     metrics = {"faithfulness": MultiModalFaithfulness(llm=judge), "factual_correctness": FactualCorrectness(llm=judge),
                "context_precision": ContextPrecision(llm=judge), "context_recall": ContextRecall(llm=judge)}
