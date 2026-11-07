@@ -54,6 +54,16 @@ def index_upload(student, upload):
     return Outcome(st.success, f"{file} added to your notebook.", file)
 
 
+def escape_markdown(text):
+    """LLM text made safe to show as markdown: its punctuation escaped, so it reads as typed."""
+    return re.sub(r"([!-/:-@\[-`{-~])", r"\\\1", text)
+
+
+def chat_history():
+    """The messages shown, as the {"role", "content"} history run_turn and end_session take."""
+    return [{"role": entry["role"], "content": entry["content"]} for entry in state.messages]
+
+
 def mastery_panel(student, concepts):
     """Each of these concepts: a bar at its score or "Not tested yet", with weak spots standing out. Nothing at all when there are none."""
     if not concepts:
@@ -64,7 +74,7 @@ def mastery_panel(student, concepts):
     st.subheader("Mastery")
     for concept in concepts:
         # these labels are markdown, and concept names are an LLM's reading of the file: untrusted, so escape its punctuation
-        name = re.sub(r"([!-/:-@\[-`{-~])", r"\\\1", concept)
+        name = escape_markdown(concept)
         if concept not in scores:
             st.caption(f"{name}: Not tested yet")
             continue
@@ -158,11 +168,11 @@ with st.sidebar:
     quiz_message = f"Quiz me on {concept}" if st.button("Start quiz", disabled=not concepts or view == "Memory") else None
     if st.button("End session", disabled=not state.messages):
         try:
-            note = reflection.end_session(student, [{"role": e["role"], "content": e["content"]} for e in state.messages])
+            note = reflection.end_session(student, chat_history())
         except Exception as e:  # a rate limit or missing key: the chat stays, so the student can try again
             state.end_notice = Outcome(st.error, f"The session couldn't be ended: {e}")
         else:
-            state.end_notice = (Outcome(st.success, f"Session note: {note}") if note
+            state.end_notice = (Outcome(st.success, f"Session note: {escape_markdown(note)}") if note
                                 else Outcome(st.warning, "The session ended, but its note couldn't be written."))
             state.messages, state.turn, state.failed = [], 1, None
         st.rerun()  # redraws the mastery bars, which reflection can lower
@@ -199,7 +209,7 @@ if message:
     with st.chat_message("user"):
         st.markdown(message)
     with st.chat_message("assistant"), st.spinner("The tutor is working...", show_time=True):
-        history = [{"role": entry["role"], "content": entry["content"]} for entry in state.messages]
+        history = chat_history()
         try:
             out = run_turn(message, student, state.turn, history=history, search_fn=notebook.search,
                            passages_fn=notebook.get_passages, memory="learner")
