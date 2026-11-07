@@ -24,7 +24,9 @@ def check(ctx, answer):
     # outside every <document> marker, and unable to fake one: earlier answers must not support new course claims (#22)
     session = f"<session>\n{s6_guard.escape_markers(ctx.session)}\n</session>\n\n" if ctx.session else ""
     verdict = s2_tools.ask(ctx, "judge", FAITHFULNESS_PROMPT, passages,
-                           f"{no_passages_note}{record}{session}Answer to check:\n{answer}", "{", model=JUDGE_MODEL)
+                           # the answer can repeat student text, so it can't fake a passage either
+                           f"{no_passages_note}{record}{session}Answer to check:\n{s6_guard.escape_markers(answer)}",
+                           "{", model=JUDGE_MODEL)
     if not (isinstance(verdict, dict) and isinstance(verdict.get("supported"), bool)):
         # fail closed: an unreadable verdict must not let an unchecked answer through without a warning
         return {"supported": False, "reason": "The judge's reply had no valid verdict"}
