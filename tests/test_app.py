@@ -219,7 +219,7 @@ def test_a_new_version_differing_only_in_capitals_clears_the_notices_and_removin
 # removing a file
 
 def remove(at, name="notes.pdf"):
-    buttons(at, f"Remove {name}")[0].click()
+    at.button(key=f"remove {name}").click()
     return at.run()
 
 
@@ -232,7 +232,7 @@ def test_a_remove_button_takes_the_file_out_of_the_list_and_the_notebook(tmp_pat
     assert notebook.files("jun-yu") == ["kept.pdf"]
     assert notebook.search("jun-yu", "LoRA") == []
     assert learner.concepts("jun-yu") == []
-    assert not buttons(at, "Remove notes.pdf")
+    assert not [b for b in at.button if b.key == "remove notes.pdf"]
     assert at.chat_input  # another file is still there
 
 

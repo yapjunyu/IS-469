@@ -1,0 +1,83 @@
+/* Study Tutor: a lamplit desk at night. Colours come from the theme in config.toml; these are the few the theme can't set. */
+:root {
+  --amber: #E7A955;
+  --amber-soft: rgba(231, 169, 85, 0.14);
+  --ink-muted: #A79E8E;
+  --rule: #2E2821;
+}
+
+::selection { background: rgba(231, 169, 85, 0.35); color: #FFF8EC; }
+* { scrollbar-width: thin; scrollbar-color: #3A332A transparent; }
+input, textarea { caret-color: var(--amber); }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+/* main column: a reading measure, and room under the pinned chat box */
+.block-container { max-width: 50rem; padding-top: 3.5rem; }
+
+/* page head: a quiet serif masthead, not a banner */
+h1 { font-size: 2.1rem !important; font-weight: 600 !important; letter-spacing: -0.02em; padding-bottom: 0.15rem !important; }
+.st-key-masthead { border-bottom: 1px solid var(--rule); padding-bottom: 1rem; margin-bottom: 0.75rem; }
+.st-key-masthead [data-testid="stCaptionContainer"] { color: var(--ink-muted); }
+
+/* sidebar */
+[data-testid="stSidebarContent"] { padding-top: 0.25rem; }
+[data-testid="stSidebarUserContent"] { padding-top: 0.5rem; }
+[data-testid="stSidebar"] h3 {
+  font-family: "Public Sans", sans-serif !important;
+  font-size: 0.72rem !important; font-weight: 600 !important;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-muted);
+  padding: 1.1rem 0 0 !important; border-top: 1px solid var(--rule);
+}
+.st-key-notebook p { font-family: "Newsreader", serif; font-size: 1.35rem; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+
+/* Chat / Memory: a segmented switch, not radio dots */
+.st-key-view, .st-key-view [data-testid="stRadio"] { width: 100% !important; }
+.st-key-view [role="radiogroup"] {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; width: 100%;
+  padding: 0.25rem; border: 1px solid var(--rule); border-radius: 0.6rem; background: #1A1712;
+}
+.st-key-view [role="radiogroup"] > div { margin: 0; }
+.st-key-view [data-testid="stRadioOption"] {
+  display: flex; justify-content: center; width: 100%; margin: 0; padding: 0.45rem 0; border-radius: 0.4rem; cursor: pointer;
+  transition: background 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.st-key-view [data-testid="stRadioOption"] > div > div:first-child { display: none; }
+.st-key-view [data-testid="stRadioOption"] p { color: var(--ink-muted); transition: color 160ms; }
+.st-key-view [data-testid="stRadioOption"]:hover p { color: #EDE6D9; }
+.st-key-view [data-testid="stRadioOption"][data-selected="true"] { background: var(--amber-soft); }
+.st-key-view [data-testid="stRadioOption"][data-selected="true"] p { color: var(--amber); font-weight: 600; }
+.st-key-view [data-testid="stRadioOption"]:has(input:focus-visible) { outline: 2px solid var(--amber); outline-offset: 1px; }
+
+/* file list: name, then a quiet remove that wakes on hover */
+[class*="st-key-file-"] [data-testid="stHorizontalBlock"] { gap: 0.5rem; flex-wrap: nowrap; padding: 0.1rem 0; }
+[class*="st-key-file-"] [data-testid="stColumn"]:first-child { flex: 1 1 0 !important; min-width: 0; }
+[class*="st-key-file-"] [data-testid="stColumn"]:last-child { flex: 0 0 auto !important; width: auto !important; min-width: 0; }
+[class*="st-key-file-"] [data-testid="stText"] { font-size: 0.86rem; line-height: 1.35; overflow-wrap: anywhere; }
+[class*="st-key-file-"] button p { font-size: 0.8rem; color: var(--ink-muted); }
+[class*="st-key-file-"] button:hover p { color: #F0957F; }
+
+/* mastery: a capped, scrollable list so the quiz stays in reach */
+.st-key-mastery_list { max-height: 17rem; overflow-y: auto !important; flex-wrap: nowrap; padding-right: 0.4rem; gap: 0.4rem; }
+.st-key-mastery_list [data-testid="stCaptionContainer"] p { font-size: 0.82rem; }
+.st-key-mastery_list [data-testid="stProgress"] p { font-size: 0.85rem; }
+
+/* chat */
+[data-testid="stChatMessage"] { padding: 0.9rem 1rem; border-radius: 0.75rem; }
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) { background: #221E18; }
+[data-testid="stChatMessage"] [data-testid="stExpander"] details { border-color: var(--rule); }
+.st-key-empty_chat { padding: 2.5rem 0 1rem; }
+.st-key-empty_chat h3 { font-size: 1.5rem !important; }
+.st-key-empty_chat p { color: var(--ink-muted); max-width: 34rem; }
+
+/* memory view: each table a section of hairline-ruled rows */
+[class*="st-key-memory-"] { border-top: 1px solid var(--rule); padding-top: 1rem; margin-top: 0.75rem; }
+[class*="st-key-memory-"] { gap: 0.5rem; }
+[class*="st-key-memory-"] h3 { font-size: 1.3rem !important; padding: 0 0 0.35rem !important; }
+[class*="st-key-memory-"] [data-testid="stHorizontalBlock"] { border-bottom: 1px solid var(--rule); padding: 0.35rem 0; flex-wrap: nowrap; gap: 0.75rem; }
+[class*="st-key-memory-"] [data-testid="stColumn"]:first-child { flex: 1 1 0 !important; min-width: 0; }
+[class*="st-key-memory-"] [data-testid="stColumn"]:last-child { flex: 0 0 auto !important; width: auto !important; min-width: 0; }
+[class*="st-key-memory-"] [data-testid="stHorizontalBlock"]:last-child { border-bottom: 0; }
+[class*="st-key-memory-"] button p { font-size: 0.82rem; color: var(--ink-muted); }
+[class*="st-key-memory-"] button:hover p { color: #F0957F; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

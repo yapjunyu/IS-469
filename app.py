@@ -72,14 +72,15 @@ def mastery_panel(student, concepts):
     # limit: every weak spot here, not only the few the system prompt gets
     weak = {row["concept"] for row in learner.weak_concepts(student, limit=len(concepts))}
     st.subheader("Mastery")
-    for concept in concepts:
-        # these labels are markdown, and concept names are an LLM's reading of the file: untrusted, so escape its punctuation
-        name = escape_markdown(concept)
-        if concept not in scores:
-            st.caption(f"{name}: Not tested yet")
-            continue
-        percent = round(scores[concept] * 100)  # given a float, st.progress truncates: 0.29 would draw 28
-        st.progress(percent, text=f":red[**{name}: {percent}%, weak spot**]" if concept in weak else f"{name}: {percent}%")
+    with st.container(key="mastery_list"):  # capped in style.css, so a long list scrolls and the quiz stays in reach
+        for concept in concepts:
+            # these labels are markdown, and concept names are an LLM's reading of the file: untrusted, so escape its punctuation
+            name = escape_markdown(concept)
+            if concept not in scores:
+                st.caption(f"{name}: Not tested yet")
+                continue
+            percent = round(scores[concept] * 100)  # given a float, st.progress truncates: 0.29 would draw 28
+            st.progress(percent, text=f":red[**{name}: {percent}%, weak spot**]" if concept in weak else f"{name}: {percent}%")
 
 
 # learner table -> its heading and one row's text. Passage IDs stay hidden, as everywhere a student reads.
@@ -95,12 +96,15 @@ def memory_view(student):
     """Everything the tutor remembers about this student, each row deletable. No edit, so a student can't raise their own score."""
     for table, rows in learner.read_all(student).items():
         heading, row_text = MEMORY_TABLES[table]
-        st.subheader(heading)
+        section = st.container(key=f"memory-{table}")
+        section.subheader(heading)
+        if not rows:
+            section.caption("Nothing here yet.")
         for row in rows:
             key = row[learner.TABLE_KEYS[table]]
-            entry, control = st.columns([5, 1])
+            entry, control = section.columns([6, 1], vertical_alignment="center")
             entry.text(row_text(row))  # not markdown: it came from the LLM and the student's words
-            if control.button("Delete", key=f"delete {table} {key}"):
+            if control.button("Delete", key=f"delete {table} {key}", type="tertiary"):
                 try:
                     learner.delete(student, table, key)
                 except Exception as e:  # the store failing: the row stays listed, and deleting it again retries
@@ -111,13 +115,15 @@ def memory_view(student):
 
 state = st.session_state
 
-st.title("Study Tutor")
-st.caption("The tutor is only as accurate as your files, so check anything important against them.")
+st.html(Path(__file__).resolve().parent / ".streamlit" / "style.css")
+with st.container(key="masthead"):
+    st.title("Study Tutor")
+    st.caption("The tutor is only as accurate as your files, so check anything important against them.")
 
 if "student" not in state:
     with st.sidebar.form("name"):
         name = st.text_input("Your name")
-        entered = st.form_submit_button("Open my notebook")
+        entered = st.form_submit_button("Open my notebook", type="primary", width="stretch")
     if entered:
         try:
             state.student = notebook.student_id(name)
@@ -139,8 +145,8 @@ state.setdefault("turn", 1)
 state.setdefault("failed", None)  # the turn that failed last, {"message", "error"}; neither messages nor turn counted it
 
 with st.sidebar:
-    st.write(f"Notebook: {student}")
-    view = st.radio("View", ["Chat", "Memory"])
+    st.container(key="notebook").write(f"Notebook: {student}")
+    view = st.radio("View", ["Chat", "Memory"], horizontal=True, label_visibility="collapsed", key="view")
     uploads = st.file_uploader("Add .pptx or PDF files", type=["pptx", "pdf"], accept_multiple_files=True)
     for upload in uploads:
         if upload.file_id not in state.upload_outcomes:
@@ -150,9 +156,10 @@ with st.sidebar:
         if outcome := state.upload_outcomes[upload.file_id]:
             outcome.show(outcome.text)
     st.subheader("Your files")
-    for file in notebook.files(student):
-        st.text(file)
-        if st.button(f"Remove {file}"):
+    for i, file in enumerate(notebook.files(student)):
+        name, control = st.container(key=f"file-{i}").columns([5, 1], vertical_alignment="center")
+        name.text(file)
+        if control.button("Remove", key=f"remove {file}", help=f"Remove {file} from your notebook", type="tertiary"):
             try:
                 notebook.remove_file(student, file)
             except Exception as e:  # the store or a locked file failing: it stays listed, and removing it again finishes the job
@@ -165,8 +172,9 @@ with st.sidebar:
     st.subheader("Quiz")
     concept = st.selectbox("Concept", concepts, disabled=not concepts)
     # off in the Memory view, which has no chat for the reply to appear in
-    quiz_message = f"Quiz me on {concept}" if st.button("Start quiz", disabled=not concepts or view == "Memory") else None
-    if st.button("End session", disabled=not state.messages):
+    quiz_message = (f"Quiz me on {concept}" if st.button("Start quiz", type="primary", width="stretch",
+                                                         disabled=not concepts or view == "Memory") else None)
+    if st.button("End session", width="stretch", disabled=not state.messages):
         try:
             note = reflection.end_session(student, chat_history())
         except Exception as e:  # a rate limit or missing key: the chat stays, so the student can try again
@@ -187,9 +195,15 @@ if not notebook.files(student):
     st.info("Upload a .pptx or PDF in the sidebar to start chatting.")
     st.stop()
 
+AVATARS = {"user": ":material/person:", "assistant": ":material/school:"}
 held = notebook.files(student)
+if not state.messages and not state.failed:
+    with st.container(key="empty_chat"):
+        st.subheader("What are we studying tonight?")
+        st.markdown("Ask anything about your files and the tutor answers with numbered citations you can open. "
+                    "Or pick a concept under Quiz in the sidebar to be tested on it.")
 for entry in state.messages:
-    with st.chat_message(entry["role"]):
+    with st.chat_message(entry["role"], avatar=AVATARS[entry["role"]]):
         st.markdown(entry.get("shown", entry["content"]))
         if entry.get("warning"):
             st.warning(WARNING)
@@ -206,9 +220,9 @@ for entry in state.messages:
 message = st.chat_input("Ask about your notes", submit_mode="disable") or quiz_message or state.pop("resend", None)
 if message:
     state.failed = state.end_notice = None
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar=AVATARS["user"]):
         st.markdown(message)
-    with st.chat_message("assistant"), st.spinner("The tutor is working...", show_time=True):
+    with st.chat_message("assistant", avatar=AVATARS["assistant"]), st.spinner("The tutor is working...", show_time=True):
         history = chat_history()
         try:
             out = run_turn(message, student, state.turn, history=history, search_fn=notebook.search,
@@ -224,7 +238,7 @@ if message:
     st.rerun()
 
 if state.failed:
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar=AVATARS["user"]):
         st.markdown(state.failed["message"])
     st.error(f"The tutor couldn't answer: {state.failed['error']}")
     if st.button("Resend"):
