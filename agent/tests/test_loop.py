@@ -49,6 +49,7 @@ def test_tool_then_answer(monkeypatch):
     monkeypatch.setattr(s1_llm, "chat", scripted(reply(SEARCH_CALL),
                                                   reply({"role": "assistant", "content": "LoRA is ... [stub-1]"})))
     out = turn("What is LoRA?", "alice", 1)
+    assert [c["tool"] for c in out.pop("tool_calls")] == ["search_notes"]
     assert out == {"answer": "LoRA is ... [stub-1]", "citations": ["stub-1"], "steps": 2,
                    "faithfulness": None, "warning": False}
 
@@ -101,6 +102,26 @@ def test_bad_tool_json_traced_raw_and_turn_completes(monkeypatch, tmp_data):
     tool_row = read_trace(tmp_data)[1]
     assert out["answer"] == "ok"
     assert tool_row["inputs"] == '{"query": LoRA' and not tool_row["ok"] and tool_row["error"]
+    assert out["tool_calls"][0]["inputs"] == '{"query": LoRA'
+
+
+def test_turn_without_tools_returns_no_tool_calls(monkeypatch):
+    monkeypatch.setattr(s1_llm, "chat", scripted(reply({"role": "assistant", "content": "hi"})))
+    assert turn("hello", "alice", 1)["tool_calls"] == []
+
+
+def test_tool_calls_returned_in_order_with_inputs_and_full_results(monkeypatch):
+    two = {"role": "assistant", "tool_calls": [
+        {"id": "c1", "type": "function", "function": {"name": "search_notes", "arguments": '{"query": "LoRA"}'}},
+        {"id": "c2", "type": "function", "function": {"name": "search_notes", "arguments": '{"query": "KV cache"}'}}]}
+    long_text = "x" * 500  # longer than the trace row's 200-character result_summary
+    search = lambda student, query: [{"id": query, "file": "notes.pdf", "page": 1, "text": long_text}]
+    monkeypatch.setattr(s1_llm, "chat", scripted(reply(two), reply({"role": "assistant", "content": "done"})))
+    out = turn("Compare LoRA and KV cache", "alice", 1, search_fn=search)
+    assert [(c["tool"], c["inputs"]) for c in out["tool_calls"]] == [
+        ("search_notes", {"query": "LoRA"}), ("search_notes", {"query": "KV cache"})]
+    assert [c["result"]["passages"][0]["id"] for c in out["tool_calls"]] == ["LoRA", "KV cache"]
+    assert out["tool_calls"][0]["result"]["passages"][0]["text"] == long_text
 
 
 def test_system_prompt_lists_the_notebooks_concepts(monkeypatch):
