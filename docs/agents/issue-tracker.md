@@ -16,6 +16,10 @@ Infer the repo from `git remote -v`; `gh` does this automatically when run insid
 
 Triage state is a label on the issue (see `triage-labels.md` for the strings).
 
+## Reported bugs
+
+A bug the user reports in chat may already be a ticket. Search open `bug` and `needs-triage` issues first, and work under the matching one: a ticket that says *Decide first* gets the decision in a comment before the code.
+
 ## Specs and tickets
 
 - A spec is one issue, titled `Spec: <feature>`.

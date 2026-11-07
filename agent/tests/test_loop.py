@@ -68,6 +68,13 @@ def test_search_then_answer_trace_rows(monkeypatch, tmp_data):
     assert all(list(r)[:5] == ["kind", "ts", "student", "turn", "step"] for r in rows)
     assert rows[1]["tool"] == "search_notes" and rows[1]["inputs"] == {"query": "LoRA"} and rows[1]["ok"]
     assert rows[-1]["duration_ms"] >= 0  # turn latency for step 22
+    assert rows[-1]["message_preview"] == "What is LoRA?"
+
+
+def test_final_row_previews_the_first_100_chars_of_the_students_message(monkeypatch, tmp_data):
+    monkeypatch.setattr(s1_llm, "chat", scripted(reply({"role": "assistant", "content": "done"})))
+    turn("a" * 150, "alice", 1)
+    assert read_trace(tmp_data)[-1]["message_preview"] == "a" * 100
 
 
 def test_every_trace_row_carries_turn_number(monkeypatch, tmp_data):

@@ -185,7 +185,7 @@ def run_turn(user_message, student_id, turn, *, history=None, open_quiz=None, se
     s4_trace.log_row(ctx, "final", steps=ctx.step, cap_hit=cap_hit, searches=ctx.searches,
                      tokens=dict(ctx.tokens),
                      duration_ms=round((time.perf_counter() - t_start) * 1000),
-                     faithfulness=verdict, answer_preview=answer[:100])
+                     faithfulness=verdict, message_preview=user_message[:100], answer_preview=answer[:100])
     citations = [] if ctx.hide_citations else _cited(answer, ctx.passage_ids)
     return {"answer": answer, "citations": citations, "steps": ctx.step, "faithfulness": verdict, "warning": warning,
             "quiz": ctx.quiz}

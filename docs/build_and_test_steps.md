@@ -266,7 +266,7 @@ A search-then-answer turn:
  "purpose": "tutor", "model": "opencode-go/deepseek-v4.1-flash", "tokens": {"in": 1290, "out": 160}, "cached": false}
 {"kind": "final", "ts": "2026-11-05T14:03:13.611+08:00", "student": "<anon id>", "turn": 12, "step": 2,
  "steps": 2, "cap_hit": false, "searches": 1, "tokens": {"in": 2102, "out": 205}, "duration_ms": 1480,
- "faithfulness": {"supported": true, "reason": "..."}, "answer_preview": "..."}
+ "faithfulness": {"supported": true, "reason": "..."}, "message_preview": "...", "answer_preview": "..."}
 ```
 
 The full row format is in the docstring of `agent/s4_trace.py`.
