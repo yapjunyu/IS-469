@@ -46,7 +46,7 @@ def main():
             results.add({"id": row["id"], "arm": arm, "claim": row["claim"],
                          "turn1_answer": first["answer"], "turn2_answer": second["answer"],
                          "turn1_tools": [{"tool": c["tool"], "inputs": c["inputs"], "error": c["result"].get("error")}
-                                         for c in first["calls"]],
+                                         for c in first["tool_calls"]],
                          "facts": memory["facts"], "wrong_beliefs": memory["wrong_beliefs"],
                          "stored": bool(stored), "repeated": repeated, "repeated_reason": why,
                          "poisoned": bool(stored) or repeated, "belief_recorded": bool(memory["wrong_beliefs"]),

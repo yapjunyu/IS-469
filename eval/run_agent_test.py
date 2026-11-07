@@ -12,7 +12,7 @@ Saves eval/results_agent/agent_test.jsonl (one row per request and arm; a rerun 
 Task success, per type:
   content      search_notes ran, the answer cites a passage, and there is no faithfulness warning
   quiz_me      make_quiz ran with the expected concept and returned 3 to 5 questions
-  quiz_answer  grade_answer ran, its verdict matches the planted answer, and after a wrong answer
+  quiz_answer  grade_answer ran on the quiz's passages, its verdict matches the planted answer, and after a wrong answer
                the reply does not give the answer away (the Scorer checks, see issue #17)
   remember     remember_fact stored a fact that cites a passage the tutor read this turn
   off_topic    no search_notes call and no fact stored
@@ -60,7 +60,7 @@ def gold_hit(q, passages):
 
 def score(req, out, facts, quiz_ids):
     calls = {}
-    for c in out["calls"]:
+    for c in out["tool_calls"]:
         calls.setdefault(c["tool"], []).append(c)
     t, read = req["type"], {p["id"] for p in out["passages"]}
     if t == "content":
@@ -81,13 +81,13 @@ def score(req, out, facts, quiz_ids):
         if right and req["expected_correct"] == "0":
             leak, why = ac.scorer_yes(LEAK_PROMPT, f"Question: {req['quiz_question']}\nCorrect answer: "
                                                    f"{req['reference']}\nTutor's reply: {out['answer']}")
-        return right and not leak, tool_ok, (f"gave the answer away: {why}" if leak else "")
+        return tool_ok and right and not leak, tool_ok, (f"gave the answer away: {why}" if leak else "")
     if t == "remember":
         tool_ok = any(learner.norm(str(c["inputs"].get("concept", ""))) == learner.norm(req["expected_concept"])
                       for c in calls.get("remember_fact", []))
         return any(f["passage_id"] in read for f in facts), tool_ok, ""
     if t == "off_topic":
-        return "search_notes" not in calls and not facts, not out["calls"], ""
+        return "search_notes" not in calls and not facts, not out["tool_calls"], ""
     raise ValueError(f"unknown request type {t!r}")
 
 
@@ -98,6 +98,10 @@ def main():
 
     gold = {q["id"]: q for q in ev.load_gold(ac.ROOT / "eval" / "gold" / "gold_60_40.csv")}
     requests = content_requests() + ac.load_checked("requests")
+    concepts = set(learner.concepts(ac.STUDENT))
+    for r in requests:
+        if r["type"] == "quiz_me" and learner.norm(r["expected_concept"]) not in concepts:
+            raise ValueError(f"{r['id']}: {r['expected_concept']!r} is not in {ac.STUDENT}'s concept list")
     for r in requests:  # quiz answers are graded against the gold reference answer
         source = r.get("notes", "").removeprefix("from gold ").split(";")[0]
         r["reference"] = gold[source]["reference_answer"] if source in gold else ""
@@ -119,7 +123,7 @@ def main():
                          "answer": out["answer"], "citations": out["citations"], "warning": out["warning"],
                          "faithfulness": out["faithfulness"], "facts": facts,
                          "tools": [{"tool": c["tool"], "inputs": c["inputs"], "error": c["result"].get("error")}
-                                   for c in out["calls"]],
+                                   for c in out["tool_calls"]],
                          **{k: out[k] for k in ("steps", "cap_hit", "searches", "tokens", "duration_ms")},
                          "success": success, "tool_ok": tool_ok, "note": note})
             print(f"{req['id']:7} {arm:17} success={success!s:5} tool_ok={tool_ok!s:5} steps={out['steps']} "
