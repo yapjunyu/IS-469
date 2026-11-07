@@ -17,8 +17,8 @@ from agent.memory import learner
 from agent.tests.test_loop import SEARCH_CALL, reply, turn
 from tutor import notebook
 from tutor.pipeline import EMBEDDER, STORE_TAG
-from tutor.retrieval import embed, search
-from tutor.retrieval.extract import FileRejected
+from tutor.retrieval import embed, extract, search
+from tutor.retrieval.extract import FileRejected, file_sha256
 
 WORDS = ["lora", "bm25", "agent"]
 CONCEPTS = reply({"role": "assistant", "content": '["LoRA", "Adapters"]'})
@@ -111,13 +111,7 @@ def test_search_returns_the_top_3(tmp_path):
 
 
 def test_a_figure_comes_back_with_its_saved_picture(tmp_data):
-    path = tmp_data / "paper.pdf"
-    with pymupdf.open() as doc:
-        page = doc.new_page()  # portrait, so a document page: its figure is cropped to its own PNG
-        page.insert_text((72, 72), "LoRA adapters, see the figure")
-        page.insert_image(pymupdf.Rect(72, 100, 272, 300), pixmap=PICTURE)
-        doc.save(path)
-    notebook.add_file("alice", path)
+    notebook.add_file("alice", figure_pdf(tmp_data / "paper.pdf", "LoRA adapters, see the figure"))
     [picture] = [p for p in notebook.search("alice", "LoRA") if p["image_path"]]
     assert picture["text"] == "" and picture["page"] == 1
     assert Path(picture["image_path"]).is_relative_to(tmp_data / "images") and Path(picture["image_path"]).exists()
@@ -277,14 +271,298 @@ def test_a_crash_between_indexing_and_saving_is_put_right_by_adding_again(tmp_da
     assert len(notebook.search("alice", "LoRA")) == 1
 
 
-def test_same_name_with_new_content_is_turned_away_until_replacing_exists(tmp_data, tmp_path):
-    old = make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small").read_bytes()
-    notebook.add_file("alice", tmp_path / "notes.pdf")
+# removing a file
+
+def concepts_reply(*names):
+    return lambda *a, **k: reply({"role": "assistant", "content": json.dumps(names)})
+
+
+def figure_pdf(path, text):
+    """A portrait PDF, so a document page: its figure is cropped to its own saved picture."""
+    with pymupdf.open() as doc:
+        page = doc.new_page()
+        page.insert_text((72, 72), text)
+        page.insert_image(pymupdf.Rect(72, 100, 272, 300), pixmap=PICTURE)
+        doc.save(path)
+    return path
+
+
+def saved_pictures(path):
+    """The pictures saved for the file at this path, which live in a folder named after its fingerprint."""
+    return sorted((extract.IMAGE_DIR / file_sha256(path)[:12]).glob("*"))
+
+
+def test_a_removed_file_is_gone_from_the_list_search_and_get_passages_and_its_saved_copy_is_deleted(tmp_data, tmp_path):
+    notebook.add_file("alice", make_pdf(tmp_path / "gone.pdf", "LoRA adapters are small"))
+    notebook.add_file("alice", make_pdf(tmp_path / "kept.pdf", "BM25 ranks by keyword"))
+    gone = next(p for p in notebook.search("alice", "LoRA") if p["file"] == "gone.pdf")
+    notebook.remove_file("alice", "gone.pdf")
+    assert notebook.files("alice") == ["kept.pdf"]
+    assert {p["file"] for p in notebook.search("alice", "LoRA")} == {"kept.pdf"}
+    assert notebook.get_passages("alice", [gone["id"]]) == []
+    assert not (tmp_data / "uploads" / "alice" / "gone.pdf").exists()
+
+
+def test_removing_a_file_drops_concepts_only_it_had(monkeypatch, tmp_path):
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply("LoRA", "Shared"))
+    notebook.add_file("alice", make_pdf(tmp_path / "gone.pdf", "LoRA adapters are small"))
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply("BM25", "Shared"))
+    notebook.add_file("alice", make_pdf(tmp_path / "kept.pdf", "BM25 ranks by keyword"))
+    notebook.remove_file("alice", "gone.pdf")
+    assert learner.concepts("alice") == ["bm25", "shared"]
+
+
+def test_removing_a_file_drops_facts_citing_it_keeps_other_facts_and_keeps_mastery(tmp_path):
+    notebook.add_file("alice", make_pdf(tmp_path / "gone.pdf", "LoRA adapters are small"))
+    notebook.add_file("alice", make_pdf(tmp_path / "kept.pdf", "BM25 ranks by keyword"))
+    [gone] = [p for p in notebook.search("alice", "LoRA") if p["file"] == "gone.pdf"]
+    [kept] = [p for p in notebook.search("alice", "BM25") if p["file"] == "kept.pdf"]
+    learner.add_fact("alice", "lora", "LoRA adapters are small", gone["id"])
+    learner.add_fact("alice", "bm25", "BM25 ranks by keyword", kept["id"])
+    learner.update_mastery("alice", "lora", correct=True)
+    notebook.remove_file("alice", "gone.pdf")
+    memory = learner.read_all("alice")
+    assert [f["passage_id"] for f in memory["facts"]] == [kept["id"]]
+    assert [(m["concept"], m["score"]) for m in memory["mastery"]] == [("lora", 0.65)]  # 0.5 + 0.3 * (1 - 0.5)
+
+
+def test_removing_a_file_deletes_its_pictures_and_no_other_files(tmp_path):
+    gone = figure_pdf(tmp_path / "gone.pdf", "LoRA adapters, see the figure")
+    kept = figure_pdf(tmp_path / "kept.pdf", "BM25 ranks, see the figure")
+    notebook.add_file("alice", gone)
+    notebook.add_file("alice", kept)
+    assert saved_pictures(gone) and saved_pictures(kept)
+    notebook.remove_file("alice", "gone.pdf")
+    assert not saved_pictures(gone)
+    assert saved_pictures(kept)
+
+
+def test_pictures_stay_until_the_last_notebook_holding_the_file_removes_it(tmp_path):
+    path = figure_pdf(tmp_path / "notes.pdf", "LoRA adapters, see the figure")
+    notebook.add_file("alice", path)
+    notebook.add_file("bob", path)
+    notebook.remove_file("alice", "notes.pdf")
+    [picture] = [p for p in notebook.search("bob", "LoRA") if p["image_path"]]
+    assert Path(picture["image_path"]).exists()  # bob's search still reaches it
+    notebook.remove_file("bob", "notes.pdf")
+    assert not saved_pictures(path)
+
+
+def test_pictures_stay_if_another_notebook_holds_the_same_file_under_another_name(tmp_path):
+    path = figure_pdf(tmp_path / "notes.pdf", "LoRA adapters, see the figure")
+    renamed = tmp_path / "renamed.pdf"
+    renamed.write_bytes(path.read_bytes())
+    notebook.add_file("alice", path)
+    notebook.add_file("bob", renamed)
+    notebook.remove_file("alice", "notes.pdf")
+    assert saved_pictures(path)
+
+
+@pytest.mark.parametrize("name", ["ghost.pdf", "../bob/notes.pdf", r"..\bob\notes.pdf", "../../outside.pdf", "..", ".", ""])
+def test_removing_a_name_not_in_the_notebook_touches_nothing(name, tmp_data, tmp_path):
+    path = make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small")
+    outside = tmp_data / "outside.pdf"
+    outside.write_bytes(b"not the students")
+    notebook.add_file("alice", path)
+    notebook.add_file("bob", path)
+    before = sorted(p for p in tmp_data.rglob("*") if "chroma" not in p.parts)
+    notebook.remove_file("alice", name)
+    assert sorted(p for p in tmp_data.rglob("*") if "chroma" not in p.parts) == before
+    assert notebook.files("alice") == notebook.files("bob") == ["notes.pdf"]
+    assert learner.concepts("alice") == learner.concepts("bob") == ["adapters", "lora"]
+    assert notebook.search("alice", "LoRA")[0]["file"] == notebook.search("bob", "LoRA")[0]["file"] == "notes.pdf"
+
+
+def test_removing_the_last_file_empties_the_notebook_and_adding_it_again_brings_back_its_score(tmp_path):
+    path = make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small")
+    notebook.add_file("alice", path)
+    learner.update_mastery("alice", "lora", correct=True)
+    notebook.remove_file("alice", "notes.pdf")
+    assert notebook.files("alice") == [] and notebook.search("alice", "LoRA") == []
+    assert learner.concepts("alice") == []
+    assert notebook.add_file("alice", path)["status"] == "added"
+    assert notebook.search("alice", "LoRA")[0]["text"] == "LoRA adapters are small"
+    assert learner.concepts("alice") == ["adapters", "lora"]
+    assert [m["concept"] for m in learner.read_all("alice")["mastery"]] == ["lora"]
+
+
+def tutor_prompt(monkeypatch, student):
+    """The system prompt a turn with the app's memory switch sends the tutor."""
+    sent = []
+
+    def chat(messages, model, **kw):
+        sent.append(messages[0]["content"])
+        return reply({"role": "assistant", "content": "Fine."})
+
+    monkeypatch.setattr(s1_llm, "chat", chat)
+    turn("Hello", student, 1, search_fn=notebook.search, passages_fn=notebook.get_passages, memory="learner")
+    return sent[0]
+
+
+def test_a_removed_files_concepts_leave_the_weak_spots_to_a_current_one_and_return_with_the_file(monkeypatch, tmp_path):
+    gone = make_pdf(tmp_path / "gone.pdf", "LoRA adapters are small")
+    removed = ["alpha", "beta", "gamma"]
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply(*removed))
+    notebook.add_file("alice", gone)
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply("delta"))
+    notebook.add_file("alice", make_pdf(tmp_path / "kept.pdf", "BM25 ranks by keyword"))
+    for concept in removed:
+        for _ in range(3):
+            learner.update_mastery("alice", concept, correct=False)  # 0.5 * 0.7 ** 3 = 0.17
+    learner.update_mastery("alice", "delta", correct=False)  # 0.5 * 0.7 = 0.35
+
+    prompt = tutor_prompt(monkeypatch, "alice")
+    assert all(f"{c} 0.17" in prompt for c in removed) and "delta 0.35" not in prompt  # the limit of 3 crowds it out
+
+    notebook.remove_file("alice", "gone.pdf")
+    prompt = tutor_prompt(monkeypatch, "alice")
+    assert not any(c in prompt for c in removed) and "delta 0.35" in prompt
+    assert {m["concept"] for m in learner.read_all("alice")["mastery"]} == {*removed, "delta"}  # the scores stay
+
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply(*removed))
+    notebook.add_file("alice", gone)
+    prompt = tutor_prompt(monkeypatch, "alice")
+    assert all(f"{c} 0.17" in prompt for c in removed) and "delta 0.35" not in prompt
+
+
+def test_removing_then_adding_retries_concepts_that_could_not_be_listed(monkeypatch, tmp_path):
+    path = make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small")
+    monkeypatch.setattr(s1_llm, "chat", _rate_limited)
+    assert notebook.add_file("alice", path)["concepts_found"] is False
+    monkeypatch.setattr(s1_llm, "chat", lambda *a, **k: CONCEPTS)
+    notebook.remove_file("alice", "notes.pdf")
+    assert notebook.add_file("alice", path)["concepts_found"] is True
+    assert learner.concepts("alice") == ["adapters", "lora"]
+
+
+# replacing a file
+
+def replacement(tmp_path, name="notes.pdf"):
+    """Where to build the new upload: its own folder, as the name it shares with the old file is what makes it a replacement."""
     (tmp_path / "new").mkdir()
+    return tmp_path / "new" / name
+
+
+def test_same_name_with_new_content_replaces_the_old_file(tmp_data, tmp_path):
+    notebook.add_file("alice", make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small"))
+    old = notebook.search("alice", "LoRA")[0]["id"]
+    new = make_pdf(replacement(tmp_path), "BM25 ranks by keyword")
+    assert notebook.add_file("alice", new) == {"status": "replaced", "file": "notes.pdf", "concepts_found": True}
+    assert notebook.files("alice") == ["notes.pdf"]
+    assert [p["text"] for p in notebook.search("alice", "LoRA")] == ["BM25 ranks by keyword"]  # the only passage left
+    assert notebook.get_passages("alice", [old]) == []
+    assert (tmp_data / "uploads" / "alice" / "notes.pdf").read_bytes() == new.read_bytes()
+
+
+def test_a_replacement_swaps_the_files_concepts_and_keeps_another_files_and_keeps_mastery(monkeypatch, tmp_path):
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply("LoRA", "Shared"))
+    notebook.add_file("alice", make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small"))
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply("Agents", "Shared"))
+    notebook.add_file("alice", make_pdf(tmp_path / "other.pdf", "An agent calls tools"))
+    learner.update_mastery("alice", "lora", correct=True)
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply("BM25"))
+    notebook.add_file("alice", make_pdf(replacement(tmp_path), "BM25 ranks by keyword"))
+    assert learner.concepts("alice") == ["agents", "bm25", "shared"]
+    assert [m["concept"] for m in learner.read_all("alice")["mastery"]] == ["lora"]
+
+
+def test_a_replacement_drops_facts_citing_the_old_file(tmp_path):
+    notebook.add_file("alice", make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small"))
+    learner.add_fact("alice", "lora", "LoRA adapters are small", notebook.search("alice", "LoRA")[0]["id"])
+    notebook.add_file("alice", make_pdf(replacement(tmp_path), "BM25 ranks by keyword"))
+    assert learner.read_all("alice")["facts"] == []
+
+
+def test_a_replacement_whose_concepts_could_not_be_listed_says_so(monkeypatch, tmp_path):
+    notebook.add_file("alice", make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small"))
+    monkeypatch.setattr(s1_llm, "chat", _rate_limited)
+    out = notebook.add_file("alice", make_pdf(replacement(tmp_path), "BM25 ranks by keyword"))
+    assert out == {"status": "replaced", "file": "notes.pdf", "concepts_found": False}
+    assert learner.concepts("alice") == []
+
+
+def test_a_replacement_deletes_the_old_files_pictures_and_keeps_the_new_ones(tmp_path):
+    old = figure_pdf(tmp_path / "notes.pdf", "LoRA adapters, see the figure")
+    notebook.add_file("alice", old)
+    new = figure_pdf(replacement(tmp_path), "BM25 ranks, see the figure")
+    notebook.add_file("alice", new)
+    assert not saved_pictures(old)
+    assert saved_pictures(new)
+    [picture] = [p for p in notebook.search("alice", "BM25") if p["image_path"]]
+    assert Path(picture["image_path"]).exists()
+
+
+def test_a_replacement_keeps_the_old_pictures_while_another_notebook_holds_the_old_file(tmp_path):
+    old = figure_pdf(tmp_path / "notes.pdf", "LoRA adapters, see the figure")
+    notebook.add_file("alice", old)
+    notebook.add_file("bob", old)
+    notebook.add_file("alice", figure_pdf(replacement(tmp_path), "BM25 ranks, see the figure"))
+    assert saved_pictures(old)
+    [picture] = [p for p in notebook.search("bob", "LoRA") if p["image_path"]]
+    assert Path(picture["image_path"]).exists()
+
+
+@pytest.mark.parametrize("build", [scanned_pdf, blank_pdf, corrupt_pdf])
+def test_a_rejected_replacement_changes_nothing_including_pictures(build, monkeypatch, tmp_data, tmp_path):
+    old = figure_pdf(tmp_path / "notes.pdf", "LoRA adapters, see the figure")
+    notebook.add_file("alice", old)
+    learner.add_fact("alice", "lora", "LoRA adapters are small", notebook.search("alice", "LoRA")[0]["id"])
+    passages, memory = notebook.search("alice", "LoRA"), learner.read_all("alice")
+
+    def on_disk():
+        return sorted(tmp_data.glob("images/**/*")) + sorted(tmp_data.glob("uploads/**/*"))
+
+    before = on_disk()
+    bad = replacement(tmp_path)
+    build(bad)
+    monkeypatch.setattr(s1_llm, "chat", lambda *a, **k: pytest.fail("a rejected file needs no concepts"))
     with pytest.raises(FileRejected, match="notes.pdf"):
-        notebook.add_file("alice", make_pdf(tmp_path / "new" / "notes.pdf", "BM25 ranks by keyword"))
-    assert [p["text"] for p in notebook.search("alice", "BM25")] == ["LoRA adapters are small"]
-    assert (tmp_data / "uploads" / "alice" / "notes.pdf").read_bytes() == old
+        notebook.add_file("alice", bad)
+    assert notebook.search("alice", "LoRA") == passages
+    assert learner.read_all("alice") == memory and learner.concepts("alice") == ["adapters", "lora"]
+    assert on_disk() == before
+    assert (tmp_data / "uploads" / "alice" / "notes.pdf").read_bytes() == old.read_bytes()
+
+
+def test_a_replacement_that_fails_to_index_leaves_the_old_file_searchable(monkeypatch, tmp_data, tmp_path):
+    old = make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small")
+    notebook.add_file("alice", old)
+    new = make_pdf(replacement(tmp_path), "BM25 ranks by keyword")
+
+    def fail(self, inputs, **kwargs):
+        raise RuntimeError("out of memory")
+
+    with monkeypatch.context() as broken:
+        broken.setattr(FakeSentenceTransformer, "encode", fail)
+        with pytest.raises(RuntimeError):
+            notebook.add_file("alice", new)
+    assert [p["text"] for p in notebook.search("alice", "LoRA")] == ["LoRA adapters are small"]
+    assert learner.concepts("alice") == ["adapters", "lora"]
+    assert (tmp_data / "uploads" / "alice" / "notes.pdf").read_bytes() == old.read_bytes()
+    assert notebook.add_file("alice", new)["status"] == "replaced"
+
+
+def test_a_name_differing_only_in_capitals_replaces_the_old_file_and_its_concepts(monkeypatch, tmp_path):
+    # Windows sees these as one file, so without this the old name's concepts would never go
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply("LoRA"))
+    notebook.add_file("alice", make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small"))
+    monkeypatch.setattr(s1_llm, "chat", concepts_reply("BM25"))
+    out = notebook.add_file("alice", make_pdf(replacement(tmp_path, "Notes.PDF"), "BM25 ranks by keyword"))
+    assert out == {"status": "replaced", "file": "Notes.PDF", "concepts_found": True}
+    assert notebook.files("alice") == ["Notes.PDF"]
+    assert learner.concepts("alice") == ["bm25"]
+
+
+def test_a_files_name_with_another_files_content_changes_nothing_and_names_the_holder(monkeypatch, tmp_path):
+    notebook.add_file("alice", make_pdf(tmp_path / "a.pdf", "LoRA adapters are small"))
+    b = make_pdf(tmp_path / "b.pdf", "BM25 ranks by keyword")
+    notebook.add_file("alice", b)
+    copy = replacement(tmp_path, "a.pdf")
+    copy.write_bytes(b.read_bytes())
+    monkeypatch.setattr(s1_llm, "chat", lambda *a, **k: pytest.fail("nothing new to read"))
+    assert notebook.add_file("alice", copy) == {"status": "already_held", "file": "b.pdf", "concepts_found": None}
+    assert notebook.files("alice") == ["a.pdf", "b.pdf"]
+    assert {p["file"] for p in notebook.search("alice", "LoRA")} == {"a.pdf", "b.pdf"}
 
 
 # student IDs reaching storage

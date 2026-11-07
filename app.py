@@ -1,6 +1,7 @@
 """The Study Tutor app: enter a name, upload files, chat with the tutor. Start it from the repo root with `streamlit run app.py`."""
 import sys
 import tempfile
+from collections import namedtuple
 from pathlib import Path
 
 import streamlit as st
@@ -15,24 +16,38 @@ from tutor import notebook  # noqa: E402
 from tutor.retrieval.extract import FileRejected  # noqa: E402
 
 WARNING = "Warning: this answer may not be supported by your files, so don't rely on it."
+# show: the st function to show it with. file: the notebook file its text is about, None when it's about the upload alone.
+Outcome = namedtuple("Outcome", "show text file", defaults=[None])
+
+
+def clear_notices(file):
+    """Clear what past uploads say about this file, in any capitals. The entries stay, so those uploads aren't indexed again."""
+    for file_id, outcome in state.upload_outcomes.items():
+        if outcome and outcome.file and outcome.file.casefold() == file.casefold():
+            state.upload_outcomes[file_id] = None
 
 
 def index_upload(student, upload):
-    """Add one uploaded file to the notebook. Returns the st function to show the outcome with, and its text."""
+    """Add one uploaded file to the notebook. Returns its Outcome."""
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / Path(upload.name).name  # add_file keeps this name, so only the base name
         path.write_bytes(upload.getvalue())
         try:
             added = notebook.add_file(student, path)
         except FileRejected as e:
-            return st.error, str(e)
+            return Outcome(st.error, str(e))
         except Exception as e:  # the embedder or store failing: cached like any outcome, so a rerun doesn't retry and die before chat
-            return st.error, f"{upload.name} couldn't be indexed: {e}. Remove it from the uploader and add it again to retry."
+            return Outcome(st.error, f"{upload.name} couldn't be indexed: {e}. Remove it from the uploader and add it again to retry.")
+    file = added["file"]
     if added["status"] == "already_held":
-        return st.info, f"{upload.name} has the same content as {added['file']}, already in your notebook."
+        return Outcome(st.info, f"{upload.name} has the same content as {file}, already in your notebook.", file)
+    if added["status"] == "replaced":
+        clear_notices(file)
     if not added["concepts_found"]:
-        return st.warning, f"{added['file']} added, but its concepts couldn't be listed. Removing and re-uploading it retries."
-    return st.success, f"{added['file']} added to your notebook."
+        return Outcome(st.warning, f"{file} {added['status']}, but its concepts couldn't be listed. Removing and re-uploading it retries.", file)
+    if added["status"] == "replaced":
+        return Outcome(st.success, f"{file} replaced with the new version.", file)
+    return Outcome(st.success, f"{file} added to your notebook.", file)
 
 
 state = st.session_state
@@ -55,19 +70,31 @@ if "student" not in state:
     st.stop()
 
 student = state.student
-state.setdefault("upload_outcomes", {})  # file_id -> outcome, as Streamlit hands back every uploaded file on every rerun
+# file_id -> Outcome, as Streamlit hands back every uploaded file on every rerun. None once clear_notices has cleared it:
+# the entry stays, so an upload still in the uploader isn't indexed again, but says nothing. Uploading it again gets a new file_id.
+state.setdefault("upload_outcomes", {})
 
 with st.sidebar:
     st.write(f"Notebook: {student}")
-    for upload in st.file_uploader("Add .pptx or PDF files", type=["pptx", "pdf"], accept_multiple_files=True):
+    uploads = st.file_uploader("Add .pptx or PDF files", type=["pptx", "pdf"], accept_multiple_files=True)
+    for upload in uploads:
         if upload.file_id not in state.upload_outcomes:
             with st.spinner(f"Indexing {upload.name}...", show_time=True):
                 state.upload_outcomes[upload.file_id] = index_upload(student, upload)
-        show, text = state.upload_outcomes[upload.file_id]
-        show(text)
+    for upload in uploads:  # after indexing them all, as a new version clears what older uploads would show
+        if outcome := state.upload_outcomes[upload.file_id]:
+            outcome.show(outcome.text)
     st.subheader("Your files")
     for file in notebook.files(student):
         st.text(file)
+        if st.button(f"Remove {file}"):
+            try:
+                notebook.remove_file(student, file)
+            except Exception as e:  # the store or a locked file failing: it stays listed, and removing it again finishes the job
+                st.error(f"{file} couldn't be removed: {e}")
+            else:
+                clear_notices(file)
+                st.rerun()
 
 if not notebook.files(student):
     st.info("Upload a .pptx or PDF in the sidebar to start chatting.")
