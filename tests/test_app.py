@@ -9,7 +9,7 @@ from streamlit.testing.v1 import AppTest
 from agent import s1_llm, s3_loop
 from agent.memory import learner
 from agent.tests.test_loop import SEARCH_CALL, read_trace, reply
-from test_notebook import fake_models, make_pdf  # noqa: F401  (fake_models is autouse: importing it keeps real models out of this file)
+from test_notebook import fake_models, figure_pdf, make_pdf  # noqa: F401  (fake_models is autouse: importing it keeps real models out of this file)
 from tutor import notebook
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -419,6 +419,103 @@ def test_a_warning_stays_on_its_own_answer_in_later_turns(monkeypatch):
     script_llm(monkeypatch, "Fine answer.")
     at = say(at, "And BM25?")
     assert [len(m.warning) for m in at.chat_message] == [0, 1, 0, 0]
+
+
+# citations
+
+LECTURE = {"id": "aaaaaaaaaaaa:0001", "file": "Lecture3.pdf", "page": 12, "page_end": 12, "kind": "page",
+           "text": "LoRA adds low-rank matrices.", "image_path": None}
+SLIDES = {"id": "bbbbbbbbbbbb:0002", "file": "Week5.pptx", "page": 4, "page_end": 6, "kind": "slide",
+          "text": "BM25 ranks by keyword.", "image_path": None}
+UNUSED = {"id": "cccccccccccc:0003", "file": "Lecture3.pdf", "page": 13, "page_end": 13, "kind": "page",
+          "text": "Not used by the answer.", "image_path": None}
+RAW_ANSWER = f"BM25 ranks [{SLIDES['id']}]. LoRA adds matrices [{LECTURE['id']}]. BM25 again [{SLIDES['id']}]."
+QUIZ_CALL = {"role": "assistant", "tool_calls": [{"id": "c1", "type": "function",
+             "function": {"name": "make_quiz", "arguments": '{"concept": "LoRA"}'}}]}
+
+
+def fake_notes(monkeypatch):
+    """The notebook's search and lookup return these three passages. Tutor replies are scripted by the test."""
+    passages = [LECTURE, SLIDES, UNUSED]
+    monkeypatch.setattr(notebook, "search", lambda student, query: passages)
+    monkeypatch.setattr(notebook, "get_passages", lambda student, ids: [p for i in ids for p in passages if p["id"] == i])
+
+
+def test_an_answer_shows_numbered_markers_with_no_passage_ids(monkeypatch):
+    fake_notes(monkeypatch)
+    script_llm(monkeypatch, SEARCH_CALL, RAW_ANSWER)
+    at = say(chat_ready(), "What is LoRA?")
+    assert shown(at)[-1] == ("assistant", "BM25 ranks [1]. LoRA adds matrices [2]. BM25 again [1].")
+
+
+def test_the_app_lists_only_the_cited_passages_by_label_in_marker_order(monkeypatch):
+    fake_notes(monkeypatch)
+    script_llm(monkeypatch, SEARCH_CALL, RAW_ANSWER)
+    at = say(chat_ready(), "What is LoRA?")
+    assert [e.label for e in at.chat_message[1].expander] == ["[1] Week5.pptx, slides 4–6", "[2] Lecture3.pdf, page 12"]
+
+
+def test_opening_a_citation_shows_its_text(monkeypatch):
+    fake_notes(monkeypatch)
+    script_llm(monkeypatch, SEARCH_CALL, RAW_ANSWER)
+    first, second = say(chat_ready(), "What is LoRA?").chat_message[1].expander
+    assert first.text[0].value == "BM25 ranks by keyword."
+    assert second.text[0].value == "LoRA adds low-rank matrices."
+    assert not first.image and not second.image
+
+
+def test_opening_a_citation_with_a_picture_shows_the_picture(monkeypatch, tmp_data):
+    notebook.add_file("jun-yu", figure_pdf(tmp_data / "paper.pdf", "LoRA adapters, see the figure"))
+    [picture] = [p for p in notebook.search("jun-yu", "LoRA") if p["image_path"]]
+    script_llm(monkeypatch, SEARCH_CALL, f"See the figure [{picture['id']}].")
+    at = say(enter_name(open_app(), "Jun Yu"), "What is LoRA?")
+    [citation] = at.chat_message[1].expander
+    assert citation.label == "[1] paper.pdf, page 1"
+    assert len(citation.image) == 1
+
+
+def test_a_cited_picture_whose_file_was_removed_leaves_the_chat_working(monkeypatch, tmp_data):
+    notebook.add_file("jun-yu", figure_pdf(tmp_data / "paper.pdf", "LoRA adapters, see the figure"))
+    seed_file("jun-yu", "other.pdf")  # so removing paper.pdf doesn't lock the chat
+    [picture] = [p for p in notebook.search("jun-yu", "LoRA") if p["image_path"]]
+    script_llm(monkeypatch, SEARCH_CALL, f"See the figure [{picture['id']}].")
+    at = remove(say(enter_name(open_app(), "Jun Yu"), "What is LoRA?"), "paper.pdf")
+    assert not at.exception and not Path(picture["image_path"]).exists()
+    [citation] = at.chat_message[1].expander
+    assert citation.label == "[1] paper.pdf, page 1" and not citation.image
+
+
+def test_the_next_turn_gets_the_raw_ids_in_its_history(monkeypatch):
+    fake_notes(monkeypatch)
+    sent = script_llm(monkeypatch, SEARCH_CALL, RAW_ANSWER, "Later answer.")
+    say(say(chat_ready(), "What is LoRA?"), "Later question")
+    assert history_sent(sent[2]) == [("user", "What is LoRA?"), ("assistant", RAW_ANSWER), ("user", "Later question")]
+
+
+def test_a_quiz_shows_no_passage_ids_and_no_citations_and_the_next_turn_still_gets_the_ids(monkeypatch):
+    fake_notes(monkeypatch)
+    raw_quiz = f"1. What does LoRA add? [{LECTURE['id']}, {UNUSED['id']}]\nWhich one are you answering?"
+    sent = script_llm(monkeypatch, QUIZ_CALL, raw_quiz, "Not quite.")
+    at = say(chat_ready(), "Quiz me on LoRA")
+    assert shown(at)[-1] == ("assistant", "1. What does LoRA add?\nWhich one are you answering?")
+    assert not at.chat_message[1].expander
+    say(at, "Question 1: tiny matrices")
+    assert history_sent(sent[2])[1] == ("assistant", raw_quiz)
+
+
+def test_each_answer_keeps_its_own_citations_in_later_turns(monkeypatch):
+    fake_notes(monkeypatch)
+    script_llm(monkeypatch, SEARCH_CALL, RAW_ANSWER, SEARCH_CALL, f"Only this [{UNUSED['id']}].")
+    at = say(say(chat_ready(), "What is LoRA?"), "And the rest?")
+    assert shown(at)[1][1] == "BM25 ranks [1]. LoRA adds matrices [2]. BM25 again [1]."
+    assert len(at.chat_message[1].expander) == 2
+    assert [e.label for e in at.chat_message[3].expander] == ["[1] Lecture3.pdf, page 13"]
+
+
+def test_a_student_message_is_shown_as_typed(monkeypatch):
+    script_llm(monkeypatch, "Fine.")
+    message = f"What is {LECTURE['id']}?"
+    assert shown(say(chat_ready(), message))[0] == ("user", message)
 
 
 # a failed turn

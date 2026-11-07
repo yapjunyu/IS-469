@@ -47,9 +47,9 @@ def read_trace(tmp_data):
 
 def test_tool_then_answer(monkeypatch):
     monkeypatch.setattr(s1_llm, "chat", scripted(reply(SEARCH_CALL),
-                                                  reply({"role": "assistant", "content": "LoRA is ..."})))
+                                                  reply({"role": "assistant", "content": "LoRA is ... [stub-1]"})))
     out = turn("What is LoRA?", "alice", 1)
-    assert out == {"answer": "LoRA is ...", "citations": [{"file": "stub.pdf", "page": 1}], "steps": 2,
+    assert out == {"answer": "LoRA is ... [stub-1]", "citations": ["stub-1"], "steps": 2,
                    "faithfulness": None, "warning": False}
 
 

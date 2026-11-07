@@ -13,10 +13,10 @@ def fake_search(student_id, query):
     return PASSAGES
 
 
-def run(monkeypatch, search_fn=fake_search, **switches):
+def run(monkeypatch, search_fn=fake_search, answer="done", **switches):
     """One search-then-answer turn with the fake search. Returns run_turn's output and every request sent."""
     sent = []
-    replies = iter([reply(SEARCH_CALL), reply({"role": "assistant", "content": "done"})])
+    replies = iter([reply(SEARCH_CALL), reply({"role": "assistant", "content": answer})])
     def chat(messages, model, **kw):
         sent.append([dict(m) for m in messages])
         return next(replies)
@@ -29,8 +29,8 @@ def tool_message(sent):
 
 
 def test_turn_uses_the_given_search_function(monkeypatch):
-    out, sent = run(monkeypatch)
-    assert out["citations"] == [{"file": "lec3.pdf", "page": 12}, {"file": "lec4.pdf", "page": 2}]
+    out, sent = run(monkeypatch, answer="LoRA adds matrices [p1].")
+    assert out["citations"] == ["p1"]
     assert "LoRA adds low-rank matrices." in tool_message(sent)
     assert "Stub" not in tool_message(sent)
 
