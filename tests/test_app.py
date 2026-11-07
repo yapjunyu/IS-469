@@ -9,7 +9,7 @@ from unittest.mock import patch
 from streamlit.testing.v1 import AppTest
 
 from agent import s1_llm, s3_loop
-from agent.memory import learner
+from agent.memory import learner, reflection
 from agent.tests.test_loop import SEARCH_CALL, read_trace, reply
 from test_notebook import fake_models, figure_pdf, make_pdf  # noqa: F401  (fake_models is autouse: importing it keeps real models out of this file)
 from tutor import notebook
@@ -891,6 +891,72 @@ def test_start_quiz_is_unavailable_in_the_memory_view_where_it_could_not_show_a_
     at = chat_ready()
     assert not buttons(at, "Start quiz")[0].disabled
     assert buttons(open_view(at, "Memory"), "Start quiz")[0].disabled
+
+
+# ending a session
+
+def end_session(at):
+    buttons(at, "End session")[0].click()
+    return at.run()
+
+
+def test_end_session_is_disabled_until_there_is_a_turn(monkeypatch):
+    script_llm(monkeypatch, RuntimeError("rate limit reached"), "LoRA is small.")
+    at = chat_ready()
+    assert buttons(at, "End session")[0].disabled
+    at = say(at, "What is LoRA?")
+    assert buttons(at, "End session")[0].disabled  # a failed turn isn't a turn
+    assert not buttons(resend(at), "End session")[0].disabled
+
+
+def test_ending_a_session_passes_the_history_shows_the_note_and_clears_the_chat_keeping_the_name(monkeypatch, tmp_data):
+    sent = script_llm(monkeypatch, "LoRA is small.", "Next session answer.", checks={"note": "Asked what LoRA is"})
+    received = []
+    real = reflection.end_session
+    monkeypatch.setattr(reflection, "end_session", lambda *a: received.append(a) or real(*a))
+    at = end_session(say(chat_ready(), "What is LoRA?"))
+    assert received == [("jun-yu", [{"role": "user", "content": "What is LoRA?"}, {"role": "assistant", "content": "LoRA is small."}])]
+    assert "Asked what LoRA is" in at.sidebar.success[0].value
+    assert not shown(at) and at.chat_input
+    assert "Notebook: jun-yu" in [m.value for m in at.sidebar.markdown]
+    assert [r["note"] for r in learner.read_all("jun-yu")["session_notes"]] == ["Asked what LoRA is"]
+    assert buttons(at, "End session")[0].disabled
+    say(at, "A new question")
+    assert history_sent(sent[1]) == [("user", "A new question")]
+    assert final_turns(tmp_data) == [1, 1]  # the new session starts again at turn 1
+
+
+def test_the_note_appears_in_the_memory_views_session_notes(monkeypatch):
+    script_llm(monkeypatch, "LoRA is small.", checks={"note": "Asked what LoRA is"})
+    at = open_view(end_session(say(chat_ready(), "What is LoRA?")), "Memory")
+    assert [row.split(": ", 1)[1] for row in memory_rows(at)] == ["Asked what LoRA is"]
+
+
+def test_a_note_that_could_not_be_written_says_so_and_the_session_still_ends(monkeypatch, tmp_data):
+    script_llm(monkeypatch, "LoRA is small.", "Next.")  # the reflection reply has no note, so end_session returns None
+    at = end_session(say(chat_ready(), "What is LoRA?"))
+    assert "couldn't be written" in at.sidebar.warning[0].value
+    assert not shown(at)
+    assert learner.read_all("jun-yu")["session_notes"] == []
+    say(at, "A new question")
+    assert final_turns(tmp_data) == [1, 1]
+
+
+def test_an_end_session_that_raises_shows_the_error_and_the_chat_stays(monkeypatch, tmp_data):
+    script_llm(monkeypatch, "LoRA is small.", "Later answer.")
+    at = say(chat_ready(), "What is LoRA?")
+
+    def fails(*args):
+        raise RuntimeError("rate limit reached")
+
+    monkeypatch.setattr(reflection, "end_session", fails)
+    at = end_session(at)
+    assert not at.exception
+    assert "rate limit reached" in at.sidebar.error[0].value
+    assert shown(at) == [("user", "What is LoRA?"), ("assistant", "LoRA is small.")]
+    assert not buttons(at, "End session")[0].disabled  # so the student can try again
+    say(at, "Later question")
+    assert final_turns(tmp_data) == [1, 2]
 
 
 # running it

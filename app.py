@@ -13,7 +13,7 @@ SRC = str(Path(__file__).resolve().parent / "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-from agent.memory import learner  # noqa: E402
+from agent.memory import learner, reflection  # noqa: E402
 from agent.s3_loop import run_turn  # noqa: E402
 from tutor import notebook  # noqa: E402
 from tutor.retrieval.extract import FileRejected  # noqa: E402
@@ -122,6 +122,11 @@ student = state.student
 # file_id -> Outcome, as Streamlit hands back every uploaded file on every rerun. None once clear_notices has cleared it:
 # the entry stays, so an upload still in the uploader isn't indexed again, but says nothing. Uploading it again gets a new file_id.
 state.setdefault("upload_outcomes", {})
+# the messages shown, each {"role", "content"}; an answer's content keeps its passage IDs for the next turn's history, and it also
+# has "shown", its displayed text, "citations", the passages it cited as they were that turn, and "warning"
+state.setdefault("messages", [])
+state.setdefault("turn", 1)
+state.setdefault("failed", None)  # the turn that failed last, {"message", "error"}; neither messages nor turn counted it
 
 with st.sidebar:
     st.write(f"Notebook: {student}")
@@ -151,6 +156,18 @@ with st.sidebar:
     concept = st.selectbox("Concept", concepts, disabled=not concepts)
     # off in the Memory view, which has no chat for the reply to appear in
     quiz_message = f"Quiz me on {concept}" if st.button("Start quiz", disabled=not concepts or view == "Memory") else None
+    if st.button("End session", disabled=not state.messages):
+        try:
+            note = reflection.end_session(student, [{"role": e["role"], "content": e["content"]} for e in state.messages])
+        except Exception as e:  # a rate limit or missing key: the chat stays, so the student can try again
+            state.end_notice = Outcome(st.error, f"The session couldn't be ended: {e}")
+        else:
+            state.end_notice = (Outcome(st.success, f"Session note: {note}") if note
+                                else Outcome(st.warning, "The session ended, but its note couldn't be written."))
+            state.messages, state.turn, state.failed = [], 1, None
+        st.rerun()  # redraws the mastery bars, which reflection can lower
+    if notice := state.get("end_notice"):
+        notice.show(notice.text)
 
 if view == "Memory":  # before the no-files stop: memory can outlive files
     memory_view(student)
@@ -159,12 +176,6 @@ if view == "Memory":  # before the no-files stop: memory can outlive files
 if not notebook.files(student):
     st.info("Upload a .pptx or PDF in the sidebar to start chatting.")
     st.stop()
-
-# the messages shown, each {"role", "content"}; an answer's content keeps its passage IDs for the next turn's history, and it also
-# has "shown", its displayed text, "citations", the passages it cited as they were that turn, and "warning"
-state.setdefault("messages", [])
-state.setdefault("turn", 1)
-state.setdefault("failed", None)  # the turn that failed last, {"message", "error"}; neither messages nor turn counted it
 
 held = notebook.files(student)
 for entry in state.messages:
@@ -184,7 +195,7 @@ for entry in state.messages:
 # chat_input pins itself to the bottom of the page, so calling it first only means a new message is known before drawing
 message = st.chat_input("Ask about your notes", submit_mode="disable") or quiz_message or state.pop("resend", None)
 if message:
-    state.failed = None
+    state.failed = state.end_notice = None
     with st.chat_message("user"):
         st.markdown(message)
     with st.chat_message("assistant"), st.spinner("The tutor is working...", show_time=True):
