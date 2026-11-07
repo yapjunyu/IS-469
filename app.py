@@ -3,6 +3,7 @@ import re
 import sys
 import tempfile
 from collections import namedtuple
+from datetime import date
 from pathlib import Path
 
 import streamlit as st
@@ -53,22 +54,22 @@ def index_upload(student, upload):
     return Outcome(st.success, f"{file} added to your notebook.", file)
 
 
-def mastery_panel(student):
-    """Each concept on the notebook's list in the sidebar: a bar at its score or "Not tested yet", with weak spots standing out."""
-    concepts = learner.concepts(student)
+def mastery_panel(student, concepts):
+    """Each of these concepts: a bar at its score or "Not tested yet", with weak spots standing out. Nothing at all when there are none."""
+    if not concepts:
+        return
     scores = {row["concept"]: row["score"] for row in learner.read_all(student)["mastery"]}
     # limit: every weak spot here, not only the few the system prompt gets
     weak = {row["concept"] for row in learner.weak_concepts(student, limit=len(concepts))}
-    with st.sidebar:
-        st.subheader("Mastery")
-        for concept in concepts:
-            # these labels are markdown, and concept names are an LLM's reading of the file: untrusted, so escape its punctuation
-            name = re.sub(r"([!-/:-@\[-`{-~])", r"\\\1", concept)
-            if concept not in scores:
-                st.caption(f"{name}: Not tested yet")
-                continue
-            percent = round(scores[concept] * 100)  # given a float, st.progress truncates: 0.29 would draw 28
-            st.progress(percent, text=f":red[**{name}: {percent}%, weak spot**]" if concept in weak else f"{name}: {percent}%")
+    st.subheader("Mastery")
+    for concept in concepts:
+        # these labels are markdown, and concept names are an LLM's reading of the file: untrusted, so escape its punctuation
+        name = re.sub(r"([!-/:-@\[-`{-~])", r"\\\1", concept)
+        if concept not in scores:
+            st.caption(f"{name}: Not tested yet")
+            continue
+        percent = round(scores[concept] * 100)  # given a float, st.progress truncates: 0.29 would draw 28
+        st.progress(percent, text=f":red[**{name}: {percent}%, weak spot**]" if concept in weak else f"{name}: {percent}%")
 
 
 # learner table -> its heading and one row's text. Passage IDs stay hidden, as everywhere a student reads.
@@ -76,19 +77,19 @@ MEMORY_TABLES = {
     "mastery": ("Mastery scores", lambda row: f"{row['concept']}: {row['score']:.2f}"),
     "wrong_beliefs": ("Wrong beliefs", lambda row: f"{row['concept']}: {row['belief']}"),
     "facts": ("Facts", lambda row: f"{row['concept']}: {row['fact']}"),
-    "session_notes": ("Session notes", lambda row: row["note"]),
+    "session_notes": ("Session notes", lambda row: f"{date.fromtimestamp(row['written'])}: {row['note']}"),
 }
 
 
 def memory_view(student):
     """Everything the tutor remembers about this student, each row deletable. No edit, so a student can't raise their own score."""
-    memory = learner.read_all(student)
-    for table, (heading, row_text) in MEMORY_TABLES.items():
+    for table, rows in learner.read_all(student).items():
+        heading, row_text = MEMORY_TABLES[table]
         st.subheader(heading)
-        for row in memory[table]:
+        for row in rows:
             key = row[learner.TABLE_KEYS[table]]
-            text, control = st.columns([5, 1])
-            text.text(row_text(row))  # not markdown: it came from the LLM and the student's words
+            entry, control = st.columns([5, 1])
+            entry.text(row_text(row))  # not markdown: it came from the LLM and the student's words
             if control.button("Delete", key=f"delete {table} {key}"):
                 try:
                     learner.delete(student, table, key)
@@ -144,8 +145,9 @@ with st.sidebar:
             else:
                 clear_notices(file)
                 st.rerun()
-    st.subheader("Quiz")
     concepts = learner.concepts(student)
+    mastery_panel(student, concepts)  # in every view; a turn and a Delete both end in st.rerun, which redraws the bars
+    st.subheader("Quiz")
     concept = st.selectbox("Concept", concepts, disabled=not concepts)
     # off in the Memory view, which has no chat for the reply to appear in
     quiz_message = f"Quiz me on {concept}" if st.button("Start quiz", disabled=not concepts or view == "Memory") else None
@@ -157,8 +159,6 @@ if view == "Memory":  # before the no-files stop: memory can outlive files
 if not notebook.files(student):
     st.info("Upload a .pptx or PDF in the sidebar to start chatting.")
     st.stop()
-
-mastery_panel(student)  # after the stop: with no files there are no concepts to show
 
 # the messages shown, each {"role", "content"}; an answer's content keeps its passage IDs for the next turn's history, and it also
 # has "shown", its displayed text, "citations", the passages it cited as they were that turn, and "warning"

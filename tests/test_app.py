@@ -2,7 +2,9 @@
 import inspect
 import json
 import re
+from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
@@ -303,6 +305,7 @@ def test_with_no_files_chat_is_locked_with_a_prompt_to_upload():
     at = enter_name(open_app(), "Jun Yu")
     assert not at.chat_input
     assert "upload" in at.info[0].value.lower()
+    assert "Mastery" not in [s.value for s in at.sidebar.subheader]  # no concepts, so no panel heading
 
 
 def test_a_notice_says_the_tutor_is_only_as_accurate_as_the_files():
@@ -687,11 +690,15 @@ def panel_text(at):
 
 
 def test_the_panel_lists_each_concept_on_the_list():
-    on_the_list("lora", "bm25", "[x](y)")
+    on_the_list("lora", "bm25", "[x](y)", "[w](z)")
     learner.update_mastery("jun-yu", "lora", True)
-    text = " ".join(panel_text(chat_ready()))
+    learner.update_mastery("jun-yu", "[w](z)", False)
+    at = chat_ready()
+    text = " ".join(panel_text(at))
     assert "lora" in text and "bm25" in text
-    assert r"\[x\]\(y\)" in text  # shown as typed, not as a link: a file can put anything in its concept names
+    assert r"\[x\]\(y\)" in text  # escaped in the source, so it renders as typed, not as a link: a file can put anything in its concept names
+    assert r"\[w\]\(z\): 35%, weak spot" in text  # a weak spot's name too. 0.5 + 0.3 * (0 - 0.5)
+    assert [s.value for s in at.sidebar.subheader] == ["Your files", "Mastery", "Quiz"]
 
 
 def test_a_concept_with_a_score_shows_a_bar_at_that_score():
@@ -737,7 +744,7 @@ def test_a_score_for_a_concept_no_longer_on_the_list_is_not_shown():
     learner.update_mastery("jun-yu", "gone", False)
     learner.remove_file("jun-yu", "removed.pdf")
     at = chat_ready()
-    assert list(bars(at)) == ["lora: 65%"]
+    assert list(bars(at)) == ["lora: 65%"]  # 0.5 + 0.3 * (1 - 0.5)
     assert not any("gone" in line for line in panel_text(at))
 
 
@@ -748,7 +755,7 @@ def open_view(at, view):
     return at.run()
 
 
-def test_a_sidebar_control_switches_views_and_the_chat_survives_the_trip(monkeypatch):
+def test_a_sidebar_control_switches_views_and_the_session_survives_the_trip(monkeypatch):
     sent = script_llm(monkeypatch, "LoRA is small.", "Later answer.")
     at = say(chat_ready(), "What is LoRA?")
     at = open_view(at, "Memory")
@@ -760,10 +767,19 @@ def test_a_sidebar_control_switches_views_and_the_chat_survives_the_trip(monkeyp
     assert history_sent(sent[1]) == [("user", "What is LoRA?"), ("assistant", "LoRA is small."), ("user", "Later question")]
 
 
+NOTE_ROW = "2026-03-09: Struggled with LoRA rank"
+
+
+def write_note(student, note):
+    """A session note written at noon local time on 2026-03-09, so the date its row shows can be spelled out."""
+    with patch.object(learner.time, "time", return_value=datetime(2026, 3, 9, 12).timestamp()):
+        learner.add_session_note(student, note)
+
+
 def remember_one_of_each(student="jun-yu"):
     learner.update_mastery(student, "LoRA", correct=True, wrong_belief="LoRA retrains the whole model")
     learner.add_fact(student, "LoRA", "LoRA adds small matrices", "abc-1")
-    learner.add_session_note(student, "Struggled with LoRA rank")
+    write_note(student, "Struggled with LoRA rank")
 
 
 def memory_rows(at):
@@ -777,7 +793,7 @@ def test_the_view_shows_mastery_wrong_beliefs_facts_and_session_notes():
     assert memory_rows(at) == ["lora: 0.65",  # 0.5 + 0.3 * (1 - 0.5)
                                "lora: LoRA retrains the whole model",
                                "lora: LoRA adds small matrices",
-                               "Struggled with LoRA rank"]
+                               NOTE_ROW]
 
 
 def delete_row(at, row_text):
@@ -792,7 +808,7 @@ def test_each_row_has_a_delete_control_and_a_deleted_row_leaves_the_store_and_th
     at = open_view(chat_ready(), "Memory")
     assert [b.label for b in at.main.button] == ["Delete"] * 4
     expected = {"lora: 0.65": "mastery", "lora: LoRA retrains the whole model": "wrong_beliefs",
-                "lora: LoRA adds small matrices": "facts", "Struggled with LoRA rank": "session_notes"}
+                "lora: LoRA adds small matrices": "facts", NOTE_ROW: "session_notes"}
     for row_text, table in expected.items():
         assert learner.read_all("jun-yu")[table]
         at = delete_row(at, row_text)
@@ -822,14 +838,29 @@ def test_a_deleted_wrong_belief_is_absent_from_the_system_prompt_on_the_next_tur
     assert "KV cache stores weights" in sent[1][0]["content"]  # the prompt still carries the belief that wasn't deleted
 
 
+def test_a_deleted_mastery_score_leaves_the_weak_spots_in_the_system_prompt_on_the_next_turn(monkeypatch):
+    sent = script_llm(monkeypatch, "First.", "Second.")
+    on_the_list("lora", "kv cache")
+    learner.update_mastery("jun-yu", "lora", False)  # 0.35: 0.5 + 0.3 * (0 - 0.5)
+    learner.update_mastery("jun-yu", "kv cache", False)  # 0.35
+    at = say(chat_ready(), "What is LoRA?")
+    # with its score, because the prompt's concept list names lora either way
+    assert "lora 0.35" in sent[0][0]["content"]
+    at = delete_row(open_view(at, "Memory"), "lora: 0.35")
+    assert "lora: Not tested yet" in panel_text(at)  # the sidebar's bar went with it, in this view
+    say(open_view(at, "Chat"), "And now?")
+    assert "lora 0.35" not in sent[1][0]["content"]
+    assert "kv cache 0.35" in sent[1][0]["content"]  # the prompt still carries the weak spot that wasn't deleted
+
+
 def test_another_students_entries_never_appear_and_a_delete_leaves_them_alone():
     remember_one_of_each("bob")  # the same row ids as jun-yu's, as each student has their own database
     learner.update_mastery("bob", "bobs concept", correct=True)
-    learner.add_session_note("jun-yu", "Jun Yu's own note")
+    write_note("jun-yu", "Jun Yu's own note")
     at = open_view(chat_ready(), "Memory")
-    assert memory_rows(at) == ["Jun Yu's own note"]
+    assert memory_rows(at) == ["2026-03-09: Jun Yu's own note"]
     bobs = learner.read_all("bob")
-    at = delete_row(at, "Jun Yu's own note")
+    at = delete_row(at, "2026-03-09: Jun Yu's own note")
     assert memory_rows(at) == []
     assert learner.read_all("bob") == bobs
 
@@ -837,7 +868,7 @@ def test_another_students_entries_never_appear_and_a_delete_leaves_them_alone():
 def test_the_view_is_reachable_with_no_files_because_memory_can_outlive_them():
     remember_one_of_each()
     at = open_view(enter_name(open_app(), "Jun Yu"), "Memory")
-    assert "Struggled with LoRA rank" in memory_rows(at)
+    assert NOTE_ROW in memory_rows(at)
     assert not at.info  # the prompt to upload locks chat, not this view
 
 
@@ -849,14 +880,14 @@ def test_a_delete_that_fails_says_so_and_the_row_stays(monkeypatch):
         raise RuntimeError("database is locked")
 
     monkeypatch.setattr(learner, "delete", locked)
-    at = delete_row(at, "Struggled with LoRA rank")
+    at = delete_row(at, NOTE_ROW)
     assert not at.exception
     assert "database is locked" in at.error[0].value
-    assert "Struggled with LoRA rank" in memory_rows(at)
+    assert NOTE_ROW in memory_rows(at)
 
 
 def test_start_quiz_is_unavailable_in_the_memory_view_where_it_could_not_show_a_reply():
-    learner.add_concepts("jun-yu", "notes.pdf", ["LoRA"])
+    on_the_list("lora")
     at = chat_ready()
     assert not buttons(at, "Start quiz")[0].disabled
     assert buttons(open_view(at, "Memory"), "Start quiz")[0].disabled

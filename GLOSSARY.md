@@ -42,6 +42,14 @@ _Avoid_: Note, knowledge
 A short summary of what the student struggled with in one past session, written by reflection at the end of that session.
 _Avoid_: Memory (alone), log
 
+**Mastery panel**:
+The sidebar's list of the notebook's concepts, each with a bar at its mastery score or "Not tested yet", with weak spots standing out.
+_Avoid_: Dashboard, progress view
+
+**Memory view**:
+The screen showing everything the tutor remembers about one student: mastery scores, wrong beliefs, facts and session notes. Each row can be deleted, none edited.
+_Avoid_: Memory page, memory (alone)
+
 ## Conversation
 
 **Session**:
