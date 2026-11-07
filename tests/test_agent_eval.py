@@ -1,5 +1,7 @@
 """The agent experiments: the recorded turn, the scoring rules and the runner, on a scripted provider and stub search
 (no real LLM, no notebook)."""
+import asyncio
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -10,6 +12,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "eval"))
 
 import agent_common as ac  # noqa: E402
+import run_agent_generation as gen  # noqa: E402
 import run_agent_test as at  # noqa: E402
 import run_injection as inj  # noqa: E402
 from agent import s1_llm, s2_tools, s3_loop  # noqa: E402
@@ -304,6 +307,122 @@ def test_the_scorers_tokens_are_on_each_result_row_and_in_no_trace(monkeypatch, 
     assert all(r["success"] for r in rows if r["id"] == "qa-01")  # graded wrong on the quiz's passage, only a hint
     for path in (eval_dirs / "results_agent").glob("trace_*.jsonl"):
         assert ac.SCORER not in {r.get("model") for r in trace(path)}
+
+
+# Answer quality: the generation runner and the RAGAS scorer
+
+QUESTIONS = [{"id": f"q{i}", "llm_eval": "1", "evidence_type": "text", "question": f"What is LoRA, part {i}?",
+              "reference_answer": f"Small adapter matrices {i}."} for i in (1, 2)]
+
+
+def generate(monkeypatch, *args):
+    """Run run_agent_generation's main on QUESTIONS, the tutor searching and reading PASSAGE and a figure."""
+    picture = ac.OUT.parent / "notes-p4.png"
+    picture.write_bytes(b"png")  # the tutor only reads a picture whose file exists
+    figure = {"id": "notes-p4", "file": "notes.pdf", "page": 4, "text": "", "image_path": str(picture)}
+    monkeypatch.setattr(gen.ev, "load_gold", lambda path: QUESTIONS)
+    monkeypatch.setattr(notebook, "search", lambda student, query: [PASSAGE, figure])
+    monkeypatch.setattr(sys, "argv", ["run_agent_generation.py", *args])
+    gen.main()
+    return {arm: json.loads((ac.OUT / f"generation_agent_{arm}.json").read_text(encoding="utf-8"))["rows"]
+            for arm in ("search_again_on", "search_again_off")}
+
+
+def test_a_generation_row_holds_the_question_answers_and_every_passage_the_tutor_read(monkeypatch, eval_dirs):
+    provider(monkeypatch, searches_then_answers)
+    for rows in generate(monkeypatch, "--limit", "1").values():
+        [row] = rows
+        assert {k: row[k] for k in ("id", "user_input", "response", "reference", "retrieved_contexts",
+                                    "retrieved_images")} == {
+            "id": "q1", "user_input": "What is LoRA, part 1?", "response": "LoRA trains adapters [notes-p3].",
+            "reference": "Small adapter matrices 1.", "retrieved_contexts": [PASSAGE["text"]],
+            "retrieved_images": [str(eval_dirs / "notes-p4.png")]}
+
+
+def test_a_stopped_generation_run_resumes_from_the_next_unanswered_question_in_each_arm(monkeypatch, eval_dirs):
+    provider(monkeypatch, searches_then_answers)
+    generate(monkeypatch, "--limit", "1")  # stopped after q1 in both arms
+    for arm, rows in generate(monkeypatch).items():
+        assert [r["id"] for r in rows] == ["q1", "q2"]
+        turns = [r for r in trace(eval_dirs / "results_agent" / f"trace_generation_{arm}.jsonl") if r["kind"] == "final"]
+        assert len(turns) == 2  # q1 was not answered again
+
+
+@pytest.fixture
+def ragas(monkeypatch, tmp_path):
+    """ragas_eval's main with its folders in the temp folder and fake RAGAS modules (metrics, LLM, cache), so nothing
+    is sent. Call it with the command-line arguments; returns what the judge LLM was made with and what each metric
+    scored."""
+    seen = {"judge": [], "scored": []}
+
+    def llm_factory(model, client, cache, **kw):
+        seen["judge"].append({"model": model, "url": str(client.base_url), "headers": client.default_headers,
+                              "cache": cache})
+        return "the judge"
+
+    def metric(name):
+        class Metric:
+            def __init__(self, llm):
+                assert llm == "the judge"
+
+            async def ascore(self, **inputs):
+                seen["scored"].append((name, inputs))
+                return SimpleNamespace(value=0.5)
+        return Metric
+
+    metrics = {n: metric(n) for n in ("MultiModalFaithfulness", "FactualCorrectness", "ContextPrecision", "ContextRecall")}
+    fakes = {"ragas": {}, "ragas.cache": {"DiskCacheBackend": lambda folder: Path(folder)},
+             "ragas.llms": {"llm_factory": llm_factory}, "ragas.metrics": {}, "ragas.metrics.collections": metrics}
+    for name, attrs in fakes.items():
+        monkeypatch.setitem(sys.modules, name, SimpleNamespace(**attrs))
+    monkeypatch.delitem(sys.modules, "ragas_eval", raising=False)  # imported afresh on the fakes, dropped after
+    rg = importlib.import_module("ragas_eval")
+    monkeypatch.setattr(rg, "ROOT", tmp_path)
+    monkeypatch.setattr(rg, "RESULTS", tmp_path / "results_60_40")
+    monkeypatch.setattr(rg, "AGENT_RESULTS", ac.OUT)
+    monkeypatch.setattr(rg, "load_dotenv", lambda path: None)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test")
+    monkeypatch.setenv("OPENCODE_API_KEY", "test")
+
+    def main(*args):
+        monkeypatch.setattr(sys, "argv", ["ragas_eval.py", *args])
+        asyncio.run(rg.main())
+        return seen
+    return main
+
+
+def test_in_agent_mode_the_scorer_scores_the_agents_answers_and_saves_beside_them(monkeypatch, eval_dirs, ragas):
+    provider(monkeypatch, searches_then_answers)
+    generate(monkeypatch, "--limit", "1")
+    seen = ragas("--agent", "agent_search_again_on")
+    [judge] = seen["judge"]
+    assert judge["model"] == "claude-haiku-5-5" and judge["url"].startswith("https://opencode.ai/inference/go/")
+    assert judge["headers"]["x-opencode-session"]  # Go rejects a request without one
+    assert judge["cache"] == eval_dirs / "data" / "ragas_cache_scorer"  # never the pipeline judge's replies
+    faithfulness = dict(seen["scored"])["MultiModalFaithfulness"]
+    assert faithfulness["retrieved_contexts"] == [PASSAGE["text"], str(eval_dirs / "notes-p4.png")]  # text and picture
+    saved = json.loads((eval_dirs / "results_agent" / "ragas_agent_search_again_on.json").read_text())
+    assert saved["judge"] == "claude-haiku-5-5"
+    assert [r["id"] for r in saved["rows"]] == ["q1"] and saved["means"]["faithfulness"] == 0.5
+    assert not (eval_dirs / "results_60_40").exists()
+
+
+def test_without_the_agent_flag_the_pipeline_run_reads_and_writes_its_files_with_its_judge(eval_dirs, ragas):
+    results = eval_dirs / "results_60_40"
+    results.mkdir()
+    row = {"id": "q1", "evidence_type": "text", "user_input": "What is LoRA?", "retrieved_contexts": ["LoRA – adapters."],
+           "retrieved_images": [], "response": "Adapters – small ones.", "reference": "Small adapter matrices."}
+    # written as eval/run_generation.py writes it: the locale's encoding, non-ASCII kept
+    (results / "generation_sample.json").write_text(json.dumps({"rows": [row]}, indent=1, ensure_ascii=False))
+    seen = ragas("sample")
+    [judge] = seen["judge"]
+    assert (judge["model"], judge["url"]) == ("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+                                              "https://openrouter.ai/api/v1/")
+    assert judge["cache"] == eval_dirs / "data" / "ragas_cache"
+    assert dict(seen["scored"])["FactualCorrectness"]["response"] == "Adapters – small ones."
+    saved = json.loads((results / "ragas_sample.json").read_text())
+    assert saved["judge"] == "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free" and saved["means"]["faithfulness"] == 0.5
+    assert not (eval_dirs / "results_agent").exists()
 
 
 def test_injection_canary_is_found_in_answer_tools_or_memory_case_blind():
