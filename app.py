@@ -52,6 +52,33 @@ def index_upload(student, upload):
     return Outcome(st.success, f"{file} added to your notebook.", file)
 
 
+# learner table -> its heading and one row's text. Passage IDs stay hidden, as everywhere a student reads.
+MEMORY_TABLES = {
+    "mastery": ("Mastery scores", lambda row: f"{row['concept']}: {row['score']:.2f}"),
+    "wrong_beliefs": ("Wrong beliefs", lambda row: f"{row['concept']}: {row['belief']}"),
+    "facts": ("Facts", lambda row: f"{row['concept']}: {row['fact']}"),
+    "session_notes": ("Session notes", lambda row: row["note"]),
+}
+
+
+def memory_view(student):
+    """Everything the tutor remembers about this student, each row deletable. No edit, so a student can't raise their own score."""
+    memory = learner.read_all(student)
+    for table, (heading, row_text) in MEMORY_TABLES.items():
+        st.subheader(heading)
+        for row in memory[table]:
+            key = row[learner.TABLE_KEYS[table]]
+            text, control = st.columns([5, 1])
+            text.text(row_text(row))  # not markdown: it came from the LLM and the student's words
+            if control.button("Delete", key=f"delete {table} {key}"):
+                try:
+                    learner.delete(student, table, key)
+                except Exception as e:  # the store failing: the row stays listed, and deleting it again retries
+                    st.error(f"That entry couldn't be deleted: {e}")
+                else:
+                    st.rerun()
+
+
 state = st.session_state
 
 st.title("Study Tutor")
@@ -78,6 +105,7 @@ state.setdefault("upload_outcomes", {})
 
 with st.sidebar:
     st.write(f"Notebook: {student}")
+    view = st.radio("View", ["Chat", "Memory"])
     uploads = st.file_uploader("Add .pptx or PDF files", type=["pptx", "pdf"], accept_multiple_files=True)
     for upload in uploads:
         if upload.file_id not in state.upload_outcomes:
@@ -100,7 +128,12 @@ with st.sidebar:
     st.subheader("Quiz")
     concepts = learner.concepts(student)
     concept = st.selectbox("Concept", concepts, disabled=not concepts)
-    quiz_message = f"Quiz me on {concept}" if st.button("Start quiz", disabled=not concepts) else None
+    # off in the Memory view, which has no chat for the reply to appear in
+    quiz_message = f"Quiz me on {concept}" if st.button("Start quiz", disabled=not concepts or view == "Memory") else None
+
+if view == "Memory":  # before the no-files stop: memory can outlive files
+    memory_view(student)
+    st.stop()
 
 if not notebook.files(student):
     st.info("Upload a .pptx or PDF in the sidebar to start chatting.")
