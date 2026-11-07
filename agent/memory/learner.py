@@ -178,4 +178,4 @@ def concepts(student_id):
     with _db(student_id) as conn:
         return [r["concept"] for r in conn.execute("SELECT DISTINCT concept FROM concepts ORDER BY concept")]
 
-# shortcut: no edit function yet, memory page (step 17) can delete + re-add; add edit when the UI needs it
+# No edit function, on purpose: the Memory view only deletes, so a student can't raise their own score

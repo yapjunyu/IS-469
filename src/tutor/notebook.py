@@ -7,9 +7,11 @@
     remove_file(student, "Lecture3.pdf")    # its passages, concepts, facts, saved copy and pictures go; mastery scores stay
     search(student, "What is LoRA?")        # passages: id, file, page, page_end, kind, text, image_path
     get_passages(student, ids)              # the passages with those ids, same shape
+    display_answer(answer, citation_ids)    # the answer with [1]-style markers and no passage ids
 
 search and get_passages are what run_turn takes as search_fn and passages_fn.
 """
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -23,6 +25,7 @@ from agent.ingest import extract_concepts  # noqa: E402
 from agent.memory import learner  # noqa: E402
 from tutor.pipeline import EMBEDDER, STORE_TAG, search_index, store_pages  # noqa: E402
 from tutor.rag import K  # noqa: E402
+from tutor.retrieval.chunk import PASSAGE_ID  # noqa: E402
 from tutor.retrieval.clean import clean_pages  # noqa: E402
 from tutor.retrieval.embed import Embedder  # noqa: E402
 from tutor.retrieval.extract import FileRejected, extract, file_sha256  # noqa: E402
@@ -134,3 +137,20 @@ def get_passages(student: str, ids: list[str]) -> list[dict]:
 
 def _passage(passage) -> dict:
     return {k: getattr(passage, k) for k in ("id", "file", "page", "page_end", "kind", "text", "image_path")}
+
+
+_IDS = rf"{PASSAGE_ID}(?:\s*[,;]\s*{PASSAGE_ID})*"
+# one or more passage IDs, bare or alone inside a matching pair of brackets, with the space before them
+_ID_GROUP = re.compile(rf"(\s*)(?:\[\s*{_IDS}\s*\]|\(\s*{_IDS}\s*\)|{_IDS})")
+
+
+def display_answer(answer: str, citation_ids: list[str]) -> str:
+    """The answer as the student reads it: citation IDs become [1]-style markers, numbered by their place
+    in citation_ids, and every other passage ID goes. For display only: history keeps the IDs for grading."""
+    numbers = {passage_id: n for n, passage_id in enumerate(citation_ids, start=1)}
+
+    def markers(group):
+        cited = [f"[{numbers[i]}]" for i in re.findall(PASSAGE_ID, group[0]) if i in numbers]
+        return group[1] + "".join(cited) if cited else ""
+
+    return _ID_GROUP.sub(markers, answer)

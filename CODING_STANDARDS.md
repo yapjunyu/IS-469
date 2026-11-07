@@ -16,7 +16,7 @@ The `agent/s4_trace.py` module docstring is the single source of truth for trace
 
 ## Turn state
 
-Per-turn state lives on `TurnContext` in `agent/s2_tools.py`: who and where (student, turn, step), running totals (tokens, searches, retrieved passage ids) and the switches. Anything that must count toward the turn is added there, so work done inside tools reaches the `final` row.
+Per-turn state lives on `TurnContext` in `agent/s2_tools.py`: who and where (student, turn, step), running totals (tokens, searches, retrieved passages) and the switches. Anything that must count toward the turn is added there, so work done inside tools reaches the `final` row.
 
 ## Tests
 

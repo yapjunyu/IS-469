@@ -9,7 +9,7 @@ It is similar in spirit to Google's NotebookLM, which answers questions from a u
 ## Features
 
 - **Upload your own material:** PowerPoint (.pptx) files and readable PDFs (selectable text, not scans), several per notebook. Anything else is rejected with a clear message. Each file is indexed once, with a progress bar.
-- **Chat with citations:** every answer cites its source (e.g. "Lecture3.pdf, page 12" or "Week5.pptx, slide 23"). Click a citation to see that passage.
+- **Chat with citations:** each answer marks the passages it used with numbers like [1] and lists them below it, labelled like "Lecture3.pdf, page 12" or "Week5.pptx, slides 4–6". Open a citation to see that passage and any picture from it.
 - **Quiz-me mode:** pick a topic from your files and get 3–5 practice questions grounded in them. The tutor grades your answer and gives a hint, not the answer.
 - **"My weak spots" panel:** a mastery bar per concept (e.g. LoRA 40%, photosynthesis 85%) that updates after quizzes and chats. Concepts are pulled from the uploaded files automatically.
 - **Memory controls:** view, edit and delete what the tutor remembers about you, and remove any uploaded file.
@@ -207,4 +207,4 @@ The system splits into three parts, each owned by one team member:
 
 ## Future work
 
-Fine-tuning and DPO, other file types (Word, plain text), multimodal reading of images and diagrams, OCR for scanned PDFs, web search as a fallback source, an MCP server, a multi-agent supervisor, and larger ablation studies.
+Fine-tuning and DPO, other file types (Word, plain text), OCR for scanned PDFs, web search as a fallback source, an MCP server, a multi-agent supervisor, and larger ablation studies.
