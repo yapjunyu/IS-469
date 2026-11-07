@@ -71,7 +71,7 @@ def test_the_tutor_is_told_to_show_the_whole_numbered_set_with_ids_and_ask_which
     sent = fake_chat(monkeypatch, "Hello.")
     turn("Quiz me on LoRA", "alice", 1)
     system = sent[0][0]["content"]
-    assert "the whole set" in system
+    assert "whole-set format" in system
     assert "1. <question> [p1, p2]" in system and "2. <question> [p3]" in system
     assert "Which question are you answering?" in system
 

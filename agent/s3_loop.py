@@ -6,7 +6,7 @@ for step in range(step_cap):
     reply = llm.chat(messages, tools)
     if no tool_calls: break
     for each tool_call: run_tool, append `role: tool` message, write a tool row
-    pictures in the tool results: one user message after them, holding the turn's newest pictures
+    pictures among the passages the tools retrieved: one user message after the results, holding the turn's newest pictures
 if cap hit: one last llm.chat(..., tool_choice="none") to force an answer
 faithfulness on: the judge checks the answer; on a fail, regenerate once, then return it with a warning
 write the final trace row (see s4_trace for the row format)
@@ -53,8 +53,8 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     answer: the tutor's text with its passage ids left in, because the next turn's grade_answer
     needs them in history. The app removes them for display only.
     citations: the ids of the passages retrieved this turn that the final answer names, in order
-    of first appearance, without repeats. Empty on a turn where make_quiz passed its checks: the ids
-    after quiz questions are for grading, and showing them would point at the answer.
+    of first appearance, without repeats. Empty on a turn that called grade_answer or where make_quiz
+    passed its checks: the ids in quiz questions and hints would point at the answer.
 
     turn: the app's turn number, written on every trace row.
     history: earlier {"role": "user"/"assistant", "content": ...} messages, so quiz
@@ -113,7 +113,7 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     ]
 
     answer, cap_hit = None, False
-    found, picture_message = [], None  # every passage the tools gave the tutor this turn, oldest first
+    picture_message = None
     for step in range(1, step_cap+1):
         ctx.step = step
         msg = s4_trace.traced_chat(ctx, "tutor", messages, MODEL, tools=TOOL_SCHEMAS)["message"]
@@ -142,13 +142,12 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
 
             content = s6_guard.material(result["passages"], guard) if "passages" in result else json.dumps(result)
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": content})
-            found += result.get("passages", [])
 
         # only after all of a step's tool results: providers reject a user message between them.
         # One message, rebuilt each step, so old pictures can't push a request over the cap.
         if picture_message:
             messages.remove(picture_message)
-        parts = picture_parts(found)
+        parts = picture_parts(ctx.passages)
         picture_message = {"role": "user", "content": parts} if parts else None
         if picture_message:
             messages.append(picture_message)
@@ -174,5 +173,5 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
                      tokens=dict(ctx.tokens),
                      duration_ms=round((time.perf_counter() - t_start) * 1000),
                      faithfulness=verdict, answer_preview=answer[:100])
-    citations = [] if ctx.quiz_called else _cited(answer, ctx.passage_ids)
+    citations = [] if ctx.hide_citations else _cited(answer, ctx.passage_ids)
     return {"answer": answer, "citations": citations, "steps": ctx.step, "faithfulness": verdict, "warning": warning}

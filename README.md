@@ -207,4 +207,4 @@ The system splits into three parts, each owned by one team member:
 
 ## Future work
 
-Fine-tuning and DPO, other file types (Word, plain text), multimodal reading of images and diagrams, OCR for scanned PDFs, web search as a fallback source, an MCP server, a multi-agent supervisor, and larger ablation studies.
+Fine-tuning and DPO, other file types (Word, plain text), OCR for scanned PDFs, web search as a fallback source, an MCP server, a multi-agent supervisor, and larger ablation studies.

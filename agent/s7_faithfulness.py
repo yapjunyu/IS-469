@@ -14,8 +14,7 @@ JUDGE_MODEL = "gpt-5.4-mini-2026-03-17"
 def check(ctx, answer):
     """Judge the answer against the passages retrieved this turn. Returns {"supported": bool, "reason": str}."""
     # unique, a passage found again counting as newest, so the judge keeps the same pictures as the tutor
-    ids = list(dict.fromkeys(reversed(ctx.passage_ids)))[::-1]
-    passages = ctx.passages_fn(ctx.student_id, ids) if ids else []
+    passages = list({p["id"]: p for p in reversed(ctx.passages)}.values())[::-1]
     verdict = s2_tools.ask(ctx, "judge", FAITHFULNESS_PROMPT, passages, f"Answer to check:\n{answer}", "{",
                            model=JUDGE_MODEL)
     if not (isinstance(verdict, dict) and isinstance(verdict.get("supported"), bool)):

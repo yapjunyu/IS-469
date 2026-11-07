@@ -12,6 +12,8 @@ PASSAGES = [{"id": "p1", "file": "lec3.pdf", "page": 12, "text": "LoRA adds low-
             {"id": REAL_ID, "file": "lec6.pdf", "page": 1, "text": "Reranking reorders."}]
 QUIZ_CALL = {"role": "assistant", "tool_calls": [{"id": "c1", "type": "function",
              "function": {"name": "make_quiz", "arguments": '{"concept": "LoRA"}'}}]}
+GRADE_CALL = {"role": "assistant", "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "grade_answer",
+              "arguments": '{"question": "What does LoRA add?", "student_answer": "x", "passage_ids": ["p1"]}'}}]}
 
 
 def answer(text):
@@ -87,6 +89,19 @@ def test_a_make_quiz_that_found_no_passages_keeps_the_answers_citations(monkeypa
     out, _ = run(monkeypatch, reply(QUIZ_CALL), reply(SEARCH_CALL), answer("LoRA adds [p1]."),
                  search_fn=lambda student, query: next(results))
     assert out["citations"] == ["p1"]
+
+
+def test_a_turn_that_calls_grade_answer_returns_no_citations_even_if_the_hint_names_an_id(monkeypatch):
+    out, _ = run(monkeypatch, reply(GRADE_CALL), answer('{"correct": false, "hint": "Reread [p1]."}'),
+                 answer("Not quite. Reread [p1]."), passages_fn=lambda student, ids: PASSAGES[:1])
+    assert out["answer"] == "Not quite. Reread [p1]." and out["citations"] == []
+
+
+def test_a_grade_answer_that_found_no_passages_still_returns_no_citations(monkeypatch):
+    # the tutor is still answering a quiz question, so an id it then finds must not become an openable citation
+    out, _ = run(monkeypatch, reply(GRADE_CALL), reply(SEARCH_CALL), answer("Not quite. Reread [p1]."),
+                 passages_fn=lambda student, ids: [])
+    assert out["citations"] == []
 
 
 def test_a_bare_real_format_id_followed_by_a_colon_is_cited(monkeypatch):

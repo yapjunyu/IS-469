@@ -620,6 +620,18 @@ def test_a_numbered_set_shows_without_ids_then_a_wrong_answer_is_graded_on_them_
     assert shown(at)[-1] == ("assistant", f"Not quite. {hint}")
 
 
+def test_a_hint_that_names_a_passage_id_offers_no_citation_to_open(monkeypatch, tmp_data):
+    fake_notes(monkeypatch)
+    learner.add_concepts("jun-yu", "Lecture3.pdf", ["LoRA"])
+    raw_quiz = f"1. What does LoRA add? [{LECTURE['id']}]\nWhich question are you answering?"
+    script_llm(monkeypatch, QUIZ_CALL, raw_quiz, grade_call_from_history, f"Not quite. Reread this [{LECTURE['id']}].",
+               checks={"correct": False, "hint": "Reread.",
+                       "questions": [{"question": "What does LoRA add?", "passage_ids": [LECTURE["id"]]}]})
+    at = say(start_quiz(chat_ready(), "lora"), "Question 1: tiny matrices")
+    assert shown(at)[-1] == ("assistant", "Not quite. Reread this.")
+    assert not at.chat_message[3].expander
+
+
 # a failed turn
 
 def test_a_failed_turn_shows_the_error_and_keeps_the_message_with_a_resend_button(monkeypatch):
