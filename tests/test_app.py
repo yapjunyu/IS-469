@@ -672,6 +672,75 @@ def test_a_failed_resend_keeps_the_message_and_the_turn_number(monkeypatch, tmp_
     assert final_turns(tmp_data) == [1]
 
 
+# the mastery panel
+
+def on_the_list(*concepts, file="notes.pdf"):
+    learner.add_concepts("jun-yu", file, concepts)
+
+
+def bars(at):
+    return {b.proto.text: b.proto.value for b in at.sidebar.get("progress")}
+
+
+def panel_text(at):
+    return list(bars(at)) + [c.value for c in at.sidebar.caption]
+
+
+def test_the_panel_lists_each_concept_on_the_list():
+    on_the_list("lora", "bm25", "[x](y)")
+    learner.update_mastery("jun-yu", "lora", True)
+    text = " ".join(panel_text(chat_ready()))
+    assert "lora" in text and "bm25" in text
+    assert r"\[x\]\(y\)" in text  # shown as typed, not as a link: a file can put anything in its concept names
+
+
+def test_a_concept_with_a_score_shows_a_bar_at_that_score():
+    on_the_list("lora")
+    learner.update_mastery("jun-yu", "lora", True)  # 0.65: 0.5 + 0.3 * (1 - 0.5)
+    assert bars(chat_ready()) == {"lora: 65%": 65}
+
+
+def test_a_concept_with_no_score_shows_not_tested_yet_not_fifty_percent():
+    on_the_list("lora")
+    at = chat_ready()
+    assert not bars(at)
+    assert "lora: Not tested yet" in panel_text(at)
+    assert not any("50%" in line for line in panel_text(at))
+
+
+def test_every_weak_spot_stands_out_from_the_other_concepts():
+    weak = ["bm25", "chunking", "kv cache", "lora"]  # more than the three the system prompt gets
+    on_the_list("agents", *weak)
+    learner.update_mastery("jun-yu", "agents", True)  # 0.65
+    for concept in weak:
+        learner.update_mastery("jun-yu", concept, False)  # 0.35: 0.5 + 0.3 * (0 - 0.5)
+    lines = list(bars(chat_ready()))
+    assert sum("weak spot" in line for line in lines) == 4
+    assert "agents: 65%" in lines
+
+
+def test_a_score_changed_during_a_turn_shows_on_the_next_render(monkeypatch):
+    on_the_list("lora")
+    at = chat_ready()
+    assert "lora: Not tested yet" in panel_text(at)
+    script_llm(monkeypatch, {"role": "assistant", "tool_calls": [{"id": "c1", "type": "function", "function": {
+        "name": "update_mastery", "arguments": '{"concept": "lora", "correct": true}'}}]}, "Well done.")
+    at = say(at, "A lora adds small matrices")
+    assert bars(at) == {"lora: 65%": 65}  # 0.5 + 0.3 * (1 - 0.5)
+    assert "lora: Not tested yet" not in panel_text(at)
+
+
+def test_a_score_for_a_concept_no_longer_on_the_list_is_not_shown():
+    on_the_list("lora")
+    on_the_list("gone", file="removed.pdf")
+    learner.update_mastery("jun-yu", "lora", True)
+    learner.update_mastery("jun-yu", "gone", False)
+    learner.remove_file("jun-yu", "removed.pdf")
+    at = chat_ready()
+    assert list(bars(at)) == ["lora: 65%"]
+    assert not any("gone" in line for line in panel_text(at))
+
+
 # running it
 
 def test_the_readme_documents_the_launch_command_and_streamlit_is_pinned():

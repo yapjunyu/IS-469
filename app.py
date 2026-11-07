@@ -1,4 +1,5 @@
 """The Study Tutor app: enter a name, upload files, chat with the tutor. Start it from the repo root with `streamlit run app.py`."""
+import re
 import sys
 import tempfile
 from collections import namedtuple
@@ -50,6 +51,24 @@ def index_upload(student, upload):
     if added["status"] == "replaced":
         return Outcome(st.success, f"{file} replaced with the new version.", file)
     return Outcome(st.success, f"{file} added to your notebook.", file)
+
+
+def mastery_panel(student):
+    """Each concept on the notebook's list in the sidebar: a bar at its score or "Not tested yet", with weak spots standing out."""
+    concepts = learner.concepts(student)
+    scores = {row["concept"]: row["score"] for row in learner.read_all(student)["mastery"]}
+    # limit: every weak spot here, not only the few the system prompt gets
+    weak = {row["concept"] for row in learner.weak_concepts(student, limit=len(concepts))}
+    with st.sidebar:
+        st.subheader("Mastery")
+        for concept in concepts:
+            # these labels are markdown, and concept names are an LLM's reading of the file: untrusted, so escape its punctuation
+            name = re.sub(r"([!-/:-@\[-`{-~])", r"\\\1", concept)
+            if concept not in scores:
+                st.caption(f"{name}: Not tested yet")
+                continue
+            percent = round(scores[concept] * 100)  # given a float, st.progress truncates: 0.29 would draw 28
+            st.progress(percent, text=f":red[**{name}: {percent}%, weak spot**]" if concept in weak else f"{name}: {percent}%")
 
 
 state = st.session_state
@@ -105,6 +124,8 @@ with st.sidebar:
 if not notebook.files(student):
     st.info("Upload a .pptx or PDF in the sidebar to start chatting.")
     st.stop()
+
+mastery_panel(student)  # after the stop: with no files there are no concepts to show
 
 # the messages shown, each {"role", "content"}; an answer's content keeps its passage IDs for the next turn's history, and it also
 # has "shown", its displayed text, "citations", the passages it cited as they were that turn, and "warning"
