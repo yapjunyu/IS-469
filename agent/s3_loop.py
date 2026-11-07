@@ -8,7 +8,8 @@ for step in range(step_cap):
     for each tool_call: run_tool, append `role: tool` message, write a tool row
     pictures among the passages the tools retrieved: one user message after the results, holding the turn's newest pictures
 if cap hit: one last llm.chat(..., tool_choice="none") to force an answer
-faithfulness on: the judge checks the answer; on a fail, regenerate once, then return it with a warning
+faithfulness on: the judge checks the answer; on a fail, regenerate once back in the loop (tools on, same step cap),
+then return it with a warning if it still fails
 write the final trace row (see s4_trace for the row format)
 """
 
@@ -45,10 +46,11 @@ def _cited(answer, passage_ids):
     return sorted(first, key=first.get)
 
 
-def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_search,
+def run_turn(user_message, student_id, turn, *, history=None, open_quiz=None, search_fn=stub_search,
              passages_fn=stub_passages, search_again=True, guard=True, memory_check=True, faithfulness=True, images=True, memory="learner", embedder=None, step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int,
-    "faithfulness": the judge's {"supported", "reason"} or None when off, "warning": bool}.
+    "faithfulness": the judge's {"supported", "reason"} or None when off, "warning": bool,
+    "quiz": the questions of this turn's last successful make_quiz, each {"question", "passage_ids"}, or None}.
 
     answer: the tutor's text with its passage ids left in, because the next turn's grade_answer
     needs them in history. The app removes them for display only.
@@ -59,14 +61,17 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     turn: the app's turn number, written on every trace row.
     history: earlier {"role": "user"/"assistant", "content": ...} messages, so quiz
     answers can be graded against the question asked last turn.
+    open_quiz: the "quiz" an earlier turn returned, still open: listed in the system prompt with each
+    question's passage ids, so an answer to it is graded with grade_answer.
     search_fn: search(student_id, query) -> [{id, file, page, text}, ...], plus image_path if a passage has a picture.
     passages_fn: get_passages(student_id, ids) -> the passages with those ids, same shape.
     search_again: rephrase and search again, up to 3 searches, while an LLM check says the passages
     are not enough; off uses the first result, the fixed-pipeline baseline.
     memory_check: remember_fact stores only facts citing a passage retrieved this turn;
     off is the unsafe baseline for the poisoning test.
-    faithfulness: judge the answer against every passage retrieved this turn; warning is true
-    when it still fails after one regeneration.
+    faithfulness: judge the answer against every passage retrieved this turn and the student's record
+    (concepts, weak spots, wrong beliefs, session notes, open quiz); warning is true when it still fails
+    after one regeneration, which may search or grade first.
     images: every LLM call over passages also receives their pictures, at most 3 per request, newest kept;
     off leaves pictures and passages with no text out, the text-only baseline. Pictures never reach
     the answer, the trace or history, so a follow-up question searches again.
@@ -86,24 +91,29 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
     ctx = TurnContext(student_id=student_id, turn=turn, search_fn=search_fn,
                       passages_fn=passages_fn, search_again=search_again, guard=guard,
                       memory_check=memory_check, faithfulness=faithfulness, images=images, memory=memory, step_cap=step_cap)
-    system = SYSTEM_PROMPT + (GUARD_PROMPT if guard else "")
+    record = ""  # the student's record: what the tutor is told about this student and notebook, also the judge's support for it
     concepts = learner.concepts(student_id)
     if concepts:
-        system += "\nConcepts in this notebook (use these exact names in tools): " + ", ".join(concepts)
+        record += "\nConcepts in this notebook (use these exact names in tools): " + ", ".join(concepts)
     if memory == "learner":
         if weak := learner.weak_concepts(student_id):
-            system += ("\nThis student's weak spots (score 0 to 1): " + ", "
+            record += ("\nThis student's weak spots (score 0 to 1): " + ", "
                        .join(f"{w['concept']} {w['score']:.2f}" for w in weak))
         if beliefs := learner.wrong_beliefs(student_id):
-            system += ("\nWrong beliefs this student showed (never treat them as true): " + "; "
+            record += ("\nWrong beliefs this student showed (never treat them as true): " + "; "
                        .join(f"{b['concept']}: {b['belief']}" for b in beliefs))
     if memory == "vector" and (notes := vector.similar_notes(student_id, user_message, embedder)):
-        system += "\nNotes from this student's past sessions: " + " | ".join(notes)
+        record += "\nNotes from this student's past sessions: " + " | ".join(notes)
+    if open_quiz:
+        record += ("\nOpen quiz (grade an answer to one of these with grade_answer and that question's passage ids):\n"
+                   + "\n".join(f"{n}. {q['question']} [{', '.join(q['passage_ids'])}]"
+                               for n, q in enumerate(open_quiz, start=1)))
+    ctx.record = record.strip()
 
     messages = [
         {
             "role": "system",
-            "content": system
+            "content": SYSTEM_PROMPT + (GUARD_PROMPT if guard else "") + record
         },
         *(history or []),
         {
@@ -112,17 +122,32 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
         }
     ]
 
-    answer, cap_hit = None, False
+    answer, cap_hit, verdict, regenerated = None, False, None, False
     picture_message = None
-    for step in range(1, step_cap+1):
-        ctx.step = step
-        msg = s4_trace.traced_chat(ctx, "tutor", messages, MODEL, tools=TOOL_SCHEMAS)["message"]
-
-        messages.append({k: msg[k] for k in ("role", "content", "tool_calls") if k in msg})
-
-        if not msg.get("tool_calls"):
+    purpose = "tutor"  # "regenerate" for the first call after the judge fails the answer
+    while True:
+        if ctx.step >= step_cap:
+            # cap hit: one last call with tools off, so it must answer from what it has
+            ctx.step, cap_hit = ctx.step + 1, True
+            msg = s4_trace.traced_chat(ctx, "forced_answer" if purpose == "tutor" else purpose, messages, MODEL,
+                                       tools=TOOL_SCHEMAS, tool_choice="none")["message"]
             answer = msg.get("content") or ""
-            break
+            messages.append({"role": "assistant", "content": answer})
+        else:
+            ctx.step += 1
+            msg = s4_trace.traced_chat(ctx, purpose, messages, MODEL, tools=TOOL_SCHEMAS)["message"]
+            purpose = "tutor"
+            messages.append({k: msg[k] for k in ("role", "content", "tool_calls") if k in msg})
+            if not msg.get("tool_calls"):
+                answer = msg.get("content") or ""
+        if answer is not None:
+            verdict = s7_faithfulness.check(ctx, answer) if ctx.faithfulness else None
+            if regenerated or not verdict or verdict["supported"]:
+                break
+            # one regeneration with the judge's reason, back in the loop with tools on, so it can search or grade first
+            regenerated, answer, purpose = True, None, "regenerate"
+            messages.append({"role": "user", "content": REGENERATE_PROMPT.format(reason=verdict["reason"])})
+            continue
 
         for call in msg["tool_calls"]:
             name, args = call["function"]["name"], call["function"]["arguments"]
@@ -151,22 +176,6 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
         picture_message = {"role": "user", "content": parts} if parts else None
         if picture_message:
             messages.append(picture_message)
-    else:
-        # cap hit: one last call with tools off, so it must answer from what it has
-        ctx.step, cap_hit = step_cap + 1, True
-        msg = s4_trace.traced_chat(ctx, "forced_answer", messages, MODEL,
-                                   tools=TOOL_SCHEMAS, tool_choice="none")["message"]
-        answer = msg.get("content") or ""
-        messages.append({"role": "assistant", "content": answer})
-
-    verdict = s7_faithfulness.check(ctx, answer) if ctx.faithfulness else None
-    if verdict and not verdict["supported"]:
-        # one regeneration with the judge's reason; tools stay listed (history holds tool calls) but off
-        messages.append({"role": "user", "content": REGENERATE_PROMPT.format(reason=verdict["reason"])})
-        ctx.step += 1
-        answer = s4_trace.traced_chat(ctx, "regenerate", messages, MODEL, tools=TOOL_SCHEMAS,
-                                      tool_choice="none")["message"].get("content") or ""
-        verdict = s7_faithfulness.check(ctx, answer)
     warning = bool(verdict) and not verdict["supported"]
 
     s4_trace.log_row(ctx, "final", steps=ctx.step, cap_hit=cap_hit, searches=ctx.searches,
@@ -174,4 +183,5 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
                      duration_ms=round((time.perf_counter() - t_start) * 1000),
                      faithfulness=verdict, answer_preview=answer[:100])
     citations = [] if ctx.hide_citations else _cited(answer, ctx.passage_ids)
-    return {"answer": answer, "citations": citations, "steps": ctx.step, "faithfulness": verdict, "warning": warning}
+    return {"answer": answer, "citations": citations, "steps": ctx.step, "faithfulness": verdict, "warning": warning,
+            "quiz": ctx.quiz}

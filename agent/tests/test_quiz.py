@@ -81,6 +81,17 @@ def call(name, args):
                   "function": {"name": name, "arguments": json.dumps(args)}}]})
 
 
+def test_a_quiz_is_returned_and_listed_with_its_ids_when_passed_back_open(monkeypatch):
+    sent = []
+    replies = iter([call(*QUIZ[:2]), answer(QUIZ[2]), answer("1. What does LoRA add? [p1]"), answer("Which one?")])
+    monkeypatch.setattr(s1_llm, "chat", lambda messages, model, **kw: sent.append(messages[0]["content"]) or next(replies))
+    out = turn("Quiz me on LoRA", "alice", 1, search_fn=fake_search, passages_fn=lookup)
+    assert out["quiz"] == [{"question": "What does LoRA add?", "passage_ids": ["p1"]}]
+    later = turn("It adds layers", "alice", 2, open_quiz=out["quiz"], search_fn=fake_search, passages_fn=lookup)
+    assert later["quiz"] is None  # no new quiz this turn: the app keeps the open one
+    assert "What does LoRA add? [p1]" in sent[-1] and "What does LoRA add?" not in sent[0]
+
+
 def test_quiz_then_grade_writes_an_llm_row_for_each_call(monkeypatch, tmp_data):
     monkeypatch.setattr(s1_llm, "chat", scripted(call(*QUIZ[:2]), answer(QUIZ[2]), answer("Q1: What does LoRA add?"),
                                                   call(*GRADE[:2]), answer(GRADE[2]), answer("Correct!")))

@@ -61,8 +61,12 @@ One student message and the tutor's final reply to it.
 _Avoid_: Round, exchange
 
 **Step**:
-One LLM call inside a turn, plus the tool calls it asks for. A turn has at most the step cap of steps, plus one forced-answer step (tools off) when the cap is hit, plus one regenerate step when the judge fails the answer.
+One LLM call inside a turn, plus the tool calls it asks for. A turn has at most the step cap of steps, plus one forced-answer step (tools off) when the cap is hit. A regenerate continues the same steps under the same cap.
 _Avoid_: Iteration, hop
+
+**Quiz**:
+Practice questions on one concept, each tied to the passages it was written from. Shown without citations, since they would point at the answer.
+_Avoid_: Test, question set
 
 ## Checks
 
@@ -71,11 +75,11 @@ The LLM, from a different model family than the tutor, that runs the faithfulnes
 _Avoid_: Grader (that is `grade_answer`), checker, critic
 
 **Faithfulness**:
-Whether every claim about course content in the tutor's final answer is stated in the passages retrieved that turn or shown in their pictures. It checks the answer matches the notes, not that the notes are right.
+Whether every claim about course content in the tutor's final answer is stated in the passages retrieved that turn or shown in their pictures. Claims about the student's own record (weak spots, wrong beliefs, the concept list) are checked against that record. It checks the answer matches the notes, not that the notes are right.
 _Avoid_: Correctness, accuracy, groundedness
 
 **Regenerate**:
-The tutor's single retry after the judge fails an answer, with the judge's reason added. It counts as one more step.
+The tutor's single retry after the judge fails an answer, with the judge's reason added. It answers the student again, without apologising or mentioning the judge, and may search or grade first; its steps count toward the step cap.
 _Avoid_: Retry (alone), rewrite
 
 **Warning**:

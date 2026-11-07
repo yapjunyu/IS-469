@@ -50,7 +50,7 @@ def test_tool_then_answer(monkeypatch):
                                                   reply({"role": "assistant", "content": "LoRA is ... [stub-1]"})))
     out = turn("What is LoRA?", "alice", 1)
     assert out == {"answer": "LoRA is ... [stub-1]", "citations": ["stub-1"], "steps": 2,
-                   "faithfulness": None, "warning": False}
+                   "faithfulness": None, "warning": False, "quiz": None}
 
 
 def test_step_cap_forces_answer(monkeypatch):

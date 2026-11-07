@@ -316,7 +316,8 @@ def test_a_notice_says_the_tutor_is_only_as_accurate_as_the_files():
 
 def test_no_screen_offers_an_experiment_switch_and_run_turn_gets_only_the_learner_memory(monkeypatch):
     # every run_turn option but what the app must hand it, read from the signature so a new switch is covered too
-    switches = set(list(inspect.signature(s3_loop.run_turn).parameters)[3:]) - {"history", "search_fn", "passages_fn"}
+    switches = (set(list(inspect.signature(s3_loop.run_turn).parameters)[3:])
+                - {"history", "open_quiz", "search_fn", "passages_fn"})
     assert "faithfulness" in switches
 
     def labels(at):
@@ -335,6 +336,20 @@ def test_no_screen_offers_an_experiment_switch_and_run_turn_gets_only_the_learne
     at = say(enter_name(at, "Jun Yu"), "What is LoRA?")
     assert labels(at) and not names_a_switch(at)
     assert {k: v for k, v in received[0].items() if k in switches} == {"memory": "learner"}
+
+
+def test_a_quiz_stays_open_for_the_next_turns_until_a_new_quiz(monkeypatch):
+    first = [{"question": "What does LoRA add?", "passage_ids": ["p1"]}]
+    second = [{"question": "What is r?", "passage_ids": ["p2"]}]
+    outs = iter([first, None, second, None])
+    received = []
+    monkeypatch.setattr(s3_loop, "run_turn", lambda *a, **k: received.append(k["open_quiz"]) or
+                        {"answer": "Fine.", "citations": [], "warning": False, "quiz": next(outs)})
+    seed_file()
+    at = enter_name(open_app(), "Jun Yu")
+    for message in ("Quiz me", "x", "Quiz me again", "y"):
+        at = say(at, message)
+    assert received == [None, first, first, second]
 
 
 # a turn
