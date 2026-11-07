@@ -16,6 +16,7 @@ import json
 
 import agent_common as ac
 import eval_retrieval as ev
+from agent import s2_tools
 
 ARMS = {"search_again_on": {"search_again": True}, "search_again_off": {"search_again": False}}
 
@@ -38,7 +39,8 @@ def main():
             out = ac.run("generation", arm, q["question"], **switches)
             rows.append({"id": q["id"], "evidence_type": q["evidence_type"], "user_input": q["question"],
                          "retrieved_contexts": [p["text"] for p in out["passages"] if p["text"].strip()],
-                         "retrieved_images": [p["image_path"] for p in out["passages"] if p.get("image_path")],
+                         # search_notes kept image_path only with the images switch on, so this is what the tutor saw
+                         "retrieved_images": [p["image_path"] for p in out["passages"] if s2_tools.has_picture(p)],
                          "response": out["answer"], "reference": q["reference_answer"],
                          "retrieved": [f"{p['file']} p{p['page']}" for p in out["passages"]],
                          "warning": out["warning"], "searches": out["searches"], "steps": out["steps"],
