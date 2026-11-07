@@ -132,6 +132,127 @@ def test_a_copy_under_another_name_names_the_file_already_holding_it(tmp_path):
     assert files_listed(at) == ["notes.pdf"]
 
 
+# replacing a file
+
+def upload_new_version(at, tmp_path, *slides):
+    (tmp_path / "new").mkdir(exist_ok=True)
+    content = make_pdf(tmp_path / "new" / "notes.pdf", *slides).read_bytes()
+    at.file_uploader[0].set_value(("notes.pdf", content, "application/pdf"))
+    return at.run()
+
+
+def test_a_new_version_says_it_replaced_the_file_and_the_tutor_finds_only_it(tmp_path):
+    at = upload(enter_name(open_app(), "Jun Yu"), tmp_path)
+    at = upload_new_version(at, tmp_path, "BM25 ranks by keyword")
+    assert "replaced" in at.sidebar.success[0].value and "notes.pdf" in at.sidebar.success[0].value
+    assert files_listed(at) == ["notes.pdf"]
+    assert [p["text"] for p in notebook.search("jun-yu", "LoRA")] == ["BM25 ranks by keyword"]
+
+
+def test_a_new_version_whose_concepts_could_not_be_listed_says_it_replaced_the_file_and_how_to_retry(monkeypatch, tmp_path):
+    at = upload(enter_name(open_app(), "Jun Yu"), tmp_path)
+
+    def no_llm(*args, **kwargs):
+        raise RuntimeError("rate limit reached")
+
+    monkeypatch.setattr(s1_llm, "chat", no_llm)
+    notice = upload_new_version(at, tmp_path, "BM25 ranks by keyword").sidebar.warning[0].value
+    assert "replaced" in notice and "concepts" in notice and "re-upload" in notice
+
+
+def test_a_rejected_new_version_shows_why_and_the_old_file_stays(tmp_path):
+    at = upload(enter_name(open_app(), "Jun Yu"), tmp_path)
+    at.file_uploader[0].set_value(("notes.pdf", b"not a pdf", "application/pdf"))
+    at.run()
+    assert "could not be opened" in at.sidebar.error[0].value
+    assert files_listed(at) == ["notes.pdf"]
+    assert [p["text"] for p in notebook.search("jun-yu", "LoRA")] == ["LoRA adapters are small"]
+    assert at.chat_input
+
+
+# removing a file
+
+def remove(at, name="notes.pdf"):
+    buttons(at, f"Remove {name}")[0].click()
+    return at.run()
+
+
+def test_a_remove_button_takes_the_file_out_of_the_list_and_the_notebook(tmp_path):
+    seed_file(name="kept.pdf")
+    at = upload(enter_name(open_app(), "Jun Yu"), tmp_path)
+    assert files_listed(at) == ["kept.pdf", "notes.pdf"]
+    at = remove(at)
+    assert files_listed(at) == ["kept.pdf"]
+    assert notebook.files("jun-yu") == ["kept.pdf"]
+    assert notebook.search("jun-yu", "LoRA") == []
+    assert learner.concepts("jun-yu") == []
+    assert not buttons(at, "Remove notes.pdf")
+    assert at.chat_input  # another file is still there
+
+
+def test_removing_the_last_file_locks_chat_again(tmp_path):
+    at = upload(enter_name(open_app(), "Jun Yu"), tmp_path)
+    assert at.chat_input
+    at = remove(at)
+    assert files_listed(at) == []
+    assert not at.chat_input
+    assert "upload" in at.info[0].value.lower()
+
+
+def test_an_upload_still_in_the_uploader_is_not_indexed_again_and_stops_saying_it_was_added(monkeypatch, tmp_path):
+    calls, real = [], notebook.add_file
+    monkeypatch.setattr(notebook, "add_file", lambda *a: calls.append(a) or real(*a))
+    at = upload(enter_name(open_app(), "Jun Yu"), tmp_path)
+    assert at.sidebar.success
+    at = remove(at)
+    assert at.file_uploader[0].value  # it is still in the widget, which hands it back on every rerun
+    for _ in range(2):
+        assert not at.sidebar.success
+        assert files_listed(at) == []
+        assert len(calls) == 1
+        at.run()
+
+
+def test_a_copy_still_in_the_uploader_stops_naming_the_removed_file_and_is_not_indexed(tmp_path):
+    at = upload(enter_name(open_app(), "Jun Yu"), tmp_path)
+    at.file_uploader[0].set_value(("copy.pdf", (tmp_path / "notes.pdf").read_bytes(), "application/pdf"))
+    at.run()
+    assert "notes.pdf" in at.sidebar.info[0].value
+    at = remove(at)
+    assert not at.sidebar.info
+    assert files_listed(at) == []
+
+
+def test_uploading_a_removed_file_again_indexes_it_again(tmp_path):
+    at = remove(upload(enter_name(open_app(), "Jun Yu"), tmp_path))
+    at = upload(at, tmp_path)  # a new upload has a new file_id, whatever its content
+    assert "added" in at.sidebar.success[0].value
+    assert files_listed(at) == ["notes.pdf"]
+    assert [p["text"] for p in notebook.search("jun-yu", "LoRA")] == ["LoRA adapters are small"]
+    assert at.chat_input
+
+
+def test_a_rejected_upload_keeps_its_message_when_an_unrelated_file_is_removed():
+    seed_file(name="held.pdf")
+    at = enter_name(open_app(), "Jun Yu")
+    at.file_uploader[0].set_value(("bad.pdf", b"not a pdf", "application/pdf"))
+    at.run()
+    at = remove(at, "held.pdf")
+    assert "could not be opened" in at.sidebar.error[0].value
+
+
+def test_a_removal_that_fails_says_so_and_the_file_stays_listed(monkeypatch):
+    def fails(*args):
+        raise OSError("file in use")
+
+    monkeypatch.setattr(notebook, "remove_file", fails)
+    seed_file()
+    at = remove(enter_name(open_app(), "Jun Yu"))
+    assert "notes.pdf" in at.sidebar.error[0].value and "file in use" in at.sidebar.error[0].value
+    assert files_listed(at) == ["notes.pdf"]
+    assert at.chat_input
+
+
 # the chat screen
 
 def test_with_no_files_chat_is_locked_with_a_prompt_to_upload():
