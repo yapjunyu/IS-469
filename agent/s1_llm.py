@@ -5,7 +5,7 @@
 - GPT-5 models reject a custom temperature and take max_completion_tokens instead of
   max_tokens, so their request is adapted; reruns stay identical through the cache.
 - OpenCode Go requests turn DeepSeek's thinking off.
-- Cache every successful response to disk, keyed by a hash of the full request.
+- Cache every successful response to disk, keyed by a hash of the full request, image parts included.
 - On 429: the SDKs' own retries (max_retries) honour `retry-after`.
 - On 400 `tool_use_failed`: retry; never append the bad call to history.
 - Return plain dicts (not SDK objects) so cache and trace can JSON them.

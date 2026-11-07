@@ -1,7 +1,7 @@
 """Step 15: check the answer is supported by the student's notes.
 
 The judge is a model from a different family than the tutor (an AI marking its own homework is
-too generous). It reads the final answer and every passage retrieved in the turn, through
+too generous). It reads the final answer and every passage retrieved in the turn, with their pictures, through
 s4_trace.traced_chat (purpose "judge"), so its calls write llm rows and count toward the turn.
 """
 from agent import s2_tools
@@ -13,7 +13,8 @@ JUDGE_MODEL = "gpt-5.4-mini-2026-03-17"
 
 def check(ctx, answer):
     """Judge the answer against the passages retrieved this turn. Returns {"supported": bool, "reason": str}."""
-    ids = list(dict.fromkeys(ctx.passage_ids))
+    # unique, a passage found again counting as newest, so the judge keeps the same pictures as the tutor
+    ids = list(dict.fromkeys(reversed(ctx.passage_ids)))[::-1]
     passages = ctx.passages_fn(ctx.student_id, ids) if ids else []
     verdict = s2_tools.ask(ctx, "judge", FAITHFULNESS_PROMPT, passages, f"Answer to check:\n{answer}", "{",
                            model=JUDGE_MODEL)
