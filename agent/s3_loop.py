@@ -93,7 +93,8 @@ def run_turn(user_message, student_id, turn, *, history=None, open_quiz=None, se
     memory_check: remember_fact stores only facts citing a passage retrieved this turn;
     off is the unsafe baseline for the poisoning test.
     faithfulness: judge the answer against every passage retrieved this turn and the student's record
-    (concepts, weak spots, wrong beliefs, session notes, open quiz); warning is true when it still fails
+    (concepts, weak spots, wrong beliefs, session notes, open quiz), with history and user_message as the
+    support for claims about the session only; warning is true when it still fails
     after one regeneration, which may search or grade first.
     images: every LLM call over passages also receives their pictures, at most 3 per request, newest kept;
     off leaves pictures and passages with no text out, the text-only baseline. Pictures never reach
@@ -132,6 +133,8 @@ def run_turn(user_message, student_id, turn, *, history=None, open_quiz=None, se
                    + "\n".join(f"{n}. {q['question']} [{', '.join(q['passage_ids'])}]"
                                for n, q in enumerate(open_quiz, start=1)))
     ctx.record = record.strip()
+    ctx.session = "\n".join([*(f"{'Student' if m['role'] == 'user' else 'Tutor'}: {m['content']}" for m in history or []),
+                             f"Student's message this turn: {user_message}"])
 
     messages = [
         {
