@@ -24,6 +24,7 @@ from tutor.pipeline import corpus_files  # noqa: E402
 STUDENT = "eval-gold"
 AGENT = ROOT / "eval" / "agent"  # the hand-checked input CSVs
 OUT = ROOT / "eval" / "results_agent"
+CACHE = ROOT / "data" / "llm_cache_eval"  # one folder per experiment and arm, and one for the Scorer
 MEMORY_TABLES = ("mastery", "wrong_beliefs", "facts", "session_notes")  # concepts stay: they describe the notebook
 
 
@@ -50,31 +51,15 @@ def passages_at(file, page, student=STUDENT):
 def run(experiment, arm, message, student=STUDENT, history=None, **switches):
     """One recorded turn. Each arm gets its own LLM cache, so arms never share a reply (that would make
     the second arm look faster) and a rerun of the same arm resumes for free."""
-    s1_llm.CACHE_DIR = ROOT / "data" / "llm_cache_eval" / f"{experiment}-{arm}"
+    s1_llm.CACHE_DIR = CACHE / f"{experiment}-{arm}"
     s4_trace.TRACE_PATH = OUT / f"trace_{experiment}_{arm}.jsonl"
-    calls = []
-    real_run_tool = s3_loop.run_tool
-
-    def recording(name, arguments, ctx):
-        result = real_run_tool(name, arguments, ctx)
-        try:
-            inputs = json.loads(arguments or "{}")
-        except (json.JSONDecodeError, TypeError):
-            inputs = arguments
-        calls.append({"tool": name, "inputs": inputs, "result": result})
-        return result
-
-    # shortcut: patches the loop's run_tool to see full tool results (the trace keeps 200 chars), add them to run_turn's return if the app ever needs them
-    s3_loop.run_tool = recording
-    try:
-        out = s3_loop.run_turn(message, student, 1, history=history, search_fn=notebook.search,
-                               passages_fn=notebook.get_passages, memory="learner", **switches)
-    finally:
-        s3_loop.run_tool = real_run_tool
+    out = s3_loop.run_turn(message, student, 1, history=history, search_fn=notebook.search,
+                           passages_fn=notebook.get_passages, memory="learner", **switches)
     final = [json.loads(line) for line in s4_trace.TRACE_PATH.read_text(encoding="utf-8").splitlines()][-1]
     assert final["kind"] == "final", "run_turn always ends with its final row"
-    read = {p["id"]: p for c in calls for p in c["result"].get("passages", [])}  # what search_notes gave the tutor
-    return {**out, "calls": calls, "passages": list(read.values()),
+    read = {p["id"]: p for c in out["tool_calls"] if c["tool"] == "search_notes"
+            for p in c["result"].get("passages", [])}  # what search_notes gave the tutor
+    return {**out, "passages": list(read.values()),
             **{k: final[k] for k in ("steps", "cap_hit", "searches", "tokens", "duration_ms")}}
 
 
@@ -83,7 +68,7 @@ SCORER = "opencode-go/claude-haiku-5-5"  # a family apart from the tutor (DeepSe
 
 def scorer_yes(instructions, material):
     """Ask the Scorer one yes/no question about some material. Returns (bool, its one-line reason)."""
-    saved, s1_llm.CACHE_DIR = s1_llm.CACHE_DIR, ROOT / "data" / "llm_cache_eval" / "scorer"
+    saved, s1_llm.CACHE_DIR = s1_llm.CACHE_DIR, CACHE / "scorer"
     try:
         reply = s1_llm.chat([{"role": "system", "content": instructions + "\nReply with JSON only: "
                                                        '{"yes": true or false, "reason": "one sentence"}'},
@@ -93,9 +78,11 @@ def scorer_yes(instructions, material):
     text = reply["message"].get("content") or ""
     try:
         verdict = json.loads(text[text.find("{"):text.rfind("}") + 1])
-        return bool(verdict["yes"]), str(verdict.get("reason", ""))
-    except (ValueError, KeyError, TypeError):
+    except ValueError:
+        verdict = None
+    if not (isinstance(verdict, dict) and isinstance(verdict.get("yes"), bool)):
         raise ValueError(f"Scorer reply was not the JSON asked for: {text[:200]!r}")
+    return verdict["yes"], str(verdict.get("reason", ""))
 
 
 def load_checked(name):
