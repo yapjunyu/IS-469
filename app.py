@@ -11,6 +11,7 @@ SRC = str(Path(__file__).resolve().parent / "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
+from agent.memory import learner  # noqa: E402
 from agent.s3_loop import run_turn  # noqa: E402
 from tutor import notebook  # noqa: E402
 from tutor.retrieval.extract import FileRejected  # noqa: E402
@@ -96,6 +97,10 @@ with st.sidebar:
             else:
                 clear_notices(file)
                 st.rerun()
+    st.subheader("Quiz")
+    concepts = learner.concepts(student)
+    concept = st.selectbox("Concept", concepts, disabled=not concepts)
+    quiz = f"Quiz me on {concept}" if st.button("Start quiz", disabled=not concepts) else None
 
 if not notebook.files(student):
     st.info("Upload a .pptx or PDF in the sidebar to start chatting.")
@@ -123,7 +128,7 @@ for entry in state.messages:
                     st.image(passage["image_path"])
 
 # chat_input pins itself to the bottom of the page, so calling it first only means a new message is known before drawing
-message = st.chat_input("Ask about your notes", submit_mode="disable") or state.pop("resend", None)
+message = st.chat_input("Ask about your notes", submit_mode="disable") or quiz or state.pop("resend", None)
 if message:
     state.failed = None
     with st.chat_message("user"):

@@ -11,6 +11,7 @@ from agent.memory import learner
 from agent.tests.test_loop import SEARCH_CALL, read_trace, reply
 from test_notebook import fake_models, figure_pdf, make_pdf  # noqa: F401  (fake_models is autouse: importing it keeps real models out of this file)
 from tutor import notebook
+from tutor.retrieval.chunk import PASSAGE_ID
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -335,18 +336,21 @@ def test_no_screen_offers_an_experiment_switch_and_run_turn_gets_only_the_learne
 
 # a turn
 
-def script_llm(monkeypatch, *tutor_replies, supported=True):
+def script_llm(monkeypatch, *tutor_replies, supported=True, checks=None):
     """Fake s1_llm.chat. Calls with tools are the tutor's: each gets the next reply, a plain string as the answer,
-    an Exception raised. Calls without are the checks: enough passages, and `supported` from the judge.
+    an Exception raised, a function called with the messages for the reply. Calls without are the checks: enough passages,
+    `supported` from the judge, and any fields in `checks`: grading reads its own, and a quiz reads the list inside them.
     The judge and search-again stay on, so they're answered here, because the app exposes no switches to turn them off.
     Returns the messages each tutor call was sent."""
     replies, sent = iter(tutor_replies), []
 
     def chat(messages, model, tools=None, **kwargs):
         if not tools:
-            return reply({"role": "assistant", "content": json.dumps({"enough": True, "supported": supported, "reason": "r"})})
+            return reply({"role": "assistant", "content": json.dumps({"enough": True, "supported": supported, "reason": "r", **(checks or {})})})
         sent.append(list(messages))
         next_reply = next(replies)
+        if callable(next_reply):
+            next_reply = next_reply(messages)
         if isinstance(next_reply, Exception):
             raise next_reply
         return reply(next_reply if isinstance(next_reply, dict) else {"role": "assistant", "content": next_reply})
@@ -540,6 +544,80 @@ def test_a_student_message_is_shown_as_typed(monkeypatch):
     script_llm(monkeypatch, "Fine.")
     message = f"What is {LECTURE['id']}?"
     assert shown(say(chat_ready(), message))[0] == ("user", message)
+
+
+# the quiz
+
+def picker(at):
+    return at.sidebar.selectbox[0], buttons(at, "Start quiz")[0]
+
+
+def test_the_picker_lists_the_notebooks_concepts():
+    seed_file()
+    learner.add_concepts("jun-yu", "notes.pdf", ["LoRA", "KV cache"])
+    concept, start = picker(enter_name(open_app(), "Jun Yu"))
+    assert concept.options == ["kv cache", "lora"]
+    assert not concept.disabled and not start.disabled
+
+
+def test_the_picker_is_unavailable_when_the_notebook_has_no_concepts():
+    seed_file()
+    concept, start = picker(enter_name(open_app(), "Jun Yu"))
+    assert concept.options == []
+    assert concept.disabled and start.disabled
+
+
+def start_quiz(at, concept):
+    at.sidebar.selectbox[0].select(concept)
+    buttons(at, "Start quiz")[0].click()
+    return at.run()
+
+
+def test_start_quiz_sends_a_normal_message_and_the_agent_calls_make_quiz(monkeypatch, tmp_data):
+    fake_notes(monkeypatch)
+    learner.add_concepts("jun-yu", "Lecture3.pdf", ["LoRA", "BM25"])
+    sent = script_llm(monkeypatch, QUIZ_CALL, "1. What does LoRA add?")
+    at = start_quiz(chat_ready(), "lora")
+    assert history_sent(sent[0]) == [("user", "Quiz me on lora")]
+    assert shown(at) == [("user", "Quiz me on lora"), ("assistant", "1. What does LoRA add?")]
+    assert [r["inputs"] for r in read_trace(tmp_data) if r["kind"] == "tool" and r["tool"] == "make_quiz"] == [{"concept": "LoRA"}]
+
+
+def test_a_rerun_after_start_quiz_does_not_send_it_again(monkeypatch, tmp_data):
+    fake_notes(monkeypatch)
+    learner.add_concepts("jun-yu", "Lecture3.pdf", ["LoRA"])
+    script_llm(monkeypatch, QUIZ_CALL, "1. What does LoRA add?")
+    start_quiz(chat_ready(), "lora").run()
+    assert final_turns(tmp_data) == [1]
+
+
+def grade_call_from_history(messages):
+    """The tutor's grading call on question 1, with the passage IDs it reads after that question in last turn's answer."""
+    ids = re.findall(PASSAGE_ID, messages[-2]["content"].splitlines()[0])
+    return {"role": "assistant", "tool_calls": [{"id": "c2", "type": "function", "function": {"name": "grade_answer", "arguments": json.dumps(
+        {"question": "What does LoRA add?", "student_answer": "tiny matrices", "passage_ids": ids})}}]}
+
+
+def test_a_numbered_set_shows_without_ids_then_a_wrong_answer_is_graded_on_them_and_shows_the_hint(monkeypatch, tmp_data):
+    fake_notes(monkeypatch)
+    learner.add_concepts("jun-yu", "Lecture3.pdf", ["LoRA"])
+    hint = "Reread what the lecture says LoRA adds."
+    raw_quiz = (f"1. What does LoRA add? [{LECTURE['id']}, {UNUSED['id']}]\n"
+                f"2. What does BM25 rank by? [{SLIDES['id']}]\nWhich question are you answering?")
+    sent = script_llm(monkeypatch, QUIZ_CALL, raw_quiz, grade_call_from_history, f"Not quite. {hint}",
+                      checks={"correct": False, "hint": hint,
+                              "questions": [{"question": "What does LoRA add?", "passage_ids": [LECTURE["id"], UNUSED["id"]]},
+                                            {"question": "What does BM25 rank by?", "passage_ids": [SLIDES["id"]]}]})
+    at = start_quiz(chat_ready(), "lora")
+    assert shown(at)[-1] == ("assistant", "1. What does LoRA add?\n2. What does BM25 rank by?\nWhich question are you answering?")
+    assert not at.chat_message[1].expander
+
+    at = say(at, "Question 1: tiny matrices")
+    assert history_sent(sent[2])[1] == ("assistant", raw_quiz)
+    [graded] = [r for r in read_trace(tmp_data) if r["kind"] == "tool" and r["tool"] == "grade_answer"]
+    assert graded["ok"] and graded["inputs"]["passage_ids"] == [LECTURE["id"], UNUSED["id"]]
+    assert hint in sent[3][-1]["content"]  # the tool's result reached the tutor
+    assert shown(at)[-1] == ("assistant", f"Not quite. {hint}")
 
 
 # a failed turn
