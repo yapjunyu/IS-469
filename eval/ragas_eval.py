@@ -14,11 +14,16 @@ it does not grade its own work. Judge replies are cached in data/ragas_cache, so
 
     .venv/bin/python eval/ragas_eval.py sample --limit 3   # try a few first, to see the token cost
     .venv/bin/python eval/ragas_eval.py sample             # all questions in the run
+    .venv/bin/python eval/ragas_eval.py --agent agent_search_again_on   # an agent run from run_agent_generation.py
+
+--agent reads eval/results_agent instead and scores with the Scorer (claude-haiku-5-5 on OpenCode Go),
+a family apart from the agent's tutor (DeepSeek) and its faithfulness judge (GPT).
 """
 import argparse
 import asyncio
 import json
 import os
+import uuid
 from pathlib import Path
 
 import httpx
@@ -33,6 +38,9 @@ RESULTS = ROOT / "eval" / "results_60_40"
 JUDGE_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"  # reads pictures; a different model from rag.py
 JUDGE_MAX_TOKENS = 8192  # the judge reasons before it replies, and the reasoning counts towards this limit
 OPENROUTER_URL = "https://openrouter.ai/api/v1"  # the OpenAI API, which RAGAS expects
+AGENT_RESULTS = ROOT / "eval" / "results_agent"
+SCORER_MODEL = "claude-haiku-5-5"  # eval/agent_common.py SCORER, without the opencode-go/ routing prefix
+OPENCODE_URL = "https://opencode.ai/inference/go/openai/v1"  # as agent/s1_llm.py; Go rejects requests without a session id
 
 tokens_used = 0  # counted from every judge reply, to see how much of the daily quota a run takes
 
@@ -44,10 +52,16 @@ async def _count_tokens(response: httpx.Response):
         tokens_used += response.json().get("usage", {}).get("total_tokens", 0)
 
 
-def make_judge():
-    client = AsyncOpenAI(api_key=os.environ["OPENROUTER_API_KEY"], base_url=OPENROUTER_URL, max_retries=8,
-                         http_client=httpx.AsyncClient(event_hooks={"response": [_count_tokens]}, timeout=120))
-    return llm_factory(JUDGE_MODEL, client=client, cache=DiskCacheBackend(str(ROOT / "data" / "ragas_cache")),
+def make_judge(agent=False):
+    http = httpx.AsyncClient(event_hooks={"response": [_count_tokens]}, timeout=120)
+    if agent:
+        client = AsyncOpenAI(api_key=os.environ["OPENCODE_API_KEY"], base_url=OPENCODE_URL, max_retries=8, http_client=http,
+                             default_headers={"User-Agent": "is-469-tutor", "x-opencode-session": str(uuid.uuid4())})
+        model, cache = SCORER_MODEL, "ragas_cache_scorer"
+    else:
+        client = AsyncOpenAI(api_key=os.environ["OPENROUTER_API_KEY"], base_url=OPENROUTER_URL, max_retries=8, http_client=http)
+        model, cache = JUDGE_MODEL, "ragas_cache"
+    return llm_factory(model, client=client, cache=DiskCacheBackend(str(ROOT / "data" / cache)),
                        temperature=0.0, max_tokens=JUDGE_MAX_TOKENS)
 
 
@@ -79,11 +93,13 @@ async def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("run", help="the run to score: generation_<run>.json")
     parser.add_argument("--limit", type=int, help="only the first N questions")
+    parser.add_argument("--agent", action="store_true", help="an agent run in eval/results_agent, scored by the Scorer")
     args = parser.parse_args()
+    results_dir = AGENT_RESULTS if args.agent else RESULTS
 
     load_dotenv(ROOT / ".env")
-    rows = [r for r in json.loads((RESULTS / f"generation_{args.run}.json").read_text())["rows"] if r["response"]][:args.limit]
-    judge = make_judge()
+    rows = [r for r in json.loads((results_dir / f"generation_{args.run}.json").read_text(encoding="utf-8"))["rows"] if r["response"]][:args.limit]
+    judge = make_judge(args.agent)
     metrics = {"faithfulness": MultiModalFaithfulness(llm=judge), "factual_correctness": FactualCorrectness(llm=judge),
                "context_precision": ContextPrecision(llm=judge), "context_recall": ContextRecall(llm=judge)}
 
@@ -99,8 +115,8 @@ async def main():
 
     scored = {k: [r[k] for r in results if r[k] is not None] for k in metrics}
     means = {k: round(sum(v) / len(v), 3) if v else None for k, v in scored.items()}  # None: no question scored
-    out = RESULTS / f"ragas_{args.run}.json"
-    out.write_text(json.dumps({"judge": JUDGE_MODEL, "means": means, "scored": {k: len(v) for k, v in scored.items()}, "rows": results}, indent=1))
+    out = results_dir / f"ragas_{args.run}.json"
+    out.write_text(json.dumps({"judge": SCORER_MODEL if args.agent else JUDGE_MODEL, "means": means, "scored": {k: len(v) for k, v in scored.items()}, "rows": results}, indent=1))
     print("\nmean  " + "  ".join(f"{k} {'-' if v is None else f'{v:.2f}'} (n={len(scored[k])})" for k, v in means.items()))
     print(f"{len(results)} questions, {tokens_used} judge tokens this run "
           f"(cached replies cost nothing), saved {out}")
