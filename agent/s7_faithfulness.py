@@ -17,8 +17,10 @@ def check(ctx, answer):
     # unique, a passage found again counting as newest, so the judge keeps the same pictures as the tutor
     passages = list({p["id"]: p for p in reversed(ctx.passages)}.values())[::-1]
     record = f"Student's record:\n{ctx.record}\n\n" if ctx.record else ""
-    verdict = s2_tools.ask(ctx, "judge", FAITHFULNESS_PROMPT, passages, f"{record}Answer to check:\n{answer}", "{",
-                           model=JUDGE_MODEL)
+    # said outright: with nothing to read, the judge passed course claims that nothing contradicted (#18)
+    none = "<no-documents/> No passages were retrieved this turn.\n\n" if not passages else ""
+    verdict = s2_tools.ask(ctx, "judge", FAITHFULNESS_PROMPT, passages, f"{none}{record}Answer to check:\n{answer}",
+                           "{", model=JUDGE_MODEL)
     if not (isinstance(verdict, dict) and isinstance(verdict.get("supported"), bool)):
         # fail closed: an unreadable verdict must not let an unchecked answer through without a warning
         return {"supported": False, "reason": "The judge's reply had no valid verdict"}

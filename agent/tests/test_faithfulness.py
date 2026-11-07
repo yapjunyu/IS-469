@@ -83,3 +83,38 @@ def test_the_judge_reads_the_students_record(monkeypatch):
 def test_switch_off_makes_no_judge_call(monkeypatch, tmp_data):
     out, judged = run(monkeypatch, faithfulness=False)
     assert judged == [] and not out["warning"] and read_trace(tmp_data)[-1]["faithfulness"] is None
+
+
+NO_PASSAGES = "<no-documents/>"  # the marker the judge prompt names for a turn that retrieved no passages
+
+
+def no_search_turn(monkeypatch, message, answers, history=None, judge_passes_marked=False):
+    """A turn whose tutor never calls a tool. Like the live judge, the fake passes a request with no
+    no-passages marker; a request with the marker passes only if judge_passes_marked (no claim to check).
+    Returns the output and each judge request's text."""
+    tutor, judged = iter(answers), []
+    def chat(messages, model, **kw):
+        if model != JUDGE_MODEL:
+            return reply({"role": "assistant", "content": next(tutor)})
+        judged.append(next(m["content"] for m in messages if m["role"] == "user"))
+        supported = judge_passes_marked or NO_PASSAGES not in judged[-1]
+        return reply({"role": "assistant", "content": json.dumps({"supported": supported, "reason": "why"})})
+    monkeypatch.setattr(s1_llm, "chat", chat)
+    return turn(message, "alice", 2, history=history, faithfulness=True), judged
+
+
+def test_a_course_claim_answered_from_history_with_no_passages_is_not_supported(monkeypatch, tmp_data):
+    history = [{"role": "user", "content": "What is the KV cache?"},
+               {"role": "assistant", "content": "It stores past keys and values. [p1]"}]
+    claim = "Your notes only describe the KV cache's role in the decoder (lec3.pdf, page 13)."
+    out, judged = no_search_turn(monkeypatch, "Who invented the KV cache and in what year?", [claim, claim], history)
+    assert len(judged) == 2 and all("<document" not in j and NO_PASSAGES in j for j in judged)
+    assert out["faithfulness"]["supported"] is False and out["warning"]
+    assert read_trace(tmp_data)[-1]["faithfulness"]["supported"] is False
+
+
+def test_a_greeting_with_no_passages_can_still_pass(monkeypatch, tmp_data):
+    out, judged = no_search_turn(monkeypatch, "Hi!", ["Hi! What would you like to study today?"],
+                                 judge_passes_marked=True)
+    assert len(judged) == 1 and NO_PASSAGES in judged[0]
+    assert not out["warning"] and read_trace(tmp_data)[-1]["faithfulness"]["supported"] is True
