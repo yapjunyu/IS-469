@@ -48,13 +48,17 @@ def _cited(answer, passage_ids):
 def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_search,
              passages_fn=stub_passages, search_again=True, guard=True, memory_check=True, faithfulness=True, images=True, memory="learner", embedder=None, step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int,
-    "faithfulness": the judge's {"supported", "reason"} or None when off, "warning": bool}.
+    "faithfulness": the judge's {"supported", "reason"} or None when off, "warning": bool,
+    "tool_calls": list}.
 
     answer: the tutor's text with its passage ids left in, because the next turn's grade_answer
     needs them in history. The app removes them for display only.
     citations: the ids of the passages retrieved this turn that the final answer names, in order
     of first appearance, without repeats. Empty on a turn that called grade_answer or where make_quiz
     passed its checks: the ids in quiz questions and hints would point at the answer.
+    tool_calls: every tool call of the turn, in the order it ran, as {"tool": name, "inputs": the
+    parsed arguments (the raw string when the JSON was bad, as the trace keeps it), "result": the
+    tool's full result}. Empty when no tool ran. For evaluation: the trace keeps only 200 characters.
 
     turn: the app's turn number, written on every trace row.
     history: earlier {"role": "user"/"assistant", "content": ...} messages, so quiz
@@ -114,6 +118,7 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
 
     answer, cap_hit = None, False
     picture_message = None
+    tool_calls = []
     for step in range(1, step_cap+1):
         ctx.step = step
         msg = s4_trace.traced_chat(ctx, "tutor", messages, MODEL, tools=TOOL_SCHEMAS)["message"]
@@ -132,6 +137,7 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
                 inputs = json.loads(args)
             except (json.JSONDecodeError, TypeError):
                 inputs = args  # bad JSON: keep the raw string so the trace shows what the LLM sent
+            tool_calls.append({"tool": name, "inputs": inputs, "result": result})
 
             # the trace keeps text only: not even the picture's local path
             summary = {**result, "passages": s6_guard.text_fields(result["passages"])} if "passages" in result else result
@@ -174,4 +180,5 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
                      duration_ms=round((time.perf_counter() - t_start) * 1000),
                      faithfulness=verdict, answer_preview=answer[:100])
     citations = [] if ctx.hide_citations else _cited(answer, ctx.passage_ids)
-    return {"answer": answer, "citations": citations, "steps": ctx.step, "faithfulness": verdict, "warning": warning}
+    return {"answer": answer, "citations": citations, "steps": ctx.step, "faithfulness": verdict, "warning": warning,
+            "tool_calls": tool_calls}
