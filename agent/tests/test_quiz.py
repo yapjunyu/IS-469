@@ -67,6 +67,15 @@ def test_guard_on_wraps_passages_in_markers_off_sends_plain_json(monkeypatch, to
     assert json.dumps({"id": "p1", "file": "lec3.pdf", "page": 12, "text": "LoRA adds low-rank matrices."}) in off
 
 
+def test_the_tutor_is_told_to_show_the_whole_numbered_set_with_ids_and_ask_which_question_is_answered(monkeypatch):
+    sent = fake_chat(monkeypatch, "Hello.")
+    turn("Quiz me on LoRA", "alice", 1)
+    system = sent[0][0]["content"]
+    assert "the whole set" in system
+    assert "1. <question> [p1, p2]" in system and "2. <question> [p3]" in system
+    assert "Which question are you answering?" in system
+
+
 def call(name, args):
     return reply({"role": "assistant", "tool_calls": [{"id": "c1", "type": "function",
                   "function": {"name": name, "arguments": json.dumps(args)}}]})
