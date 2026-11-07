@@ -12,6 +12,7 @@ write the final trace row (see s4_trace for the row format)
 """
 
 import json
+import re
 import time
 
 from agent.prompts import GUARD_PROMPT, REGENERATE_PROMPT, SYSTEM_PROMPT
@@ -23,20 +24,36 @@ from agent.memory import learner, vector
 
 # 2. messages builds the list of messages the LLM needs. Every chat sends the whole list of the previous context (chat history, information etc), each step taken appends to the history to give to LLM. If smth NOT in messages, LLM will not know
 
-# 3. Citation array to store source of every passage searched in the turn
+# 3. Citations come last: the passages retrieved this turn that the final answer names by ID
 
 # 4. the loop itself, each step is 1 loop
 #   4a: Asking LLM: Give LLM whole convo + tool menu => Either answer now or use tools
 #   4b: Add LLM reply to the messages array as history, comes BEFORE the tool result
 #   4c: if the LLM did not choose to use a tool, that means it has a final answer => break
-#   4d: Run the tools the LLM wants to use. Bad input never raises errors, but instead goes back to the LLM so it can fix its calls. Each call gets a tool row and its sources go in the citation array
+#   4d: Run the tools the LLM wants to use. Bad input never raises errors, but instead goes back to the LLM so it can fix its calls. Each call gets a tool row
 #   4e: repeat itself until meet turn cap
 #   4f: write the final row (every LLM call already wrote its own llm row through s4_trace.traced_chat)
+
+def _cited(answer, passage_ids):
+    """The ids among passage_ids that the answer names, in order of first appearance."""
+    first = {}
+    for i in set(passage_ids):
+        # the lookarounds keep p1 from matching inside p10 or a longer id
+        if found := re.search(rf"(?<![\w:-]){re.escape(i)}(?![\w:-])", answer):
+            first[i] = found.start()
+    return sorted(first, key=first.get)
+
 
 def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_search,
              passages_fn=stub_passages, search_again=True, guard=True, memory_check=True, faithfulness=True, memory="learner", embedder=None, step_cap=6):
     """Run one student turn. Returns {"answer": str, "citations": list, "steps": int,
     "faithfulness": the judge's {"supported", "reason"} or None when off, "warning": bool}.
+
+    answer: the tutor's text with its passage ids left in, because the next turn's grade_answer
+    needs them in history. The app removes them for display only.
+    citations: the ids of the passages retrieved this turn that the final answer names, in order
+    of first appearance, without repeats. Empty on a turn that calls make_quiz: the ids after quiz
+    questions are for grading, and showing them as sources would point at the answer.
 
     turn: the app's turn number, written on every trace row.
     history: earlier {"role": "user"/"assistant", "content": ...} messages, so quiz
@@ -90,7 +107,6 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
             "content": user_message
         }
     ]
-    citations = []
 
     answer, cap_hit = None, False
     for step in range(1, step_cap+1):
@@ -117,7 +133,6 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
                              duration_ms=round((time.perf_counter() - t0) * 1000),
                              result_summary=json.dumps(result)[:200])
 
-            citations += [{"file": c["file"], "page": c["page"]} for c in result.get("passages", [])]
             content = s6_guard.material(result["passages"], guard) if "passages" in result else json.dumps(result)
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": content})
     else:
@@ -142,4 +157,5 @@ def run_turn(user_message, student_id, turn, *, history=None, search_fn=stub_sea
                      tokens=dict(ctx.tokens),
                      duration_ms=round((time.perf_counter() - t_start) * 1000),
                      faithfulness=verdict, answer_preview=answer[:100])
+    citations = [] if ctx.quiz_called else _cited(answer, ctx.passage_ids)
     return {"answer": answer, "citations": citations, "steps": ctx.step, "faithfulness": verdict, "warning": warning}

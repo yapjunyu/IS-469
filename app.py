@@ -14,6 +14,7 @@ if SRC not in sys.path:
 from agent.s3_loop import run_turn  # noqa: E402
 from tutor import notebook  # noqa: E402
 from tutor.retrieval.extract import FileRejected  # noqa: E402
+from tutor.retrieval.types import Passage  # noqa: E402
 
 WARNING = "Warning: this answer may not be supported by your files, so don't rely on it."
 # show: the st function to show it with. file: the notebook file its text is about, None when it's about the upload alone.
@@ -100,15 +101,24 @@ if not notebook.files(student):
     st.info("Upload a .pptx or PDF in the sidebar to start chatting.")
     st.stop()
 
-state.setdefault("messages", [])  # the messages shown, each {"role", "content"}, and "warning" on an answer
+# the messages shown, each {"role", "content"}; an answer's content keeps its passage IDs for the next turn's history, and it also
+# has "shown", its displayed text, "citations", the passages it cited as they were that turn, and "warning"
+# shortcut: a removed file's passages stay readable on answers already in this chat, look them up on each rerun if that should change
+state.setdefault("messages", [])
 state.setdefault("turn", 1)
 state.setdefault("failed", None)  # the turn that failed last, {"message", "error"}; neither messages nor turn counted it
 
 for entry in state.messages:
     with st.chat_message(entry["role"]):
-        st.markdown(entry["content"])
+        st.markdown(entry.get("shown", entry["content"]))
         if entry.get("warning"):
             st.warning(WARNING)
+        for n, passage in enumerate(entry.get("citations", []), start=1):
+            with st.expander(f"[{n}] {Passage(**passage).citation()}"):
+                st.text(passage["text"])  # not markdown: it's the file's own text, and untrusted
+                # removing or replacing a file deletes its pictures, while this answer stays on screen
+                if passage["image_path"] and Path(passage["image_path"]).exists():
+                    st.image(passage["image_path"])
 
 # chat_input pins itself to the bottom of the page, so calling it first only means a new message is known before drawing
 message = st.chat_input("Ask about your notes", submit_mode="disable") or state.pop("resend", None)
@@ -121,11 +131,13 @@ if message:
         try:
             out = run_turn(message, student, state.turn, history=history, search_fn=notebook.search,
                            passages_fn=notebook.get_passages, memory="learner")
+            citations = notebook.get_passages(student, out["citations"])
         except Exception as e:  # a turn can fail in many ways (rate limit, missing key), and the student can resend
             state.failed = {"message": message, "error": str(e)}
         else:
             state.messages += [{"role": "user", "content": message},
-                               {"role": "assistant", "content": out["answer"], "warning": out["warning"]}]
+                               {"role": "assistant", "content": out["answer"], "warning": out["warning"], "citations": citations,
+                                "shown": notebook.display_answer(out["answer"], [p["id"] for p in citations])}]
             state.turn += 1
     st.rerun()
 

@@ -7,6 +7,8 @@ Three methods, chosen with `method` (documents) or `slide_method` (slide decks):
 import re
 from tutor.retrieval.types import Chunk, PageRecord
 
+PASSAGE_ID = r"\b[0-9a-f]{12}:\d{4,}\b"  # what _chunk_id writes
+
 def _chunk_id(file_hash: str, n: int) -> str:
     """e.g. 'a1b2c3d4e5f6:0007': the file's fingerprint plus the chunk's position."""
     return f"{file_hash[:12]}:{n:04d}"
