@@ -252,7 +252,7 @@ One JSONL line per event, in three kinds. Every row starts with `kind, ts, stude
 
 - `llm`: one per LLM call anywhere, labelled with its `purpose`. Only these rows carry tokens.
 - `tool`: one per tool call. `inputs` is the parsed arguments, or the raw string if the JSON was bad.
-- `final`: one per turn, always its last row, with the turn's totals. `steps` counts a forced answer and a regeneration as one step each.
+- `final`: one per turn, always its last row, with the turn's totals. `steps` counts a forced answer as one step, and a regeneration as the steps it takes (it can search or grade first, under the same step cap).
 
 A search-then-answer turn:
 
@@ -266,7 +266,7 @@ A search-then-answer turn:
  "purpose": "tutor", "model": "opencode-go/deepseek-v4.1-flash", "tokens": {"in": 1290, "out": 160}, "cached": false}
 {"kind": "final", "ts": "2026-11-05T14:03:13.611+08:00", "student": "<anon id>", "turn": 12, "step": 2,
  "steps": 2, "cap_hit": false, "searches": 1, "tokens": {"in": 2102, "out": 205}, "duration_ms": 1480,
- "faithfulness": {"supported": true, "reason": "..."}, "answer_preview": "..."}
+ "faithfulness": {"supported": true, "reason": "..."}, "message_preview": "...", "answer_preview": "..."}
 ```
 
 The full row format is in the docstring of `agent/s4_trace.py`.

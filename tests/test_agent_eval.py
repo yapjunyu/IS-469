@@ -291,6 +291,8 @@ def test_a_quiz_answer_turn_has_the_quiz_in_history_as_the_app_keeps_it(monkeypa
     assert request["role"] == "user" and "invest criteria" in request["content"]
     # the tutor's whole-set quiz format (agent/prompts.py), its passage ids in square brackets
     assert quiz["role"] == "assistant" and "What does INVEST stand for? [notes-p3]" in quiz["content"]
+    # and the quiz is open, as the app passes it: listed in the system prompt with its passage ids
+    assert "Open quiz" in requests[0]["messages"][0]["content"]
 
 
 def test_the_scorers_tokens_are_on_each_result_row_and_in_no_trace(monkeypatch, eval_dirs, quiz_notes):

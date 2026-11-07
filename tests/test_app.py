@@ -13,7 +13,6 @@ from agent.memory import learner, reflection
 from agent.tests.test_loop import SEARCH_CALL, read_trace, reply
 from test_notebook import fake_models, figure_pdf, make_pdf  # noqa: F401  (fake_models is autouse: importing it keeps real models out of this file)
 from tutor import notebook
-from tutor.retrieval.chunk import PASSAGE_ID
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -316,7 +315,8 @@ def test_a_notice_says_the_tutor_is_only_as_accurate_as_the_files():
 
 def test_no_screen_offers_an_experiment_switch_and_run_turn_gets_only_the_learner_memory(monkeypatch):
     # every run_turn option but what the app must hand it, read from the signature so a new switch is covered too
-    switches = set(list(inspect.signature(s3_loop.run_turn).parameters)[3:]) - {"history", "search_fn", "passages_fn"}
+    switches = (set(list(inspect.signature(s3_loop.run_turn).parameters)[3:])
+                - {"history", "open_quiz", "search_fn", "passages_fn"})
     assert "faithfulness" in switches
 
     def labels(at):
@@ -335,6 +335,20 @@ def test_no_screen_offers_an_experiment_switch_and_run_turn_gets_only_the_learne
     at = say(enter_name(at, "Jun Yu"), "What is LoRA?")
     assert labels(at) and not names_a_switch(at)
     assert {k: v for k, v in received[0].items() if k in switches} == {"memory": "learner"}
+
+
+def test_a_quiz_stays_open_for_the_next_turns_until_a_new_quiz(monkeypatch):
+    first = [{"question": "What does LoRA add?", "passage_ids": ["p1"]}]
+    second = [{"question": "What is r?", "passage_ids": ["p2"]}]
+    outs = iter([first, None, second, None])
+    received = []
+    monkeypatch.setattr(s3_loop, "run_turn", lambda *a, **k: received.append(k["open_quiz"]) or
+                        {"answer": "Fine.", "citations": [], "warning": False, "quiz": next(outs)})
+    seed_file()
+    at = enter_name(open_app(), "Jun Yu")
+    for message in ("Quiz me", "x", "Quiz me again", "y"):
+        at = say(at, message)
+    assert received == [None, first, first, second]
 
 
 # a turn
@@ -594,20 +608,13 @@ def test_a_rerun_after_start_quiz_does_not_send_it_again(monkeypatch, tmp_data):
     assert final_turns(tmp_data) == [1]
 
 
-def grade_call_from_history(messages):
-    """The tutor's grading call on question 1, with the passage IDs it reads after that question in last turn's answer."""
-    ids = re.findall(PASSAGE_ID, messages[-2]["content"].splitlines()[0])
-    return {"role": "assistant", "tool_calls": [{"id": "c2", "type": "function", "function": {"name": "grade_answer", "arguments": json.dumps(
-        {"question": "What does LoRA add?", "student_answer": "tiny matrices", "passage_ids": ids})}}]}
-
-
 def test_a_numbered_set_shows_without_ids_then_a_wrong_answer_is_graded_on_them_and_shows_the_hint(monkeypatch, tmp_data):
     fake_notes(monkeypatch)
     learner.add_concepts("jun-yu", "Lecture3.pdf", ["LoRA"])
     hint = "Reread what the lecture says LoRA adds."
     raw_quiz = (f"1. What does LoRA add? [{LECTURE['id']}, {UNUSED['id']}]\n"
                 f"2. What does BM25 rank by? [{SLIDES['id']}]\nWhich question are you answering?")
-    sent = script_llm(monkeypatch, QUIZ_CALL, raw_quiz, grade_call_from_history, f"Not quite. {hint}",
+    sent = script_llm(monkeypatch, QUIZ_CALL, raw_quiz, f"Not quite. {hint}",
                       checks={"correct": False, "hint": hint,
                               "questions": [{"question": "What does LoRA add?", "passage_ids": [LECTURE["id"], UNUSED["id"]]},
                                             {"question": "What does BM25 rank by?", "passage_ids": [SLIDES["id"]]}]})
@@ -619,7 +626,7 @@ def test_a_numbered_set_shows_without_ids_then_a_wrong_answer_is_graded_on_them_
     assert history_sent(sent[2])[1] == ("assistant", raw_quiz)
     [graded] = [r for r in read_trace(tmp_data) if r["kind"] == "tool" and r["tool"] == "grade_answer"]
     assert graded["ok"] and graded["inputs"]["passage_ids"] == [LECTURE["id"], UNUSED["id"]]
-    assert hint in sent[3][-1]["content"]  # the tool's result reached the tutor
+    assert hint in sent[2][-1]["content"]  # the open quiz was graded by code, and its result reached the tutor
     assert shown(at)[-1] == ("assistant", f"Not quite. {hint}")
 
 
@@ -627,7 +634,7 @@ def test_a_hint_that_names_a_passage_id_offers_no_citation_to_open(monkeypatch, 
     fake_notes(monkeypatch)
     learner.add_concepts("jun-yu", "Lecture3.pdf", ["LoRA"])
     raw_quiz = f"1. What does LoRA add? [{LECTURE['id']}]\nWhich question are you answering?"
-    script_llm(monkeypatch, QUIZ_CALL, raw_quiz, grade_call_from_history, f"Not quite. Reread this [{LECTURE['id']}].",
+    script_llm(monkeypatch, QUIZ_CALL, raw_quiz, f"Not quite. Reread this [{LECTURE['id']}].",
                checks={"correct": False, "hint": "Reread.",
                        "questions": [{"question": "What does LoRA add?", "passage_ids": [LECTURE["id"]]}]})
     at = say(start_quiz(chat_ready(), "lora"), "Question 1: tiny matrices")

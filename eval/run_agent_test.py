@@ -116,7 +116,9 @@ def main():
                 continue
             ac.reset_learner(ac.STUDENT)
             quiz_ids, history = quiz_history(req) if req["type"] == "quiz_answer" else ([], None)
-            out = ac.run("agent_test", arm, req["message"], history=history, **switches)
+            # the app keeps the last quiz open and passes it to the next turn
+            open_quiz = [{"question": req["quiz_question"], "passage_ids": quiz_ids}] if quiz_ids else None
+            out = ac.run("agent_test", arm, req["message"], history=history, open_quiz=open_quiz, **switches)
             facts = learner.read_all(ac.STUDENT)["facts"]
             ac.SCORER_TOKENS.update({"in": 0, "out": 0})
             success, tool_ok, note = score(req, out, facts, quiz_ids)

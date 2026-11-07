@@ -143,6 +143,7 @@ state.setdefault("upload_outcomes", {})
 state.setdefault("messages", [])
 state.setdefault("turn", 1)
 state.setdefault("failed", None)  # the turn that failed last, {"message", "error"}; neither messages nor turn counted it
+state.setdefault("open_quiz", None)  # the last quiz's questions with their passage ids, until a new quiz or the session's end
 
 with st.sidebar:
     st.container(key="notebook").write(f"Notebook: {student}")
@@ -182,7 +183,7 @@ with st.sidebar:
         else:
             state.end_notice = (Outcome(st.success, f"Session note: {escape_markdown(note)}") if note
                                 else Outcome(st.warning, "The session ended, but its note couldn't be written."))
-            state.messages, state.turn, state.failed = [], 1, None
+            state.messages, state.turn, state.failed, state.open_quiz = [], 1, None, None
         st.rerun()  # redraws the mastery bars, which reflection can lower
     if notice := state.get("end_notice"):
         notice.show(notice.text)
@@ -225,9 +226,10 @@ if message:
     with st.chat_message("assistant", avatar=AVATARS["assistant"]), st.spinner("The tutor is working...", show_time=True):
         history = chat_history()
         try:
-            out = run_turn(message, student, state.turn, history=history, search_fn=notebook.search,
-                           passages_fn=notebook.get_passages, memory="learner")
+            out = run_turn(message, student, state.turn, history=history, open_quiz=state.open_quiz,
+                           search_fn=notebook.search, passages_fn=notebook.get_passages, memory="learner")
             citations = notebook.get_passages(student, out["citations"])
+            state.open_quiz = out["quiz"] or state.open_quiz  # a new quiz replaces the open one
         except Exception as e:  # a turn can fail in many ways (rate limit, missing key), and the student can resend
             state.failed = {"message": message, "error": str(e)}
         else:
