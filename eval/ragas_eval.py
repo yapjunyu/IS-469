@@ -16,8 +16,9 @@ it does not grade its own work. Judge replies are cached in data/ragas_cache, so
     .venv/bin/python eval/ragas_eval.py sample             # all questions in the run
     .venv/bin/python eval/ragas_eval.py --agent agent_search_again_on   # an agent run from run_agent_generation.py
 
---agent reads eval/results_agent instead and scores with the Scorer (claude-haiku-5-5 on OpenCode Go),
-a family apart from the agent's tutor (DeepSeek) and its faithfulness judge (GPT).
+Both runs are scored by claude-haiku-5-5 on OpenCode Go. For a pipeline run it is a family apart from the
+generator (gpt-6-luna). --agent reads eval/results_agent instead, where it is a family apart from the agent's
+tutor (DeepSeek) and its faithfulness judge (GPT).
 """
 import argparse
 import asyncio
@@ -35,14 +36,15 @@ from ragas.metrics.collections import ContextPrecision, ContextRecall, FactualCo
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "eval" / "results_60_40"
-JUDGE_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"  # reads pictures; a different model from rag.py
-JUDGE_MAX_TOKENS = 8192  # the judge reasons before it replies, and the reasoning counts towards this limit
-OPENROUTER_URL = "https://openrouter.ai/api/v1"  # the OpenAI API, which RAGAS expects
+JUDGE_MODEL = "claude-haiku-5-5"  # reads pictures; a different model from generator.py (gpt-6-luna)
+JUDGE_MAX_TOKENS = 8192  # room for the longest RAGAS reply (claim lists); unused tokens cost nothing
 AGENT_RESULTS = ROOT / "eval" / "results_agent"
 SCORER_MODEL = "claude-haiku-5-5"  # eval/agent_common.py SCORER, without the opencode-go/ routing prefix
-OPENCODE_URL = "https://opencode.ai/inference/go/openai/v1"  # as agent/s1_llm.py; Go rejects requests without a session id
+# OpenCode Go's OpenAI-compatible endpoint, which RAGAS expects. Go also serves Claude through it, with the
+# image_url parts MultiModalFaithfulness sends. As agent/s1_llm.py, Go rejects requests without a session id
+OPENCODE_URL = "https://opencode.ai/inference/go/openai/v1"
 
-tokens_used = 0  # counted from every judge reply, to see how much of the daily quota a run takes
+tokens_used = 0  # counted from every judge reply, to see what a run costs
 
 
 async def _count_tokens(response: httpx.Response):
@@ -53,14 +55,11 @@ async def _count_tokens(response: httpx.Response):
 
 
 def make_judge(agent=False):
+    """Both runs score with Claude Haiku on OpenCode Go; each keeps its own cache, so agent and pipeline runs don't mix."""
     http = httpx.AsyncClient(event_hooks={"response": [_count_tokens]}, timeout=120)
-    if agent:
-        client = AsyncOpenAI(api_key=os.environ["OPENCODE_API_KEY"], base_url=OPENCODE_URL, max_retries=8, http_client=http,
-                             default_headers={"User-Agent": "is-469-tutor", "x-opencode-session": str(uuid.uuid4())})
-        model, cache = SCORER_MODEL, "ragas_cache_scorer"
-    else:
-        client = AsyncOpenAI(api_key=os.environ["OPENROUTER_API_KEY"], base_url=OPENROUTER_URL, max_retries=8, http_client=http)
-        model, cache = JUDGE_MODEL, "ragas_cache"
+    client = AsyncOpenAI(api_key=os.environ["OPENCODE_API_KEY"], base_url=OPENCODE_URL, max_retries=8, http_client=http,
+                         default_headers={"User-Agent": "is-469-tutor", "x-opencode-session": str(uuid.uuid4())})
+    model, cache = (SCORER_MODEL, "ragas_cache_scorer") if agent else (JUDGE_MODEL, "ragas_cache")
     return llm_factory(model, client=client, cache=DiskCacheBackend(str(ROOT / "data" / cache)),
                        temperature=0.0, max_tokens=JUDGE_MAX_TOKENS)
 

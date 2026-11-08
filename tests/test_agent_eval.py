@@ -461,12 +461,11 @@ def test_without_the_agent_flag_the_pipeline_run_reads_and_writes_its_files_with
     (results / "generation_sample.json").write_text(json.dumps({"rows": [row]}, indent=1, ensure_ascii=False))
     seen = ragas("sample")
     [judge] = seen["llm"]
-    assert (judge["model"], judge["url"]) == ("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-                                              "https://openrouter.ai/api/v1/")
+    assert (judge["model"], judge["url"]) == ("claude-haiku-5-5", "https://opencode.ai/inference/go/openai/v1/")
     assert judge["cache"] == eval_dirs / "data" / "ragas_cache"
     assert dict(seen["scored"])["FactualCorrectness"]["response"] == "Adapters – small ones."
     saved = json.loads((results / "ragas_sample.json").read_text())
-    assert saved["judge"] == "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free" and saved["means"]["faithfulness"] == 0.5
+    assert saved["judge"] == "claude-haiku-5-5" and saved["means"]["faithfulness"] == 0.5
     assert saved["tokens"] == 28  # one text question, four metrics, one call of 7 tokens each
     assert not (eval_dirs / "results_agent").exists()
 

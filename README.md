@@ -63,21 +63,21 @@ All the champion settings are in [`src/tutor/pipeline.py`](src/tutor/pipeline.py
 | Slide chunking | One chunk per slide |
 | Document chunking | Recursive 200 words, 30-word overlap |
 | Embedder | Gemma 2 (`google/embeddinggemma-2`), with image chunks |
-| Search | Hybrid + rerank (`cross-encoder/ms-marco-MiniLM-L-6-v2`), top 3 chunks |
-| Answering model | `nvidia/nemotron-3.5-super-vl:free` through OpenRouter |
+| Search | Hybrid + rerank (`cross-encoder/ms-marco-MiniLM-L-6-v2`), top 3 results; a slide's text and PNG count as one result |
+| Answering model | `gpt-6-luna` through OpenCode Go, low reasoning effort |
 
-The RAGAS judge is `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`, set in `eval/ragas_eval.py`. `K` and the answering model are defined in `src/tutor/rag.py`, and `pipeline.py` imports them.
+The RAGAS judge is `claude-haiku-5-5` through OpenCode Go, set in `eval/ragas_eval.py`. `K` and the answering model are defined in `src/tutor/generator.py`, and `pipeline.py` imports them.
 
 Results and reasons are in [`SUMMARY_60_40.md`](eval/results_60_40/SUMMARY_60_40.md).
 
 ### Set up
 
-You need Python 3.11 and an [OpenRouter API key](https://openrouter.ai/keys). The corpus is in the repository under `corpora/`.
+You need Python 3.11 and an [OpenCode Go](https://opencode.ai/docs/go/) API key. The corpus is in the repository under `corpora/`.
 
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-echo 'OPENROUTER_API_KEY=your-key-here' > .env
+echo 'OPENCODE_API_KEY=your-key-here' > .env
 .venv/bin/python -m pytest tests
 ```
 
@@ -135,7 +135,7 @@ Jina CLIP v2 does not load on transformers 5, so it has its own environment:
 
 ### Score answers with RAGAS
 
-This needs your OpenRouter key. The default set is the 75 questions marked `llm_eval` in `eval/gold/gold_60_40.csv`.
+This needs your OpenCode key. The default set is the 75 questions marked `llm_eval` in `eval/gold/gold_60_40.csv`.
 
 ```bash
 .venv/bin/python eval/run_generation.py --limit 3   # try a few first
@@ -144,7 +144,7 @@ This needs your OpenRouter key. The default set is the 75 questions marked `llm_
 .venv/bin/python eval/ragas_eval.py sample
 ```
 
-A text question takes about 9 API calls and an image question about 6, so all 75 take about 630. Free OpenRouter models are limited to 50 requests a day, or 1,000 a day once you add $10 of credit, and can also be rate-limited, so a run may need several days. Answers and judge replies are cached, so rerunning continues where it stopped. Check the `scored` counts in `eval/results_60_40/ragas_sample.json`, because a metric that fails is left out of its mean.
+A text question takes about 9 API calls and an image question about 6, so all 75 take about 630. Scoring one question takes about 14,000 judge tokens, so all 75 cost well under $1. Answers and judge replies are cached, so rerunning continues where it stopped and costs nothing for replies already cached. Check the `scored` counts in `eval/results_60_40/ragas_sample.json`, because a metric that fails is left out of its mean.
 
 ## Getting started
 

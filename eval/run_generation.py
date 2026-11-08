@@ -1,7 +1,8 @@
 """Answer gold questions with the champion setup, ready for ragas_eval.py.
 
 One chunk per slide, documents recursive 200 words with 30-word overlap, Gemma 2 with image chunks,
-hybrid + rerank search, top 3 chunks. Any retrieved pictures go to the LLM with the text, as in rag.py.
+hybrid + rerank search, top 3 results (a slide's text and PNG count as one, as in the app).
+Any retrieved pictures go to the LLM with the text, as in generator.py.
 
     .venv/bin/python eval/run_generation.py --limit 3   # try a few first
     .venv/bin/python eval/run_generation.py             # the 75 questions marked llm_eval in gold_60_40.csv
@@ -20,12 +21,12 @@ sys.path[:0] = [str(ROOT / "src"), str(ROOT / "eval")]
 import eval_retrieval as ev  # noqa: E402  (load_gold)
 import common  # noqa: E402  (corpus_files, GOLD, OUT, CachedImageEmbed)
 from tutor.pipeline import CHUNKING, EMBEDDER  # noqa: E402
-from tutor.rag import answer, make_llm  # noqa: E402
+from tutor.generator import answer, make_llm  # noqa: E402
 from tutor.retrieval.chunk import chunk_pages  # noqa: E402
 from tutor.retrieval.clean import clean_pages  # noqa: E402
 from tutor.retrieval.embed import Embedder  # noqa: E402
 from tutor.retrieval.extract import extract, file_sha256  # noqa: E402
-from tutor.retrieval.search import HybridRerankIndex  # noqa: E402
+from tutor.retrieval.search import HybridRerankIndex, SlideMergeIndex  # noqa: E402
 
 
 def main():
@@ -38,7 +39,7 @@ def main():
     for f in common.corpus_files():
         pages = clean_pages(extract(f, images=True))
         chunks += chunk_pages(pages, file_sha256(f), **CHUNKING[pages[0].kind])
-    index = HybridRerankIndex(chunks, common.CachedImageEmbed(Embedder(EMBEDDER)))
+    index = SlideMergeIndex(HybridRerankIndex(chunks, common.CachedImageEmbed(Embedder(EMBEDDER))))
 
     questions = ev.load_gold(common.GOLD)
     if not args.all:

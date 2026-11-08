@@ -1,0 +1,10 @@
+split,evidence_type,questions,faithfulness,faithfulness_n,factual_correctness,factual_correctness_n,context_precision,context_precision_n,context_recall,context_recall_n
+all,all,75,0.987,75,0.706,75,0.953,55,0.896,55
+dev,all,45,1.0,45,0.672,45,0.941,34,0.89,34
+test,all,30,0.967,30,0.758,30,0.972,21,0.906,21
+all,text,55,1.0,55,0.759,55,0.953,55,0.896,55
+all,image,20,0.95,20,0.56,20,,0,,0
+dev,text,34,1.0,34,0.737,34,0.941,34,0.89,34
+dev,image,11,1.0,11,0.47,11,,0,,0
+test,text,21,1.0,21,0.795,21,0.972,21,0.906,21
+test,image,9,0.889,9,0.671,9,,0,,0

@@ -9,6 +9,8 @@
     hybrid_rerank  the top 20 text chunks from hybrid, reranked by a cross-encoder. It reads the question
                    and a chunk's text together, so it cannot score images, and images keep their dense
                    positions
+    hybrid_rerank_merged  hybrid_rerank, with a slide's text and PNG merged into one result (SlideMergeIndex);
+                   document chunks stay separate
 
 Image questions get an answer score and a figure score, as in run_image_embedders.py. The winner is
 picked on dev, all questions: evidence recall@3, then MRR. Paired gains are printed against dense.
@@ -34,7 +36,7 @@ from tutor.retrieval.chunk import chunk_pages  # noqa: E402
 from tutor.retrieval.clean import clean_pages  # noqa: E402
 from tutor.retrieval.embed import Embedder  # noqa: E402
 from tutor.retrieval.extract import extract, file_sha256  # noqa: E402
-from tutor.retrieval.search import DenseIndex, HybridIndex, HybridRerankIndex  # noqa: E402
+from tutor.retrieval.search import DenseIndex, HybridIndex, HybridRerankIndex, SlideMergeIndex  # noqa: E402
 
 CANDIDATES = 20  # chunks each of dense and BM25 hand to RRF, and text chunks the reranker reads
 
@@ -53,7 +55,9 @@ def main():
     dense_s = embed.take_used_s()  # embedding time, counted in full even when vectors were saved
     hybrid = HybridIndex(chunks, embed, CANDIDATES, dense=dense)  # reuses the dense vectors
     rerank = HybridRerankIndex(chunks, embed, CANDIDATES, dense=dense)
-    indexes = {"dense": (dense, dense_s), "hybrid": (hybrid, dense_s), "hybrid_rerank": (rerank, dense_s)}
+    merged = SlideMergeIndex(rerank)  # same ranking, a slide's text and PNG counted as one result
+    indexes = {"dense": (dense, dense_s), "hybrid": (hybrid, dense_s), "hybrid_rerank": (rerank, dense_s),
+               "hybrid_rerank_merged": (merged, dense_s)}
 
     summary, per_question, scored = [], [], {}
     for mode, (index, index_s) in indexes.items():
