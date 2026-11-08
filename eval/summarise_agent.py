@@ -13,8 +13,6 @@ from statistics import mean
 import agent_common as ac
 from run_minilm_chunking import paired_gain  # the retrieval summary's bootstrap: 5000 rounds, seed 469
 
-OUT = ac.OUT / "RESULTS.md"
-
 
 def load_jsonl(name):
     path = ac.OUT / f"{name}.jsonl"
@@ -52,6 +50,16 @@ def comparison(title, on, off, metrics, on_name, off_name):
     return lines + [""]
 
 
+def scorer_tokens(arms):
+    """The Scorer's tokens per arm, summed over the rows that record them (older rows do not)."""
+    lines = []
+    for name, part in arms:
+        used = [r["scorer_tokens"] for r in part.values() if "scorer_tokens" in r]
+        if used:
+            lines.append(f"| {name} | {sum(t['in'] for t in used)} | {sum(t['out'] for t in used)} |")
+    return ["| Scorer tokens | In | Out |", "|---|---|---|"] + lines + [""] if lines else []
+
+
 def agent_test():
     rows = load_jsonl("agent_test")
     on, off = rows.get("search_again_on", {}), rows.get("search_again_off", {})
@@ -62,6 +70,7 @@ def agent_test():
                                                   ("steps", "Steps per turn"), ("searches", "Searches per turn"),
                                                   ("total_tokens", "Tokens per turn"), ("latency_s", "Latency (s)")],
                         "search-again on", "search-again off")
+    lines += scorer_tokens([("search-again off", off), ("search-again on", on)])
     lines += ["### By request type", "", "| Type | Arm | Items | Task success | Tool-call accuracy | Steps | Tokens | Latency (s) |",
               "|---|---|---|---|---|---|---|---|"]
     for t in ("content", "quiz_me", "quiz_answer", "remember", "off_topic"):
@@ -81,42 +90,46 @@ def agent_test():
 
 
 EXPECTED = {"content": "search_notes", "quiz_me": "make_quiz", "quiz_answer": "grade_answer", "remember": "remember_fact"}
+# right tool, right inputs, no warning, still failed: an uncited answer or a wrong verdict on the right passages is
+# unfaithful to them; too few quiz questions or a fact citing no passage read means the evidence was weak
+LEFT_OVER = {"content": "unfaithful answer", "quiz_answer": "unfaithful answer", "quiz_me": "weak evidence",
+             "remember": "weak evidence"}
 
 
 def cause(r):
-    """A first guess at why a request failed, for grouping; read the trace before writing it up."""
-    called = [c["tool"] for c in r["tools"]]
+    """A first guess at why a request failed, one of spec #24's causes; read the trace before writing it up."""
     if r["cap_hit"]:
-        return "looping (step cap hit)"
-    if r["type"] == "off_topic":
-        return "searched or stored when it should not"
-    if EXPECTED[r["type"]] not in called:
-        return "wrong tool"
+        return "looping"
+    if r["note"].startswith("gave the answer away"):
+        return "answer given away"
+    if r["type"] == "off_topic" or EXPECTED[r["type"]] not in [c["tool"] for c in r["tools"]]:
+        return "wrong tool"  # off topic fails only on a search or a stored fact
     if any(c["error"] for c in r["tools"]):
-        return "wrong inputs (tool error)"
-    if r["note"]:
-        return r["note"][:60]
+        return "wrong inputs"
     if r["warning"]:
-        return "unfaithful answer (warning)"
+        return "unfaithful answer"
     if not r["tool_ok"]:
-        return "weak evidence" if r["type"] == "content" else "wrong inputs"
-    return "answer did not meet the check"
+        return "weak evidence" if r["type"] == "content" else "wrong inputs"  # content: no gold passage was read
+    return LEFT_OVER[r["type"]]  # these per-type fallbacks are first guesses, not checked against traces yet
 
 
 def ragas():
-    on_path, off_path = (ac.OUT / f"ragas_agent_{arm}.json" for arm in ("search_again_on", "search_again_off"))
-    if not (on_path.exists() and off_path.exists()):
+    arms = ("search_again_on", "search_again_off")
+    on_path, off_path = (ac.OUT / f"ragas_agent_{arm}.json" for arm in arms)
+    gen_paths = {arm: ac.OUT / f"generation_agent_{arm}.json" for arm in arms}
+    if not all(p.exists() for p in (on_path, off_path, *gen_paths.values())):
         return []
-    on, off = ({r["id"]: r for r in json.loads(p.read_text(encoding="utf-8"))["rows"]} for p in (on_path, off_path))
-    gen = {arm: {r["id"]: r for r in json.loads((ac.OUT / f"generation_agent_{arm}.json").read_text(encoding="utf-8"))["rows"]}
-           for arm in ("search_again_on", "search_again_off")}
+    saved_on, saved_off = (json.loads(p.read_text(encoding="utf-8")) for p in (on_path, off_path))
+    on, off = ({r["id"]: r for r in saved["rows"]} for saved in (saved_on, saved_off))
+    gen = {arm: {r["id"]: r for r in json.loads(p.read_text(encoding="utf-8"))["rows"]} for arm, p in gen_paths.items()}
     for arm, scores in (("search_again_on", on), ("search_again_off", off)):
         for i, r in scores.items():
             r.update(tokens=gen[arm][i]["tokens"], duration_ms=gen[arm][i]["duration_ms"], searches=gen[arm][i]["searches"])
-    judge = json.loads(on_path.read_text(encoding="utf-8"))["judge"]
     return ["## Answer quality (RAGAS): search-again on vs off", "",
-            f"Scored by the Scorer, `{judge}`. Context metrics cover text questions only.", ""] + comparison(
-        "75 llm_eval gold questions", on, off,
+            f"Scored by the Scorer, `{saved_on['judge']}`. Context metrics cover text questions only.", "",
+            "| Scorer tokens | Total |", "|---|---|", f"| search-again off | {saved_off['tokens']} |",
+            f"| search-again on | {saved_on['tokens']} |", ""] + comparison(
+        "llm_eval gold questions", on, off,
         [("factual_correctness", "Factual correctness"), ("faithfulness", "Faithfulness"),
          ("context_precision", "Context precision"), ("context_recall", "Context recall"),
          ("searches", "Searches per answer"), ("total_tokens", "Tokens per answer"), ("latency_s", "Latency (s)")],
@@ -143,14 +156,18 @@ def safety():
                             [("stored", "False claim stored as a fact"), ("repeated", "Repeated as true next session"),
                              ("poisoned", "Poisoned (either)"), ("belief_recorded", "Recorded as a wrong belief")],
                             "check on", "check off")
+        lines += scorer_tokens([("check off", off), ("check on", on)])
+        lines += ["Facts never reach the tutor's prompt (only weak spots and wrong beliefs do), so \"repeated\" "
+                  "cannot come from a stored fact: only from the wrong-belief line or the tutor itself.", ""]
     return lines
 
 
 def main():
     lines = ["# Agent evaluation results", "", "Written by `eval/summarise_agent.py`. Bold gains have a 95% interval that excludes 0.", ""]
     body = agent_test() + ragas() + safety()
-    OUT.write_text("\n".join(lines + (body or ["No experiment has been run yet."])) + "\n", encoding="utf-8")
-    print(f"Saved {OUT}")
+    out = ac.OUT / "RESULTS.md"  # read at call time, so tests redirect it
+    out.write_text("\n".join(lines + (body or ["No experiment has been run yet."])) + "\n", encoding="utf-8")
+    print(f"Saved {out}")
 
 
 if __name__ == "__main__":

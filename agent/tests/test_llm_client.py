@@ -75,7 +75,9 @@ def test_deepseek_request_turns_thinking_off_and_others_do_not(monkeypatch):
     s1_llm.chat([{"role": "user", "content": "hi"}], "opencode-go/deepseek-v4.1-flash")
     s1_llm.chat([{"role": "user", "content": "hi"}], "gpt-5.4-mini-2026-03-17")
     s1_llm.chat([{"role": "user", "content": "hi"}], "openai/gpt-oss-120b")
+    s1_llm.chat([{"role": "user", "content": "hi"}], "opencode-go/claude-haiku-5-5")  # the Scorer: Go rejects `thinking` for it
     assert clients["opencode"].requests[0]["extra_body"] == {"thinking": {"type": "disabled"}}
+    assert "extra_body" not in clients["opencode"].requests[1]
     assert "extra_body" not in clients["openai"].requests[0] and "extra_body" not in clients["groq"].requests[0]
 
 

@@ -78,9 +78,10 @@ def chat(messages, model,
     if model.startswith(OPENCODE_PREFIX):
         provider = "opencode"
         request["model"] = model.removeprefix(OPENCODE_PREFIX)
-        # DeepSeek's thinking defaults to on and then needs reasoning_content sent back; the loop and history drop it
-        # shortcut: set for every Go model, make it per-model if the tutor leaves DeepSeek
-        request["extra_body"] = {"thinking": {"type": "disabled"}}
+        # DeepSeek's thinking defaults to on and then needs reasoning_content sent back; the loop and history drop it.
+        # Go rejects the switch for other families (the Scorer is Claude).
+        if request["model"].startswith("deepseek"):
+            request["extra_body"] = {"thinking": {"type": "disabled"}}
     elif model.startswith("gpt-"):
         # shortcut: only gpt- IDs route to OpenAI, add o-series prefixes if the team ever uses them
         provider = "openai"

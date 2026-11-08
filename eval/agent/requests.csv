@@ -1,31 +1,31 @@
 id,type,message,expected_tool,expected_concept,quiz_question,quiz_file,quiz_page,expected_correct,gold_id,notes,checked
-qm-01,quiz_me,Quiz me on LoRA.,make_quiz,lora,,,,,,concept from the eval-gold concept list (Topic4_Efficient_FineTuning_IS469new.pdf),
-qm-02,quiz_me,Quiz me on the KV cache.,make_quiz,kv cache,,,,,,concept from the eval-gold concept list (Topic6_Evaluation.pdf),
-qm-03,quiz_me,Quiz me on self-attention.,make_quiz,self-attention,,,,,,concept from the eval-gold concept list (Topic2_Transformers_IS469.pdf),
-qm-04,quiz_me,Quiz me on TF-IDF.,make_quiz,tf-idf,,,,,,concept from the eval-gold concept list (Topic1_TextProcessing_IS469.pdf),
-qm-05,quiz_me,Quiz me on ReAct.,make_quiz,react,,,,,,concept from the eval-gold concept list (Topic7_Agentic_IS469.pdf),
-qm-06,quiz_me,Quiz me on BM25.,make_quiz,bm25,,,,,,concept from the eval-gold concept list (Topic8_AgenticRAG_MITB.pdf),
-qm-07,quiz_me,Quiz me on planning poker.,make_quiz,planning poker,,,,,,concept from the eval-gold concept list (Week3-Estimation_ScrumMeetings.pdf),
-qm-08,quiz_me,Quiz me on the INVEST criteria.,make_quiz,invest criteria,,,,,,concept from the eval-gold concept list (Week2-UserStories.pdf),
-qm-09,quiz_me,Quiz me on Kubernetes.,make_quiz,kubernetes,,,,,,concept from the eval-gold concept list (Lesson2-Compute.pptx),
-qm-10,quiz_me,Quiz me on eventual consistency.,make_quiz,eventual consistency,,,,,,concept from the eval-gold concept list (Lesson3-StorageDB.pptx),
-qm-11,quiz_me,Quiz me on security groups.,make_quiz,security group,,,,,,concept from the eval-gold concept list (Lesson4-Network.pptx),
-qm-12,quiz_me,Quiz me on blue/green deployment.,make_quiz,blue/green deployment,,,,,,concept from the eval-gold concept list (Lesson7-DevOps.pptx),
-qa-01,quiz_answer,"Independent, Negotiable, Valuable, Estimable, Small and Testable.",grade_answer,invest criteria,What does INVEST stand for?,Week2-UserStories.pdf,27,1,pm-17,right answer,
-qa-02,quiz_answer,"Masked LM predicts the next token from the left context only, and causal LM looks at both sides.",grade_answer,masked-language modeling,What's the difference between masked and causal language modelling?,Topic3_Training_IS469.pdf,12,0,ai-23,wrong answer,
-qa-03,quiz_answer,"It is much cheaper, up to 80% off, but runs at most 24 hours and the provider can stop it at any time.",grade_answer,pre-emptible vm,"What is a pre-emptible VM, and how does it differ from a shielded VM?",Lesson2-Compute.pptx,9,1,cl-13,right answer,
-qa-04,quiz_answer,"200 / 20 = 10 sprints, so it takes 10 weeks.",grade_answer,velocity,"If our backlog is 200 story points and our velocity is 20 per two-week sprint, how long will it take, and how much can we finish if the customer stops at 15 weeks?",Week3-Estimation_ScrumMeetings.pdf,37,0,pm-30,wrong answer,
-qa-05,quiz_answer,"Static embeddings give one fixed vector per token, so 'bank' is the same everywhere; contextual embeddings change with the surrounding sentence.",grade_answer,embeddings,What is the difference between static and contextual embeddings?,Topic2_Transformers_IS469.pdf,47,1,ai-19,right answer,
-qa-06,quiz_answer,"Strong consistency means the copies become the same eventually, while eventual consistency means every read sees the latest write straight away.",grade_answer,eventual consistency,"What is the difference between strong consistency and eventual consistency, and which does a transactional database need?",Lesson3-StorageDB.pptx,19,0,cl-28,wrong answer,
-qa-07,quiz_answer,FAT is done in the test environment at the software company; SAT is done at the customer's site in the real production environment.,grade_answer,software testing,What is the difference between Factory Acceptance Testing and Site Acceptance Testing?,Software Development - Requirements Testing Architecture.pdf,25,1,sd-15,right answer,
-qa-08,quiz_answer,"Bigger chunks are always better, because they hold more context, so recall keeps going up as chunks grow.",grade_answer,chunking,How does chunk size affect retrieval quality?,Topic8_AgenticRAG_MITB.pdf,21,0,ai-89,wrong answer,
-qa-09,quiz_answer,"In aggregation the parts can exist on their own, like a person and a pet; in composition the part cannot exist without the whole.",grade_answer,association,What is the difference between aggregation and composition?,Week5-SoftwareArchitecture.pdf,40,1,pm-58,right answer,
-qa-10,quiz_answer,"You apply them to make the data more skewed, so the outliers stand out more.",grade_answer,data cleaning and preprocessing,When would you apply a log transformation or a square-root transformation to data?,OpenStax Principles of Data Science - Ch2 Collecting and Preparing Data.pdf,26,0,ds-15,wrong answer,
-rf-01,remember,Remember this for me: a pre-emptible VM can run for at most 24 hours.,remember_fact,pre-emptible vm,,Lesson2-Compute.pptx,9,,,true fact from the files,
-rf-02,remember,"Please remember that INVEST stands for Independent, Negotiable, Valuable, Estimable, Small and Testable.",remember_fact,invest criteria,,Week2-UserStories.pdf,27,,,true fact from the files,
-rf-03,remember,Remember that in test-driven development the tests are normally written before the code.,remember_fact,test-driven development,,Software Development - Requirements Testing Architecture.pdf,36,,,true fact from the files,
-rf-04,remember,"Remember that masked language modelling, as in BERT, uses both the left and the right context.",remember_fact,masked-language modeling,,Topic3_Training_IS469.pdf,12,,,true fact from the files,
-ot-01,off_topic,Hi! How are you today?,,,,,,,,expect no search and no fact,
-ot-02,off_topic,What's a good recipe for chicken rice?,,,,,,,,expect no search and no fact,
-ot-03,off_topic,Can you recommend a movie for tonight?,,,,,,,,expect no search and no fact,
-ot-04,off_topic,"Thanks, that's all for now!",,,,,,,,expect no search and no fact,
+qm-01,quiz_me,Quiz me on LoRA.,make_quiz,lora,,,,,,concept from the eval-gold concept list (Topic4_Efficient_FineTuning_IS469new.pdf),1
+qm-02,quiz_me,Quiz me on the KV cache.,make_quiz,kv cache,,,,,,concept from the eval-gold concept list (Topic6_Evaluation.pdf),1
+qm-03,quiz_me,Quiz me on self-attention.,make_quiz,self-attention,,,,,,concept from the eval-gold concept list (Topic2_Transformers_IS469.pdf),1
+qm-04,quiz_me,Quiz me on TF-IDF.,make_quiz,tf-idf,,,,,,concept from the eval-gold concept list (Topic1_TextProcessing_IS469.pdf),1
+qm-05,quiz_me,Quiz me on ReAct.,make_quiz,react,,,,,,concept from the eval-gold concept list (Topic7_Agentic_IS469.pdf),1
+qm-06,quiz_me,Quiz me on BM25.,make_quiz,bm25,,,,,,concept from the eval-gold concept list (Topic8_AgenticRAG_MITB.pdf),1
+qm-07,quiz_me,Quiz me on planning poker.,make_quiz,planning poker,,,,,,concept from the eval-gold concept list (Week3-Estimation_ScrumMeetings.pdf),1
+qm-08,quiz_me,Quiz me on the INVEST criteria.,make_quiz,invest criteria,,,,,,concept from the eval-gold concept list (Week2-UserStories.pdf),1
+qm-09,quiz_me,Quiz me on Kubernetes.,make_quiz,kubernetes,,,,,,concept from the eval-gold concept list (Lesson2-Compute.pptx),1
+qm-10,quiz_me,Quiz me on eventual consistency.,make_quiz,eventual consistency,,,,,,concept from the eval-gold concept list (Lesson3-StorageDB.pptx),1
+qm-11,quiz_me,Quiz me on security groups.,make_quiz,security group,,,,,,concept from the eval-gold concept list (Lesson4-Network.pptx),1
+qm-12,quiz_me,Quiz me on blue/green deployment.,make_quiz,blue/green deployment,,,,,,concept from the eval-gold concept list (Lesson7-DevOps.pptx),1
+qa-01,quiz_answer,"Independent, Negotiable, Valuable, Estimable, Small and Testable.",grade_answer,invest criteria,What does INVEST stand for?,Week2-UserStories.pdf,27,1,pm-17,right answer,1
+qa-02,quiz_answer,"Masked LM predicts the next token from the left context only, and causal LM looks at both sides.",grade_answer,masked-language modeling,What's the difference between masked and causal language modelling?,Topic3_Training_IS469.pdf,12,0,ai-23,wrong answer,1
+qa-03,quiz_answer,"It is much cheaper, up to 80% off, but runs at most 24 hours and the provider can stop it at any time.",grade_answer,pre-emptible vm,"What is a pre-emptible VM, and how does it differ from a shielded VM?",Lesson2-Compute.pptx,9,1,cl-13,right answer,1
+qa-04,quiz_answer,"200 / 20 = 10 sprints, so it takes 10 weeks.",grade_answer,velocity,"If our backlog is 200 story points and our velocity is 20 per two-week sprint, how long will it take, and how much can we finish if the customer stops at 15 weeks?",Week3-Estimation_ScrumMeetings.pdf,37,0,pm-30,wrong answer,1
+qa-05,quiz_answer,"Static embeddings give one fixed vector per token, so 'bank' is the same everywhere; contextual embeddings change with the surrounding sentence.",grade_answer,embeddings,What is the difference between static and contextual embeddings?,Topic2_Transformers_IS469.pdf,47,1,ai-19,right answer,1
+qa-06,quiz_answer,"Strong consistency means the copies become the same eventually, while eventual consistency means every read sees the latest write straight away.",grade_answer,eventual consistency,"What is the difference between strong consistency and eventual consistency, and which does a transactional database need?",Lesson3-StorageDB.pptx,19,0,cl-28,wrong answer,1
+qa-07,quiz_answer,FAT is done in the test environment at the software company; SAT is done at the customer's site in the real production environment.,grade_answer,software testing,What is the difference between Factory Acceptance Testing and Site Acceptance Testing?,Software Development - Requirements Testing Architecture.pdf,25,1,sd-15,right answer,1
+qa-08,quiz_answer,"Bigger chunks are always better, because they hold more context, so recall keeps going up as chunks grow.",grade_answer,chunking,How does chunk size affect retrieval quality?,Topic8_AgenticRAG_MITB.pdf,21,0,ai-89,wrong answer,1
+qa-09,quiz_answer,"In aggregation the parts can exist on their own, like a person and a pet; in composition the part cannot exist without the whole.",grade_answer,association,What is the difference between aggregation and composition?,Week5-SoftwareArchitecture.pdf,40,1,pm-58,right answer,1
+qa-10,quiz_answer,"You apply them to make the data more skewed, so the outliers stand out more.",grade_answer,data cleaning and preprocessing,When would you apply a log transformation or a square-root transformation to data?,OpenStax Principles of Data Science - Ch2 Collecting and Preparing Data.pdf,26,0,ds-15,wrong answer,1
+rf-01,remember,Remember this for me: a pre-emptible VM can run for at most 24 hours.,remember_fact,pre-emptible vm,,Lesson2-Compute.pptx,9,,,true fact from the files,1
+rf-02,remember,"Please remember that INVEST stands for Independent, Negotiable, Valuable, Estimable, Small and Testable.",remember_fact,invest criteria,,Week2-UserStories.pdf,27,,,true fact from the files,1
+rf-03,remember,Remember that in test-driven development the tests are normally written before the code.,remember_fact,test-driven development,,Software Development - Requirements Testing Architecture.pdf,36,,,true fact from the files,1
+rf-04,remember,"Remember that masked language modelling, as in BERT, uses both the left and the right context.",remember_fact,masked-language modeling,,Topic3_Training_IS469.pdf,12,,,true fact from the files,1
+ot-01,off_topic,Hi! How are you today?,,,,,,,,expect no search and no fact,1
+ot-02,off_topic,What's a good recipe for chicken rice?,,,,,,,,expect no search and no fact,1
+ot-03,off_topic,Can you recommend a movie for tonight?,,,,,,,,expect no search and no fact,1
+ot-04,off_topic,"Thanks, that's all for now!",,,,,,,,expect no search and no fact,1
