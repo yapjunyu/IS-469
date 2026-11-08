@@ -19,6 +19,7 @@ import run_agent_generation as gen  # noqa: E402
 import run_agent_test as at  # noqa: E402
 import run_injection as inj  # noqa: E402
 import run_poisoning as poi  # noqa: E402
+import summarise_agent as sa  # noqa: E402
 from agent import s1_llm, s2_tools, s3_loop  # noqa: E402
 from agent.memory import learner  # noqa: E402
 from agent.tests.test_loop import EXTRA_CALLS_OFF  # noqa: E402
@@ -532,6 +533,63 @@ def test_each_injection_result_row_records_the_attack_whether_it_was_followed_an
     assert {(r["id"], r["arm"]): (r["attack"], r["injected"], r["where"]) for r in results} == {
         ("inj-01", "guard_on"): ("answer", True, ["answer"]), ("inj-01", "guard_off"): ("answer", True, ["answer"]),
         ("inj-11", "guard_on"): ("tool", False, []), ("inj-11", "guard_off"): ("tool", False, [])}
+
+
+# The results file
+
+def scorecard_row(id, arm, success, type="off_topic", tools=(), **kw):
+    """An agent_test.jsonl row as run_agent_test.py writes it."""
+    return {"id": id, "arm": arm, "type": type, "answer": "An answer.", "warning": False, "note": "",
+            "tools": [{"tool": t, "inputs": {}, "error": None} for t in tools], "steps": 1, "cap_hit": False,
+            "searches": 0, "tokens": {"in": 10, "out": 5}, "duration_ms": 1000, "success": success, "tool_ok": success,
+            **kw}
+
+
+def results_file(experiment, rows):
+    ac.OUT.mkdir(parents=True, exist_ok=True)
+    (ac.OUT / f"{experiment}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    sa.main()
+    return (ac.OUT / "RESULTS.md").read_text(encoding="utf-8")
+
+
+def table_row(text, label):
+    [line] = [line for line in text.splitlines() if line.startswith(f"| {label} |")]
+    return [cell.strip() for cell in line.strip("|").split("|")]
+
+
+def test_a_gain_uses_only_items_finished_in_both_arms_and_is_bold_when_its_interval_excludes_0():
+    text = results_file("agent_test", [scorecard_row(f"ot-{i}", "search_again_off", False) for i in (1, 2, 3)] +
+                        [scorecard_row(f"ot-{i}", "search_again_on", True) for i in (1, 2, 3)] +
+                        [scorecard_row("ot-4", "search_again_on", False)])  # not finished with search-again off
+    _, off, on, gain, items = table_row(text, "Task success")
+    assert (off, on, items) == ("0.000", "1.000", "3")  # ot-4 left out of both means
+    assert gain.startswith("**+1.000")  # every paired item gained 1, so the interval is 1 to 1
+    assert not table_row(text, "Steps per turn")[3].startswith("**")  # no change, interval 0 to 0
+    assert "Prompt injection" not in text and "Answer quality" not in text  # not run yet, so left out
+
+
+def test_every_failed_request_is_listed_with_one_of_the_specs_causes_its_tools_and_answer():
+    failed = [  # (row, the cause spec #24 user story 44 names for it)
+        (scorecard_row("loop", "search_again_on", False, tools=["search_notes"] * 6, cap_hit=True), "looping"),
+        (scorecard_row("ot", "search_again_on", False, tools=["search_notes"]), "wrong tool"),
+        (scorecard_row("no-search", "search_again_on", False, type="content"), "wrong tool"),
+        (scorecard_row("bad-call", "search_again_on", False, type="quiz_me", tools=["make_quiz"],
+                       tool_ok=True), "wrong inputs"),
+        (scorecard_row("off-page", "search_again_on", False, type="content", tools=["search_notes"]), "weak evidence"),
+        (scorecard_row("warned", "search_again_on", False, type="content", tools=["search_notes"], tool_ok=True,
+                       warning=True), "unfaithful answer"),
+        (scorecard_row("leak", "search_again_on", False, type="quiz_answer", tools=["grade_answer"], tool_ok=True,
+                       note="gave the answer away: it lists all six letters"), "answer given away"),
+        (scorecard_row("unbacked", "search_again_on", False, type="remember", tools=["remember_fact"],
+                       tool_ok=True), "weak evidence")]
+    failed[3][0]["tools"][0]["error"] = "unknown concept"
+    text = results_file("agent_test", [row for row, _ in failed] + [scorecard_row("fine", "search_again_on", True)])
+    listed = text.split("### Failed requests")[1]
+    for row, cause in failed:
+        _, arm, guessed, tools, answer = table_row(listed, row["id"])
+        assert (arm, guessed, answer) == ("on", cause, "An answer.")
+        assert tools == (", ".join(c["tool"] for c in row["tools"]) or "none")
+    assert "| fine |" not in listed
 
 
 # Memory poisoning
