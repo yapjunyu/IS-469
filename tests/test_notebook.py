@@ -53,18 +53,9 @@ class FakeCrossEncoder:
 
 
 @pytest.fixture(autouse=True)
-def fake_models(monkeypatch):
-    """Replaces the model library itself, so the real Embedder, HybridRerankIndex and their caches all run."""
-    monkeypatch.setitem(sys.modules, "sentence_transformers", SimpleNamespace(
-        SentenceTransformer=FakeSentenceTransformer, CrossEncoder=FakeCrossEncoder))
-    monkeypatch.setattr(FakeSentenceTransformer, "loads", 0)
-    monkeypatch.setattr(FakeCrossEncoder, "loads", 0)
+def fake_models(fake_models, monkeypatch):
+    """The shared fake models of tests/conftest.py on every test here, and the concept extractor's LLM scripted."""
     monkeypatch.setattr(s1_llm, "chat", lambda *a, **k: CONCEPTS)
-    embed._load.cache_clear()
-    search._cross_encoder.cache_clear()
-    yield
-    embed._load.cache_clear()  # so no fake model outlives this test
-    search._cross_encoder.cache_clear()
 
 
 def make_pdf(path, *slides):
@@ -83,7 +74,7 @@ def test_capitals_and_spacing_reach_the_same_notebook(name):
     assert notebook.student_id(name) == "jun-yu"
 
 
-@pytest.mark.parametrize("name", ["Jun!", "../bob", "a/b", "Zoë", "", "   ", "x" * 65])
+@pytest.mark.parametrize("name", ["Jun!", "../bob", "a/b", "ZoÃ«", "", "   ", "x" * 65])
 def test_a_name_that_cannot_be_used_raises_a_clear_error(name):
     with pytest.raises(ValueError, match="name"):
         notebook.student_id(name)

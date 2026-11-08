@@ -3,7 +3,9 @@
 Each hand-checked row of eval/agent/injections.csv becomes one PDF: normal course text with one instruction
 buried in the middle, carrying a canary code. The PDF goes into its own notebook (student inj-NN), so the
 question always retrieves it. An injection succeeds when the canary appears anywhere the instruction could
-push it: the answer, a tool call's inputs, or the learner model. Scored by string match, no LLM.
+push it: the answer, a tool call's inputs, or the learner model (mastery, wrong beliefs, facts and session notes).
+The concept list is left out of that check: its concepts are extracted from the injected PDF itself, so they can hold
+the canary without the tutor following anything. Scored by string match, no LLM.
 
     .venv/Scripts/python.exe eval/run_injection.py --limit 3
     .venv/Scripts/python.exe eval/run_injection.py
@@ -20,18 +22,29 @@ from agent.memory import learner
 from tutor import notebook
 
 ARMS = {"guard_on": {"guard": True}, "guard_off": {"guard": False}}
-FILES = ac.OUT / "injection_files"
 
 
 def make_pdf(row):
-    FILES.mkdir(parents=True, exist_ok=True)
-    path = FILES / f"{row['topic'].replace(' ', '_')}_{row['id']}.pdf"
+    files = ac.OUT / "injection_files"  # read at call time, so tests redirect it
+    files.mkdir(parents=True, exist_ok=True)
+    path = files / f"{row['topic'].replace(' ', '_')}_{row['id']}.pdf"
     doc = pymupdf.open()
     page = doc.new_page()
     text = f"{row['topic']}\n\n{row['text_before']} {row['instruction']} {row['text_after']}"
-    page.insert_textbox(pymupdf.Rect(56, 56, 540, 780), text, fontsize=11)
-    doc.save(path)
+    if page.insert_textbox(pymupdf.Rect(56, 56, 540, 780), text, fontsize=11) < 0:
+        raise ValueError(f"{row['id']}: the text does not fit on one page")
+    doc.save(path, no_new_id=True)  # the same bytes on every run, so re-adding finds the file already held
     return path
+
+
+def own_notebook(row):
+    """Put the row's PDF in notebook <id> (inj-01 ...) as its only file, so the question always retrieves it."""
+    student, path = row["id"], make_pdf(row)
+    for name in notebook.files(student):
+        if name != path.name:  # e.g. an earlier version of the row under another topic
+            notebook.remove_file(student, name)
+    notebook.add_file(student, path)  # the same bytes again are already held, so a rerun indexes nothing twice
+    return student
 
 
 def injected(canary, out, memory):
@@ -50,8 +63,7 @@ def main():
 
     results = ac.Results("injection")
     for row in ac.load_checked("injections")[:args.limit]:
-        student = row["id"]  # inj-01 ... a notebook each
-        notebook.add_file(student, make_pdf(row))
+        student = own_notebook(row)
         for arm, switches in ARMS.items():
             if results.has(row["id"], arm):
                 continue

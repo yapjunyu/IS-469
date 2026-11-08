@@ -89,8 +89,12 @@ def _check_concept(ctx, concept):
 # shortcut: a text-less passage past the MAX_PICTURES cap stays as an empty <document>, drop it if its id ever misleads the LLM
 def _readable_passages(ctx, passages):
     keys = (*s6_guard.TEXT_FIELDS, "image_path") if ctx.images else s6_guard.TEXT_FIELDS
-    has_picture = lambda p: ctx.images and p.get("image_path") and Path(p["image_path"]).is_file()
-    return [{k: p[k] for k in keys if k in p} for p in passages if p["text"].strip() or has_picture(p)]
+    return [{k: p[k] for k in keys if k in p} for p in passages if p["text"].strip() or (ctx.images and has_picture(p))]
+
+
+def has_picture(passage):
+    """The passage names a picture file that exists, so an LLM can be shown it."""
+    return bool(passage.get("image_path")) and Path(passage["image_path"]).is_file()
 
 
 def picture_parts(passages):

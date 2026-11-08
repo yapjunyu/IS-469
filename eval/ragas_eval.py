@@ -98,7 +98,10 @@ async def main():
     results_dir = AGENT_RESULTS if args.agent else RESULTS
 
     load_dotenv(ROOT / ".env")
-    rows = [r for r in json.loads((results_dir / f"generation_{args.run}.json").read_text(encoding="utf-8"))["rows"] if r["response"]][:args.limit]
+    # shortcut: a pipeline run is read in the locale's encoding, as run_generation.py writes it, so one saved on another
+    # machine can misread, read utf-8 always once run_generation.py writes utf-8
+    encoding = "utf-8" if args.agent else None
+    rows = [r for r in json.loads((results_dir / f"generation_{args.run}.json").read_text(encoding=encoding))["rows"] if r["response"]][:args.limit]
     judge = make_judge(args.agent)
     metrics = {"faithfulness": MultiModalFaithfulness(llm=judge), "factual_correctness": FactualCorrectness(llm=judge),
                "context_precision": ContextPrecision(llm=judge), "context_recall": ContextRecall(llm=judge)}
@@ -116,7 +119,7 @@ async def main():
     scored = {k: [r[k] for r in results if r[k] is not None] for k in metrics}
     means = {k: round(sum(v) / len(v), 3) if v else None for k, v in scored.items()}  # None: no question scored
     out = results_dir / f"ragas_{args.run}.json"
-    out.write_text(json.dumps({"judge": SCORER_MODEL if args.agent else JUDGE_MODEL, "means": means, "scored": {k: len(v) for k, v in scored.items()}, "rows": results}, indent=1))
+    out.write_text(json.dumps({"judge": SCORER_MODEL if args.agent else JUDGE_MODEL, "means": means, "scored": {k: len(v) for k, v in scored.items()}, "tokens": tokens_used, "rows": results}, indent=1))
     print("\nmean  " + "  ".join(f"{k} {'-' if v is None else f'{v:.2f}'} (n={len(scored[k])})" for k, v in means.items()))
     print(f"{len(results)} questions, {tokens_used} judge tokens this run "
           f"(cached replies cost nothing), saved {out}")
