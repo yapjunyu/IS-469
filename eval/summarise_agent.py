@@ -13,8 +13,6 @@ from statistics import mean
 import agent_common as ac
 from run_minilm_chunking import paired_gain  # the retrieval summary's bootstrap: 5000 rounds, seed 469
 
-OUT = ac.OUT / "RESULTS.md"
-
 
 def load_jsonl(name):
     path = ac.OUT / f"{name}.jsonl"
@@ -81,26 +79,27 @@ def agent_test():
 
 
 EXPECTED = {"content": "search_notes", "quiz_me": "make_quiz", "quiz_answer": "grade_answer", "remember": "remember_fact"}
+# right tool, right inputs, no warning, still failed: an uncited answer or a wrong verdict on the right passages is
+# unfaithful to them; too few quiz questions or a fact citing no passage read means the evidence was weak
+LEFT_OVER = {"content": "unfaithful answer", "quiz_answer": "unfaithful answer", "quiz_me": "weak evidence",
+             "remember": "weak evidence"}
 
 
 def cause(r):
-    """A first guess at why a request failed, for grouping; read the trace before writing it up."""
-    called = [c["tool"] for c in r["tools"]]
+    """A first guess at why a request failed, one of spec #24's causes; read the trace before writing it up."""
     if r["cap_hit"]:
-        return "looping (step cap hit)"
-    if r["type"] == "off_topic":
-        return "searched or stored when it should not"
-    if EXPECTED[r["type"]] not in called:
-        return "wrong tool"
+        return "looping"
+    if r["note"].startswith("gave the answer away"):
+        return "answer given away"
+    if r["type"] == "off_topic" or EXPECTED[r["type"]] not in [c["tool"] for c in r["tools"]]:
+        return "wrong tool"  # off topic fails only on a search or a stored fact
     if any(c["error"] for c in r["tools"]):
-        return "wrong inputs (tool error)"
-    if r["note"]:
-        return r["note"][:60]
+        return "wrong inputs"
     if r["warning"]:
-        return "unfaithful answer (warning)"
+        return "unfaithful answer"
     if not r["tool_ok"]:
-        return "weak evidence" if r["type"] == "content" else "wrong inputs"
-    return "answer did not meet the check"
+        return "weak evidence" if r["type"] == "content" else "wrong inputs"  # content: no gold passage was read
+    return LEFT_OVER[r["type"]]
 
 
 def ragas():
@@ -116,7 +115,7 @@ def ragas():
     judge = json.loads(on_path.read_text(encoding="utf-8"))["judge"]
     return ["## Answer quality (RAGAS): search-again on vs off", "",
             f"Scored by the Scorer, `{judge}`. Context metrics cover text questions only.", ""] + comparison(
-        "75 llm_eval gold questions", on, off,
+        "llm_eval gold questions", on, off,
         [("factual_correctness", "Factual correctness"), ("faithfulness", "Faithfulness"),
          ("context_precision", "Context precision"), ("context_recall", "Context recall"),
          ("searches", "Searches per answer"), ("total_tokens", "Tokens per answer"), ("latency_s", "Latency (s)")],
@@ -149,8 +148,9 @@ def safety():
 def main():
     lines = ["# Agent evaluation results", "", "Written by `eval/summarise_agent.py`. Bold gains have a 95% interval that excludes 0.", ""]
     body = agent_test() + ragas() + safety()
-    OUT.write_text("\n".join(lines + (body or ["No experiment has been run yet."])) + "\n", encoding="utf-8")
-    print(f"Saved {OUT}")
+    out = ac.OUT / "RESULTS.md"  # read at call time, so tests redirect it
+    out.write_text("\n".join(lines + (body or ["No experiment has been run yet."])) + "\n", encoding="utf-8")
+    print(f"Saved {out}")
 
 
 if __name__ == "__main__":
