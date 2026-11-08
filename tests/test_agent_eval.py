@@ -568,6 +568,38 @@ def test_a_gain_uses_only_items_finished_in_both_arms_and_is_bold_when_its_inter
     assert "Prompt injection" not in text and "Answer quality" not in text  # not run yet, so left out
 
 
+def test_the_scorecard_reports_the_scorers_tokens_per_arm_from_the_rows_that_record_them():
+    text = results_file("agent_test", [scorecard_row("a", "search_again_off", True, scorer_tokens={"in": 10, "out": 5}),
+                                       scorecard_row("b", "search_again_off", True, scorer_tokens={"in": 20, "out": 1}),
+                                       scorecard_row("a", "search_again_on", True)])  # a row from before they were kept
+    assert table_row(text, "search-again off") == ["search-again off", "30", "6"]  # 10 + 20 in, 5 + 1 out
+    assert "\n| search-again on |" not in text
+
+
+def ragas_results(generated=("search_again_on", "search_again_off")):
+    """Both arms' RAGAS scores, the generation rows of these arms, and the summary they give."""
+    ac.OUT.mkdir(parents=True, exist_ok=True)
+    for arm, tokens in (("search_again_on", 700), ("search_again_off", 400)):
+        (ac.OUT / f"ragas_agent_{arm}.json").write_text(json.dumps(
+            {"judge": "claude-haiku-5-5", "tokens": tokens, "rows": [{"id": "q1", "faithfulness": 1.0}]}))
+        if arm in generated:
+            (ac.OUT / f"generation_agent_{arm}.json").write_text(json.dumps(
+                {"rows": [{"id": "q1", "tokens": {"in": 10, "out": 5}, "duration_ms": 1000, "searches": 1}]}))
+    sa.main()
+    return (ac.OUT / "RESULTS.md").read_text(encoding="utf-8")
+
+
+def test_the_answer_quality_section_is_left_out_while_an_arms_generation_file_is_missing():
+    assert "Answer quality" not in ragas_results(generated=["search_again_on"])
+    assert "Answer quality" in ragas_results()
+
+
+def test_the_answer_quality_section_reports_the_scorers_tokens_per_arm():
+    section = ragas_results().split("## Answer quality")[1]
+    assert table_row(section, "search-again off")[1] == "400"  # ragas_eval.py saves one total per arm
+    assert table_row(section, "search-again on")[1] == "700"
+
+
 def test_every_failed_request_is_listed_with_one_of_the_specs_causes_its_tools_and_answer():
     failed = [  # (row, the cause spec #24 user story 44 names for it)
         (scorecard_row("loop", "search_again_on", False, tools=["search_notes"] * 6, cap_hit=True), "looping"),
@@ -626,26 +658,30 @@ def believes_then_repeats(fact=None, belief=None):
 
 
 def scorer_says_yes_to(*texts):
-    """A scripted Scorer: yes when the text it is asked about is one of these."""
+    """A scripted Scorer: yes when one of these texts appears anywhere in what it is asked."""
     def reply(request):
-        text = request["messages"][-1]["content"].split("Text: ", 1)[1]
-        return json.dumps({"yes": text in texts, "reason": "scripted"})
+        asked = [m["content"] for m in request["messages"]]
+        return json.dumps({"yes": any(t in a for t in texts for a in asked), "reason": "scripted"})
     return reply
 
 
 def test_the_followup_is_a_new_session_with_no_history_that_keeps_the_learner_model(monkeypatch, eval_dirs):
     learner.add_concepts(ac.STUDENT, "notes.pdf", ["LoRA"])
     learner.update_mastery(ac.STUDENT, "lora", False, wrong_belief="left by an earlier item")
-    seen = []
+    seen, beliefs = [], []
     tutor = believes_then_repeats(belief="LoRA updates every weight")
-    poisoning(monkeypatch, eval_dirs, lambda request: seen.append(list(request["messages"])) or tutor(request),
-              scorer_says_yes_to())
+
+    def watched(request):
+        seen.append(list(request["messages"]))
+        beliefs.append([b["belief"] for b in learner.read_all(ac.STUDENT)["wrong_beliefs"]])
+        return tutor(request)
+    poisoning(monkeypatch, eval_dirs, watched, scorer_says_yes_to())
     assert len(seen) == 4  # two turns, two arms
-    for claim, followup in (seen[0:2], seen[2:4]):
-        assert "Wrong beliefs" not in claim[0]["content"]  # each arm starts from an empty learner model
+    # each arm starts from an empty learner model, and turn 2 still has the belief turn 1 left
+    assert beliefs == [[], ["LoRA updates every weight"]] * 2
+    for followup in seen[1::2]:
         assert [m["role"] for m in followup] == ["system", "user"]  # no history
         assert followup[-1]["content"] == CLAIM["followup"]
-        assert "LoRA updates every weight" in followup[0]["content"]  # the belief turn 1 left is kept
 
 
 FALSE_FACT, TRUE_FACT, REPEAT = "LoRA updates all weights.", "LoRA trains small adapters.", "Yes, LoRA updates every weight."
@@ -665,3 +701,12 @@ def test_a_claim_is_poisoned_when_the_scorer_finds_it_stored_or_repeated_and_a_w
     assert {r["arm"]: [r[k] for k in ("stored", "repeated", "poisoned", "belief_recorded")] for r in rows} == \
         {"memory_check_on": verdict, "memory_check_off": verdict}
     assert all(r["scorer_tokens"] == {"in": 10 * calls, "out": 5 * calls} for r in rows)
+
+
+def test_the_poisoning_results_report_the_scorers_tokens_per_arm():
+    row = {"id": "poi-01", "stored": False, "repeated": False, "poisoned": False, "belief_recorded": True,
+           "tokens": {"in": 10, "out": 5}, "duration_ms": 1000}
+    text = results_file("poisoning", [{**row, "arm": "memory_check_on", "scorer_tokens": {"in": 20, "out": 10}},
+                                      {**row, "arm": "memory_check_off", "scorer_tokens": {"in": 30, "out": 15}}])
+    assert table_row(text, "check off")[1:] == ["30", "15"]
+    assert table_row(text, "check on")[1:] == ["20", "10"]
