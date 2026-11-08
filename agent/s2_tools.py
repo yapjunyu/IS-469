@@ -16,23 +16,30 @@
 - remember_fact stores a fact in the learner model. With the memory-write check on, its passage id
   must be one retrieved this turn (by search_notes, make_quiz's search or grade_answer's lookup);
   off stores anything, the unsafe baseline for the poisoning test.
+- picture_parts turns passages' pictures into message parts, for ask and the loop. _readable_passages
+  drops every passage with neither text nor a picture file to send, and with the images switch off
+  every picture and every passage with no text, so no LLM receives them.
 """
 
+import base64
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable
 
 from agent import s4_trace, s5_search_again, s6_guard
 from agent.memory import  learner
-from agent.prompts import GRADE_PROMPT, GUARD_PROMPT, QUIZ_PROMPT
+from agent.prompts import GRADE_PROMPT, GUARD_PROMPT, PICTURES_PROMPT, QUIZ_PROMPT
 
 # shortcut: hardcoded, move to config.yaml once the team agrees on it
 MODEL = "opencode-go/deepseek-v4.1-flash"  # the prefix routes it to OpenCode Go, see s1_llm
+# shortcut: hardcoded, move to config.yaml once the team agrees on it
+MAX_PICTURES = 3  # per LLM request, to bound image tokens
 
 
 # shortcut: stub, the app passes the retrieval teammate's search(student_id, query) once it lands
 def stub_search(student_id, query):
-    """The search function's shape: a list of passages, each with id, file, page and text."""
+    """The search function's shape: a list of passages, each with id, file, page and text, and image_path if it has a picture."""
     return [{"id": "stub-1", "file": "stub.pdf", "page": 1, "text": f"Stub passage about {query}."}]
 
 
@@ -50,15 +57,24 @@ class TurnContext:
     # running totals for the turn, so LLM calls made inside tools count too
     tokens: dict = field(default_factory=lambda: {"in": 0, "out": 0})
     searches: int = 0
-    passage_ids: list = field(default_factory=list)  # every passage retrieved this turn
+    passages: list = field(default_factory=list)  # every passage retrieved this turn, oldest first: the tutor's and judge's one record
+    hide_citations: bool = False  # make_quiz passed its checks or grade_answer ran, so the answer's passage ids could point at the answer
+    quiz: list | None = None  # the questions of this turn's last successful make_quiz, returned so the app keeps the quiz open
+    record: str = ""  # the student's record in the tutor's system prompt, the judge's support for claims about it
+    session: str = ""  # the session's earlier turns and this turn's message, the judge's support for claims about the session
     search_fn: Callable = stub_search
     passages_fn: Callable = stub_passages
     search_again: bool = True
     guard: bool = True
     memory_check: bool = True
     faithfulness: bool = True
+    images: bool = True
     memory: str = "learner"  # "none", "learner" or "vector", see run_turn
     step_cap: int = 6
+
+    @property
+    def passage_ids(self):
+        return [p["id"] for p in self.passages]
 
 # Concept-taking tools accept only names on the notebook's concept list; the error lists them so the LLM can retry
 def _check_concept(ctx, concept):
@@ -69,9 +85,36 @@ def _check_concept(ctx, concept):
     if known and learner.norm(concept) not in known:
         return {"error": f"Unknown concept {concept!r}. Use one of: {', '.join(known)}"}
 
-# keep only the fields an LLM needs, whatever else retrieval returns (scores etc.)
-def _fields(passages):
-    return [{k: p[k] for k in ("id", "file", "page", "text")} for p in passages]
+# the passages an LLM can read (text, or a picture with the switch on), with only the fields it needs, whatever else retrieval returns (scores etc.)
+# shortcut: a text-less passage past the MAX_PICTURES cap stays as an empty <document>, drop it if its id ever misleads the LLM
+def _readable_passages(ctx, passages):
+    keys = (*s6_guard.TEXT_FIELDS, "image_path") if ctx.images else s6_guard.TEXT_FIELDS
+    return [{k: p[k] for k in keys if k in p} for p in passages if p["text"].strip() or (ctx.images and has_picture(p))]
+
+
+def has_picture(passage):
+    """The passage names a picture file that exists, so an LLM can be shown it."""
+    return bool(passage.get("image_path")) and Path(passage["image_path"]).is_file()
+
+
+def picture_parts(passages):
+    """Message parts for the newest MAX_PICTURES pictures among passages (later is newer), each named
+    by its passage id, or [] if there are none. A picture file that no longer exists is skipped."""
+    parts, sent = [], set()
+    for p in reversed(passages):
+        if len(sent) == MAX_PICTURES:
+            break
+        if not p.get("image_path") or p["id"] in sent:
+            continue
+        try:
+            png = base64.b64encode(Path(p["image_path"]).read_bytes()).decode()
+        except OSError:
+            continue
+        sent.add(p["id"])
+        parts[:0] = [{"type": "text", "text": f"Picture from passage {p['id']}:"},
+                     # shortcut: every picture is sent as a PNG, read the type from the file once extract.py saves others
+                     {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{png}"}}]
+    return [{"type": "text", "text": PICTURES_PROMPT}, *parts] if parts else []
 
 
 def search_notes(ctx, query):
@@ -79,10 +122,10 @@ def search_notes(ctx, query):
     def search(q):
         ctx.searches += 1
         queries.append(q)
-        return _fields(ctx.search_fn(ctx.student_id, q))
+        return _readable_passages(ctx, ctx.search_fn(ctx.student_id, q))
     passages = s5_search_again.search_with_retries(ctx, query, search, ask) if ctx.search_again else search(query)
     # only the passages the tutor gets count as retrieved, not those of rejected attempts
-    ctx.passage_ids += [p["id"] for p in passages]
+    ctx.passages += passages
     # queries first, so the tool row's result_summary shows every attempt; the tutor is sent only the passages
     return {"queries": queries, "passages": passages}
 
@@ -96,11 +139,14 @@ def reply_json(content, start):
 
 def ask(ctx, purpose, prompt, passages, user_text, start, model=None):
     """One LLM call over the passages (quiz, grading, judge, search_again). Returns the reply's JSON value starting at `start` ("[" or "{"), or None.
+    passages: already through _readable_passages, as every tool's are when it retrieves them.
     model: None uses MODEL as it is at call time, so setting s2_tools.MODEL switches these calls too."""
     model = model or MODEL
     system = prompt + (GUARD_PROMPT if ctx.guard else "")
+    text = s6_guard.material(passages, ctx.guard) + "\n\n" + user_text
+    pictures = picture_parts(passages)
     messages = [{"role": "system", "content": system},
-                {"role": "user", "content": s6_guard.material(passages, ctx.guard) + "\n\n" + user_text}]
+                {"role": "user", "content": [{"type": "text", "text": text}, *pictures] if pictures else text}]
     return reply_json(s4_trace.traced_chat(ctx, purpose, messages, model)["message"].get("content") or "", start)
 
 
@@ -111,6 +157,7 @@ def make_quiz(ctx, concept, n=3):
     passages = search_notes(ctx, concept)["passages"]
     if not passages:
         return {"error": f"No passages in the notes about {concept!r}"}
+    ctx.hide_citations = True
     items = ask(ctx, "quiz", QUIZ_PROMPT.format(n=n), passages, f"Concept: {concept}", "[")
     ids = [p["id"] for p in passages]
     questions = []
@@ -122,15 +169,19 @@ def make_quiz(ctx, concept, n=3):
             # no valid source id: grade against every passage the quiz was made from
             questions.append({"question": q["question"], "passage_ids": got or ids})
     questions = questions[:n]
-    return {"questions": questions} if questions else {"error": "The quiz reply had no valid questions"}
+    if not questions:
+        return {"error": "The quiz reply had no valid questions"}
+    ctx.quiz = questions
+    return {"questions": questions}
 
 def grade_answer(ctx, question, student_answer, passage_ids):
+    ctx.hide_citations = True  # before the checks: a failed call is still a quiz question being answered
     if not (isinstance(passage_ids, list) and passage_ids and all(isinstance(i, str) for i in passage_ids)):
         return {"error": "passage_ids must be the non-empty list of ids make_quiz gave for this question"}
-    passages = _fields(ctx.passages_fn(ctx.student_id, passage_ids))
+    passages = _readable_passages(ctx, ctx.passages_fn(ctx.student_id, passage_ids))
     if not passages:
         return {"error": f"No passages found with ids {passage_ids}"}
-    ctx.passage_ids += [p["id"] for p in passages]  # fetched from the notes this turn, so they count as retrieved
+    ctx.passages += passages  # fetched from the notes this turn, so they count as retrieved
     verdict = ask(ctx, "grading", GRADE_PROMPT, passages,
                    f"Question: {question}\nStudent's answer: {student_answer}", "{")
     if not (isinstance(verdict, dict) and isinstance(verdict.get("correct"), bool)):
@@ -191,7 +242,8 @@ TOOL_SCHEMAS = [
              "n": {"type": "integer", "description": "Number of questions, 1 to 5."}},
             ["concept"]),
     _schema("grade_answer",
-            "Grade the student's answer to a quiz question. Returns correct or not and a hint, never the answer.",
+            "Grade the student's answer to a quiz question. Call it for every answer to a quiz question, "
+            "never grade from memory. Returns correct or not and a hint, never the answer.",
             {"question": {"type": "string"}, "student_answer": {"type": "string"},
              "passage_ids": {"type": "array", "items": {"type": "string"},
                              "description": "The passage ids make_quiz gave for this question."}},

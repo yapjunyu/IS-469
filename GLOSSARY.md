@@ -42,6 +42,14 @@ _Avoid_: Note, knowledge
 A short summary of what the student struggled with in one past session, written by reflection at the end of that session.
 _Avoid_: Memory (alone), log
 
+**Mastery panel**:
+The sidebar's list of the notebook's concepts, each with a bar at its mastery score or "Not tested yet", with weak spots standing out.
+_Avoid_: Dashboard, progress view
+
+**Memory view**:
+The screen showing everything the tutor remembers about one student: mastery scores, wrong beliefs, facts and session notes. Each row can be deleted, none edited.
+_Avoid_: Memory page, memory (alone)
+
 ## Conversation
 
 **Session**:
@@ -53,8 +61,12 @@ One student message and the tutor's final reply to it.
 _Avoid_: Round, exchange
 
 **Step**:
-One LLM call inside a turn, plus the tool calls it asks for. A turn has at most the step cap of steps, plus one forced-answer step (tools off) when the cap is hit, plus one regenerate step when the judge fails the answer.
+One LLM call inside a turn, plus the tool calls it asks for. A turn has at most the step cap of steps, plus one forced-answer step (tools off) when the cap is hit. A regenerate continues the same steps under the same cap.
 _Avoid_: Iteration, hop
+
+**Quiz**:
+Practice questions on one concept, each tied to the passages it was written from. Shown without citations, since they would point at the answer.
+_Avoid_: Test, question set
 
 ## Checks
 
@@ -62,12 +74,16 @@ _Avoid_: Iteration, hop
 The LLM, from a different model family than the tutor, that runs the faithfulness check.
 _Avoid_: Grader (that is `grade_answer`), checker, critic
 
+**Scorer**:
+The LLM that marks the tutor's answers during evaluation, from a family different from both the tutor and the judge. It never runs in the app.
+_Avoid_: Judge (that is the in-app faithfulness check), grader, evaluator
+
 **Faithfulness**:
-Whether every claim about course content in the tutor's final answer is stated in the passages retrieved that turn. It checks the answer matches the notes, not that the notes are right.
+Whether every claim about course content in the tutor's final answer is stated in the passages retrieved that turn or shown in their pictures. Claims about the student's own record (weak spots, wrong beliefs, the concept list) are checked against that record, and claims about the session itself (what the student asked, what an earlier answer said) against the session so far, which never supports a course-content claim. It checks the answer matches the notes, not that the notes are right.
 _Avoid_: Correctness, accuracy, groundedness
 
 **Regenerate**:
-The tutor's single retry after the judge fails an answer, with the judge's reason added. It counts as one more step.
+The tutor's single retry after the judge fails an answer, with the judge's reason added. It answers the student again, without apologising or mentioning the judge, and may search or grade first; its steps count toward the step cap.
 _Avoid_: Retry (alone), rewrite
 
 **Warning**:

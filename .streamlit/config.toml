@@ -1,0 +1,26 @@
+# A lamplit desk at night: warm charcoal, ink-cream text, one amber accent.
+[client]
+toolbarMode = "viewer"
+
+[theme]
+base = "dark"
+primaryColor = "#E7A955"
+backgroundColor = "#17140F"
+secondaryBackgroundColor = "#221E18"
+textColor = "#EDE6D9"
+borderColor = "#3A332A"
+linkColor = "#F0BE78"
+redColor = "#E8806A"
+redTextColor = "#F0957F"
+font = "Public Sans:https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap"
+headingFont = "Newsreader:https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+baseFontSize = 15
+baseRadius = "0.5rem"
+showWidgetBorder = true
+showSidebarBorder = true
+
+[theme.sidebar]
+backgroundColor = "#110F0B"
+secondaryBackgroundColor = "#1D1914"
+borderColor = "#2E2821"

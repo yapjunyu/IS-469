@@ -53,18 +53,9 @@ class FakeCrossEncoder:
 
 
 @pytest.fixture(autouse=True)
-def fake_models(monkeypatch):
-    """Replaces the model library itself, so the real Embedder, HybridRerankIndex and their caches all run."""
-    monkeypatch.setitem(sys.modules, "sentence_transformers", SimpleNamespace(
-        SentenceTransformer=FakeSentenceTransformer, CrossEncoder=FakeCrossEncoder))
-    monkeypatch.setattr(FakeSentenceTransformer, "loads", 0)
-    monkeypatch.setattr(FakeCrossEncoder, "loads", 0)
+def fake_models(fake_models, monkeypatch):
+    """The shared fake models of tests/conftest.py on every test here, and the concept extractor's LLM scripted."""
     monkeypatch.setattr(s1_llm, "chat", lambda *a, **k: CONCEPTS)
-    embed._load.cache_clear()
-    search._cross_encoder.cache_clear()
-    yield
-    embed._load.cache_clear()  # so no fake model outlives this test
-    search._cross_encoder.cache_clear()
 
 
 def make_pdf(path, *slides):
@@ -83,7 +74,7 @@ def test_capitals_and_spacing_reach_the_same_notebook(name):
     assert notebook.student_id(name) == "jun-yu"
 
 
-@pytest.mark.parametrize("name", ["Jun!", "../bob", "a/b", "Zoë", "", "   ", "x" * 65])
+@pytest.mark.parametrize("name", ["Jun!", "../bob", "a/b", "ZoÃ«", "", "   ", "x" * 65])
 def test_a_name_that_cannot_be_used_raises_a_clear_error(name):
     with pytest.raises(ValueError, match="name"):
         notebook.student_id(name)
@@ -606,7 +597,8 @@ def test_the_embedder_and_reranker_load_once_however_much_is_added_and_searched(
 
 def test_a_turn_through_the_notebook_gives_the_llm_a_real_passage(monkeypatch, tmp_path):
     notebook.add_file("alice", make_pdf(tmp_path / "notes.pdf", "LoRA adapters are small"))
-    replies = iter([reply(SEARCH_CALL), reply({"role": "assistant", "content": "They are tiny."}),
+    [passage] = notebook.search("alice", "LoRA")
+    replies = iter([reply(SEARCH_CALL), reply({"role": "assistant", "content": f"They are tiny [{passage['id']}]."}),
                     reply({"role": "assistant", "content": '{"supported": true, "reason": "stated"}'})])
     sent = []
 
@@ -616,10 +608,41 @@ def test_a_turn_through_the_notebook_gives_the_llm_a_real_passage(monkeypatch, t
 
     monkeypatch.setattr(s1_llm, "chat", chat)
     out = turn("What is LoRA?", "alice", 1, search_fn=notebook.search, passages_fn=notebook.get_passages, faithfulness=True)
-    assert out["citations"] == [{"file": "notes.pdf", "page": 1}]
+    assert out["citations"] == [passage["id"]]
     assert "LoRA adapters are small" in sent[1]  # the tool message, from search
     assert "LoRA adapters are small" in sent[2]  # the judge's passages, from get_passages
     assert out["warning"] is False
+
+
+# display_answer
+
+CITED_A, CITED_B, QUIZ_ID = "a1b2c3d4e5f6:0007", "a1b2c3d4e5f6:0012", "0123456789ab:0003"
+
+
+def test_citation_ids_become_numbered_markers_and_every_other_passage_id_is_removed():
+    answer = f"LoRA is small [{CITED_A}]. It adapts [{CITED_B}, {CITED_A}]. Again [{CITED_A}].\nQ1: Why? [{QUIZ_ID}]\nQ2: How? [{QUIZ_ID}, {CITED_B}]"
+    assert notebook.display_answer(answer, [CITED_A, CITED_B]) == (
+        "LoRA is small [1]. It adapts [2][1]. Again [1].\nQ1: Why?\nQ2: How? [2]")
+
+
+def test_with_no_citations_every_passage_id_is_removed():
+    answer = f"Q1: Why? [{CITED_A}, {QUIZ_ID}]\nQ2: How? ({QUIZ_ID}) or {CITED_B}.\nSee {QUIZ_ID} for more."
+    assert notebook.display_answer(answer, []) == "Q1: Why?\nQ2: How? or.\nSee for more."
+
+
+def test_a_bracket_that_also_holds_other_text_keeps_its_own_closing_bracket():
+    assert notebook.display_answer(f"Says so [Lecture3.pdf, {CITED_A}].", [CITED_A]) == "Says so [Lecture3.pdf, [1]]."
+    assert notebook.display_answer(f"Says so ({CITED_A}, page 3).", [CITED_A]) == "Says so ([1], page 3)."
+    assert notebook.display_answer(f"Says so [Lecture3.pdf, {QUIZ_ID}].", [CITED_A]) == "Says so [Lecture3.pdf,]."
+
+
+def test_mismatched_brackets_around_an_id_stay():
+    assert notebook.display_answer(f"Says so [{CITED_A}).", [CITED_A]) == "Says so [[1])."
+
+
+def test_brackets_and_numbers_that_are_not_passage_ids_stay():
+    answer = "See [Figure 2] at 12:30, and [1] in the paper, about [a1b2:0007]."
+    assert notebook.display_answer(answer, []) == answer
 
 
 # no Streamlit
