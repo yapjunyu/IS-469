@@ -19,6 +19,7 @@ import argparse
 import asyncio
 import json
 import os
+import uuid
 from pathlib import Path
 
 import httpx
@@ -30,11 +31,14 @@ from ragas.metrics.collections import ContextPrecision, ContextRecall, FactualCo
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "eval" / "results_60_40"
-JUDGE_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"  # reads pictures; a different model from rag.py
-JUDGE_MAX_TOKENS = 8192  # the judge reasons before it replies, and the reasoning counts towards this limit
-OPENROUTER_URL = "https://openrouter.ai/api/v1"  # the OpenAI API, which RAGAS expects
+JUDGE_MODEL = "claude-haiku-5-5"  # reads pictures; a different model from rag.py
+JUDGE_MAX_TOKENS = 8192  # room for the longest RAGAS reply (claim lists); unused tokens cost nothing
+# OpenCode Go's OpenAI-compatible endpoint, which RAGAS expects. Go also serves Claude through it,
+# with the image_url parts MultiModalFaithfulness sends
+OPENCODE_URL = "https://opencode.ai/inference/go/openai/v1"
+GO_HEADERS = {"x-opencode-session": str(uuid.uuid4()), "User-Agent": "IS469-tutor/1.0"}  # Go rejects calls without a session
 
-tokens_used = 0  # counted from every judge reply, to see how much of the daily quota a run takes
+tokens_used = 0  # counted from every judge reply, to see what a run costs
 
 
 async def _count_tokens(response: httpx.Response):
@@ -45,7 +49,8 @@ async def _count_tokens(response: httpx.Response):
 
 
 def make_judge():
-    client = AsyncOpenAI(api_key=os.environ["OPENROUTER_API_KEY"], base_url=OPENROUTER_URL, max_retries=8,
+    client = AsyncOpenAI(api_key=os.environ["OPENCODE_API_KEY"], base_url=OPENCODE_URL, max_retries=8,
+                         default_headers=GO_HEADERS,
                          http_client=httpx.AsyncClient(event_hooks={"response": [_count_tokens]}, timeout=120))
     return llm_factory(JUDGE_MODEL, client=client, cache=DiskCacheBackend(str(ROOT / "data" / "ragas_cache")),
                        temperature=0.0, max_tokens=JUDGE_MAX_TOKENS)

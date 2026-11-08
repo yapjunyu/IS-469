@@ -1,6 +1,7 @@
 """
-Calls a model through OpenRouter's OpenAI-compatible API & cache reply on disk
-Needs OPENROUTER_API_KEY (environment or .env) only when a reply is not cached yet.
+Calls a model through OpenCode Go's OpenAI Responses API & cache reply on disk
+Needs OPENCODE_API_KEY (environment or .env) only when a reply is not cached yet.
+Go wants a stable x-opencode-session per conversation and a user agent naming the app.
 """
 
 import base64
@@ -8,11 +9,13 @@ import hashlib
 import json
 import re
 import time
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CACHE = ROOT / "data" / "llm_cache"
-BASE_URL = "https://openrouter.ai/api/v1"
+BASE_URL = "https://opencode.ai/inference/go/openai/v1"
+USER_AGENT = "IS469-tutor/1.0"
 
 
 def strip_thinking(text: str | None) -> str:
@@ -25,7 +28,7 @@ def strip_thinking(text: str | None) -> str:
 class LLM:
     """Callable: llm("prompt") -> reply text, or llm("prompt", images=["slide.png"]) for a vision model."""
 
-    def __init__(self, model_id: str, temperature: float = 0.0,
+    def __init__(self, model_id: str, temperature: float | None = 0.0,
                  cache_dir: str | Path = DEFAULT_CACHE, max_retries: int = 8,
                  reasoning_effort: str | None = None):
         self.model_id = model_id
@@ -34,6 +37,7 @@ class LLM:
         self.cache_dir = Path(cache_dir)
         self.max_retries = max_retries
         self._client = None
+        self.session_id = str(uuid.uuid4())  # one per LLM object: an eval run or an app turn
 
     def __call__(self, prompt: str, images: list[str | Path] | None = None) -> str:
         images = list(images or [])
@@ -48,9 +52,9 @@ class LLM:
             "temperature": self.temperature,
             "prompt": prompt,
             "images": [str(i) for i in images],
-            "response": strip_thinking(reply.choices[0].message.content),
-            "input_tokens": getattr(reply.usage, "prompt_tokens", None),  # some replies carry no usage
-            "output_tokens": getattr(reply.usage, "completion_tokens", None),
+            "response": strip_thinking(reply.output_text),
+            "input_tokens": getattr(reply.usage, "input_tokens", None),  # some replies carry no usage
+            "output_tokens": getattr(reply.usage, "output_tokens", None),
             "latency_s": round(time.perf_counter() - start, 3),
         }
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -64,13 +68,11 @@ class LLM:
         return self.cache_dir / f"{hashlib.sha256(key.encode()).hexdigest()}.json"
 
     def _message(self, prompt: str, images: list[str | Path]) -> dict:
-        """Plain text, or text followed by one image_url part per picture."""
-        if not images:
-            return {"role": "user", "content": prompt}
-        parts = [{"type": "text", "text": prompt}]
+        """The prompt as input_text, followed by one input_image part per picture."""
+        parts = [{"type": "input_text", "text": prompt}]
         for image in images:
             b64 = base64.b64encode(Path(image).read_bytes()).decode()
-            parts.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}})
+            parts.append({"type": "input_image", "image_url": f"data:image/png;base64,{b64}"})
         return {"role": "user", "content": parts}
 
     def _call_api(self, prompt: str, images: list[str | Path]):
@@ -79,16 +81,19 @@ class LLM:
         import openai
         from dotenv import load_dotenv
 
-        load_dotenv(ROOT / ".env")  # lets OPENROUTER_API_KEY live in .env
+        load_dotenv(ROOT / ".env")  # lets OPENCODE_API_KEY live in .env
         if self._client is None:
-            self._client = openai.OpenAI(base_url=BASE_URL, api_key=os.environ["OPENROUTER_API_KEY"], max_retries=0)
-        extra = {"reasoning_effort": self.reasoning_effort} if self.reasoning_effort else {}
+            self._client = openai.OpenAI(
+                base_url=BASE_URL, api_key=os.environ["OPENCODE_API_KEY"], max_retries=0,
+                default_headers={"x-opencode-session": self.session_id, "User-Agent": USER_AGENT})
+        extra = {"reasoning": {"effort": self.reasoning_effort}} if self.reasoning_effort else {}
+        if self.temperature is not None:  # reasoning models such as gpt-6-luna reject temperature
+            extra["temperature"] = self.temperature
         for attempt in range(self.max_retries):
             try:
-                return self._client.chat.completions.create(
+                return self._client.responses.create(
                     model=self.model_id,
-                    messages=[self._message(prompt, images)],
-                    temperature=self.temperature,
+                    input=[self._message(prompt, images)],
                     **extra,
                 )
             # 429 rate limit; 500/503 the host is busy or failed (the same request often works next time)

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from tutor.retrieval.search import (BM25Index, ChromaIndex, ChromaTextOnly, DenseIndex, HybridIndex,
-                                    HybridRerankIndex, make_index, rrf)
+                                    HybridRerankIndex, SlideMergeIndex, make_index, rrf)
 from tutor.retrieval.types import Chunk, Passage
 
 WORDS = ["lora", "bm25", "agent"]
@@ -191,3 +191,30 @@ def test_chroma_text_only_skips_pictures(tmp_path):
     store.add_file(CHUNKS + [PICTURE])
     found = ChromaTextOnly(store).search("lora", k=5)
     assert found and not any(p.image_path for p in found)
+
+
+class FixedIndex:
+    def __init__(self, *passages):
+        self.passages = list(passages)
+
+    def search(self, query, k=5):
+        return self.passages[:k]
+
+
+def hit(n, page, kind="slide", text="", image=None):
+    return Passage(id=f"h:{n}", file="deck.pptx", page=page, page_end=page, text=text, kind=kind, image_path=image)
+
+
+def test_slide_text_and_png_merge_into_one_result_but_document_chunks_do_not():
+    index = SlideMergeIndex(FixedIndex(hit(1, 26, text="t26"), hit(2, 26, image="26.png"),
+                                       hit(3, 12, "page", text="p12"), hit(4, 12, "page", image="12.png")))
+    found = index.search("q", 3)
+    assert [(p.page, p.text, p.image_path) for p in found] == [
+        (26, "t26", "26.png"), (12, "p12", None), (12, "", "12.png")]
+
+
+def test_merging_still_returns_k_results():
+    index = SlideMergeIndex(FixedIndex(hit(1, 1, text="a"), hit(2, 1, image="1.png"),
+                                       hit(3, 2, text="b"), hit(4, 2, image="2.png"),
+                                       hit(5, 3, text="c"), hit(6, 4, text="d")))
+    assert [p.page for p in index.search("q", 3)] == [1, 2, 3]

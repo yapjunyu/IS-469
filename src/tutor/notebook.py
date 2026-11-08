@@ -12,6 +12,7 @@ search and get_passages are what run_turn takes as search_fn and passages_fn.
 """
 import shutil
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,7 +23,7 @@ if str(ROOT) not in sys.path:
 from agent.ingest import extract_concepts  # noqa: E402
 from agent.memory import learner  # noqa: E402
 from tutor.pipeline import EMBEDDER, STORE_TAG, search_index, store_pages  # noqa: E402
-from tutor.rag import K  # noqa: E402
+from tutor.generator import K  # noqa: E402
 from tutor.retrieval.clean import clean_pages  # noqa: E402
 from tutor.retrieval.embed import Embedder  # noqa: E402
 from tutor.retrieval.extract import FileRejected, extract, file_sha256  # noqa: E402
@@ -124,12 +125,26 @@ def search(student: str, query: str) -> list[dict]:
 
 
 def get_passages(student: str, ids: list[str]) -> list[dict]:
-    """The passages with these IDs, in the order asked. An ID not in this notebook is left out."""
+    """The passages with these IDs, in the order asked. An ID not in this notebook is left out.
+    A slide comes back with its text and PNG merged, the same as search returns it."""
     student = student_id(student)
     if not files(student):
         return []
-    held = {p.id: p for p in _store(student).chunks}
-    return [_passage(held[i]) for i in ids if i in held]
+    chunks = _store(student).chunks
+    held = {c.id: c for c in chunks}
+    slide_text = {(c.file, c.page): c.text for c in chunks if c.kind == "slide" and c.text}
+    slide_png = {(c.file, c.page): c.image_path for c in chunks if c.kind == "slide" and c.image_path}
+
+    found = []
+    for i in ids:
+        if i not in held:
+            continue
+        c = held[i]
+        if c.kind == "slide":  # fill in the other half, like SlideMergeIndex does
+            key = (c.file, c.page)
+            c = replace(c, text=c.text or slide_text.get(key, ""), image_path=c.image_path or slide_png.get(key))
+        found.append(_passage(c))
+    return found
 
 
 def _passage(passage) -> dict:

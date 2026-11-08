@@ -2,7 +2,7 @@
 
     slides     one chunk per slide, plus image chunks
     documents  recursive 200 words, 30-word overlap, plus image chunks
-    search     dense, top 3
+    search     dense, top 3, with a slide's text and PNG merged into one result (SlideMergeIndex, as the app does)
 
 Image questions get two scores:
     answer  a chunk holds the answer: an image chunk on the gold page, or any chunk on a page listed
@@ -34,7 +34,7 @@ from tutor.retrieval.chunk import chunk_pages  # noqa: E402
 from tutor.retrieval.clean import clean_pages  # noqa: E402
 from tutor.retrieval.embed import Embedder  # noqa: E402
 from tutor.retrieval.extract import extract, file_sha256  # noqa: E402
-from tutor.retrieval.search import DenseIndex  # noqa: E402
+from tutor.retrieval.search import DenseIndex, SlideMergeIndex  # noqa: E402
 
 MODELS = ("gemma2", "jinaclip2")
 SLIDES = mc.SLIDE_METHODS["slide"]
@@ -62,7 +62,7 @@ def run(key: str):
 
     embed = common.CachedImageEmbed(Embedder(key))
     began = time.perf_counter()
-    index = DenseIndex(chunks, embed)
+    index = SlideMergeIndex(DenseIndex(chunks, embed))
     index_s = embed.take_used_s()
     print(f"indexed in {time.perf_counter() - began:.0f}s ({index_s:.0f}s of embedding, cached or not)", flush=True)
 
@@ -80,9 +80,10 @@ def run(key: str):
         summary += ev.summarise([r for r in answer if r["id"] in ids], qs, {**labels, "score": "answer"}, extra, GROUPS)
         summary += ev.summarise([r for r in figure if r["id"] in ids], [q for q in qs if q["evidence_type"] == "image"],
                                 {**labels, "score": "figure"}, extra, {"image_q": GROUPS["image_q"]})
-    ev.write_csv(common.OUT / f"image_embedder_{key}.csv", summary)
-    ev.write_csv(common.OUT / f"image_embedder_{key}_questions.csv", answer + figure)
-    print(f"Saved {common.OUT / f'image_embedder_{key}.csv'}", flush=True)
+    name = f"image_embedder_{key}"
+    ev.write_csv(common.OUT / f"{name}.csv", summary)
+    ev.write_csv(common.OUT / f"{name}_questions.csv", answer + figure)
+    print(f"Saved {common.OUT / f'{name}.csv'}", flush=True)
 
 
 def compare():

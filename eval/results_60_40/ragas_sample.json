@@ -1,0 +1,617 @@
+{
+ "judge": "claude-haiku-5-5",
+ "means": {
+  "faithfulness": 0.987,
+  "factual_correctness": 0.706,
+  "context_precision": 0.953,
+  "context_recall": 0.896
+ },
+ "scored": {
+  "faithfulness": 75,
+  "factual_correctness": 75,
+  "context_precision": 55,
+  "context_recall": 55
+ },
+ "rows": [
+  {
+   "id": "cl-04",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.75,
+   "context_precision": 0.9999999999,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "cl-18",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.81,
+   "context_precision": 0.9999999999,
+   "context_recall": 0.6666666666666666,
+   "errors": {}
+  },
+  {
+   "id": "cl-20",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.83,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "cl-21",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.76,
+   "context_precision": 0.99999999995,
+   "context_recall": 0.8888888888888888,
+   "errors": {}
+  },
+  {
+   "id": "cl-33",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.84,
+   "context_precision": 0.8333333332916666,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "cl-40",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.89,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "cl-42",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.45,
+   "context_precision": 0.9999999999,
+   "context_recall": 0.3333333333333333,
+   "errors": {}
+  },
+  {
+   "id": "cl-44",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.8,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "cl-60",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.55,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "cl-75",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.94,
+   "context_precision": 0.9999999999,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "cl-81",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.96,
+   "context_precision": 0.9999999999,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "cl-87",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.25,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "ai-01",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.8,
+   "context_precision": 0.3333333333,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ai-10",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.82,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ai-15",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.14,
+   "context_precision": 0.8333333332916666,
+   "context_recall": 0.25,
+   "errors": {}
+  },
+  {
+   "id": "ai-20",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.62,
+   "context_precision": 0.9999999999,
+   "context_recall": 0.5,
+   "errors": {}
+  },
+  {
+   "id": "ai-22",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.74,
+   "context_precision": 0.99999999995,
+   "context_recall": 0.5,
+   "errors": {}
+  },
+  {
+   "id": "ai-44",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.76,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ai-51",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.67,
+   "context_precision": 0.99999999995,
+   "context_recall": 0.8333333333333334,
+   "errors": {}
+  },
+  {
+   "id": "ai-66",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.76,
+   "context_precision": 0.5833333333041666,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ai-74",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.7,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ai-83",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.55,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "ai-94",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.73,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ai-101",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.67,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "ds-01",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.74,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ds-03",
+   "faithfulness": 1.0,
+   "factual_correctness": 1.0,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ds-04",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.77,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ds-05",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.67,
+   "context_precision": 0.9999999999,
+   "context_recall": 0.8,
+   "errors": {}
+  },
+  {
+   "id": "ds-06",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.81,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ds-07",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.74,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ds-09",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.83,
+   "context_precision": 0.8333333332916666,
+   "context_recall": 0.8333333333333334,
+   "errors": {}
+  },
+  {
+   "id": "ds-10",
+   "faithfulness": 1.0,
+   "factual_correctness": 1.0,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ds-12",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.6,
+   "context_precision": 0.99999999995,
+   "context_recall": 0.6666666666666666,
+   "errors": {}
+  },
+  {
+   "id": "ds-13",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.83,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 0.8,
+   "errors": {}
+  },
+  {
+   "id": "ds-16",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.5,
+   "context_precision": 0.99999999995,
+   "context_recall": 0.6666666666666666,
+   "errors": {}
+  },
+  {
+   "id": "ds-17",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.57,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "ai-103",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.0,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "ai-104",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.44,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "ds-24",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.57,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "cl-93",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.62,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "cl-96",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.0,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "ai-105",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.2,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "ds-25",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.33,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "ds-26",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.36,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "sd-01",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.78,
+   "context_precision": 0.9999999999,
+   "context_recall": 0.6666666666666666,
+   "errors": {}
+  },
+  {
+   "id": "sd-04",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.77,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "sd-10",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.89,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "sd-12",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.93,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "sd-13",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.91,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "sd-17",
+   "faithfulness": 1.0,
+   "factual_correctness": 1.0,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "sd-19",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.86,
+   "context_precision": 0.9999999999,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "sd-22",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.89,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "sd-23",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.82,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "sd-26",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.78,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "sd-27",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.43,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "sd-28",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.6,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "sd-33",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.92,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "sd-35",
+   "faithfulness": 1.0,
+   "factual_correctness": 1.0,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "sd-36",
+   "faithfulness": 0.0,
+   "factual_correctness": 0.31,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "cl-97",
+   "faithfulness": 1.0,
+   "factual_correctness": 1.0,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "pm-05",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.86,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "pm-07",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.89,
+   "context_precision": 0.99999999995,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "pm-10",
+   "faithfulness": 1.0,
+   "factual_correctness": 1.0,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "pm-19",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.71,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "pm-20",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.89,
+   "context_precision": 0.99999999995,
+   "context_recall": 0.75,
+   "errors": {}
+  },
+  {
+   "id": "pm-27",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.86,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "pm-32",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.75,
+   "context_precision": 0.9999999999666667,
+   "context_recall": 0.6666666666666666,
+   "errors": {}
+  },
+  {
+   "id": "pm-37",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.62,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "pm-42",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.5,
+   "context_precision": 0.5833333333041666,
+   "context_recall": 0.6666666666666666,
+   "errors": {}
+  },
+  {
+   "id": "pm-45",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.86,
+   "context_precision": 0.5833333333041666,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "pm-49",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.77,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  },
+  {
+   "id": "pm-51",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.8,
+   "context_precision": 0.9999999999,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "pm-54",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.56,
+   "context_precision": 0.8333333332916666,
+   "context_recall": 0.8,
+   "errors": {}
+  },
+  {
+   "id": "pm-57",
+   "faithfulness": 1.0,
+   "factual_correctness": 0.62,
+   "context_precision": 0.9999999999,
+   "context_recall": 1.0,
+   "errors": {}
+  },
+  {
+   "id": "pm-60",
+   "faithfulness": 1.0,
+   "factual_correctness": 1.0,
+   "context_precision": null,
+   "context_recall": null,
+   "errors": {}
+  }
+ ]
+}

@@ -628,3 +628,26 @@ def test_the_module_imports_without_streamlit_and_with_only_src_on_the_path():
     code = "import sys; sys.modules['streamlit'] = None; import tutor.notebook"  # None makes any import of it fail
     subprocess.run([sys.executable, "-c", code], cwd=Path(notebook.__file__).parents[1],
                    env={**os.environ, "PYTHONPATH": ""}, check=True)
+
+
+def slide_figure_pdf(path, text):
+    """A landscape PDF, so a slide: its text and a whole-slide PNG are stored as two chunks."""
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=792, height=612)
+        page.insert_text((72, 72), text)
+        page.insert_image(pymupdf.Rect(72, 100, 272, 300), pixmap=PICTURE)
+        doc.save(path)
+    return path
+
+
+def test_a_slide_comes_back_as_one_passage_with_its_text_and_picture(tmp_data):
+    notebook.add_file("alice", slide_figure_pdf(tmp_data / "deck.pdf", "LoRA adapters are small"))
+    [found] = notebook.search("alice", "LoRA")
+    assert found["kind"] == "slide" and found["text"] == "LoRA adapters are small"
+    assert Path(found["image_path"]).exists()
+
+
+def test_get_passages_returns_a_slide_merged_like_search(tmp_data):
+    notebook.add_file("alice", slide_figure_pdf(tmp_data / "deck.pdf", "LoRA adapters are small"))
+    [found] = notebook.search("alice", "LoRA")
+    assert notebook.get_passages("alice", [found["id"]]) == [found]

@@ -1,4 +1,4 @@
-from tutor.rag import NOT_FOUND, Answer, answer, build_prompt
+from tutor.generator import NOT_FOUND, Answer, answer, build_prompt
 from tutor.retrieval.types import Passage
 
 
@@ -54,6 +54,13 @@ def test_pictures_are_attached_numbered_after_the_passages_and_citable():
     assert llm.images == ["fig.png"]
     assert "[2] (deck.pptx, slide 3)" in llm.prompts[-1] and "Pictures" in llm.prompts[-1]
     assert result.citations() == ["deck.pptx, slide 2", "deck.pptx, slide 3"]
+
+
+def test_only_the_pictures_the_answer_cites_are_shown():
+    llm = FakeLLM("Text says A [1]; the diagram shows B [3].")
+    shown, unused = passage(4, "", image_path="fig4.png"), passage(3, "", image_path="fig3.png")
+    result = answer("q", FakeIndex(passage(2, "text"), unused, shown), llm)
+    assert result.cited_figures() == [shown]
 
 
 def test_every_picture_in_the_top_3_is_sent():

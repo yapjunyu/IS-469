@@ -272,3 +272,28 @@ class HybridRerankIndex:
         text = iter(self._reranked_text(query, k))
         picked = (p if p.image_path else next(text, None) for p in self.dense.search(query, k))
         return [p for p in picked if p]
+
+
+class SlideMergeIndex:
+    """Wraps any index so a slide's text and its PNG count as one result.
+
+    A slide PNG shows the slide's own text, so both hits for the same slide would use two
+    of the k places for one slide. They are merged into one Passage with the text and the
+    image_path. Document pages are left alone: a cropped figure doesn't repeat the page's text.
+    Each slide has at most 2 chunks (one text, one PNG), so fetching 2k always gives k results.
+    """
+
+    def __init__(self, index):
+        self.index = index
+
+    def search(self, query: str, k: int = 5) -> list[Passage]:
+        merged: dict = {}  # keeps rank order: a slide sits where its best hit ranked
+        for p in self.index.search(query, 2 * k):
+            key = (p.file, p.page) if p.kind == "slide" else p.id
+            if key not in merged:
+                merged[key] = p
+            else:  # the other half of a slide already found: fill in what the first hit lacks
+                first = merged[key]
+                merged[key] = replace(first, text=first.text or p.text,
+                                      image_path=first.image_path or p.image_path)
+        return list(merged.values())[:k]

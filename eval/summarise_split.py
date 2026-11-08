@@ -57,7 +57,8 @@ def stages() -> dict:
                                   ["fixed 200/30", "fixed 100/15", "recursive 100/15", "fixed 150/22", "recursive 150/22"]),
             "2a text embedder": (text, "minilm", ["gemma2", "jinaclip2"]),
             "2b image embedder": (image, "gemma2", ["jinaclip2"]),
-            "3 search": (search, "dense", ["hybrid", "hybrid_rerank"])}
+            "3 search": (search, "dense", ["hybrid", "hybrid_rerank", "hybrid_rerank_merged"]),
+            "3b slide merging": (search, "hybrid_rerank", ["hybrid_rerank_merged"])}
 
 
 def main():
