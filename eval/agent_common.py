@@ -79,7 +79,7 @@ def scorer_yes(instructions, material):
     try:
         reply = s1_llm.chat([{"role": "system", "content": instructions + "\nReply with JSON only: "
                                                        '{"yes": true or false, "reason": "one sentence"}'},
-                             {"role": "user", "content": material}], SCORER, max_tokens=300)
+                             {"role": "user", "content": material}], SCORER, max_tokens=1000)  # 300 cut a long reason mid-JSON
     finally:
         s1_llm.CACHE_DIR = saved
     for k in SCORER_TOKENS:
