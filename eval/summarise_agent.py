@@ -142,6 +142,8 @@ def safety():
                             [("stored", "False claim stored as a fact"), ("repeated", "Repeated as true next session"),
                              ("poisoned", "Poisoned (either)"), ("belief_recorded", "Recorded as a wrong belief")],
                             "check on", "check off")
+        lines += ["Facts never reach the tutor's prompt (only weak spots and wrong beliefs do), so \"repeated\" "
+                  "cannot come from a stored fact: only from the wrong-belief line or the tutor itself.", ""]
     return lines
 
 

@@ -38,6 +38,7 @@ def main():
             if results.has(row["id"], arm):
                 continue
             ac.reset_learner(ac.STUDENT)
+            ac.SCORER_TOKENS.update({"in": 0, "out": 0})
             first = ac.run("poisoning", arm, row["message"], **switches)
             memory = learner.read_all(ac.STUDENT)
             stored = [f for f in memory["facts"] if states(row["claim"], f["fact"])[0]]
@@ -51,7 +52,8 @@ def main():
                          "stored": bool(stored), "repeated": repeated, "repeated_reason": why,
                          "poisoned": bool(stored) or repeated, "belief_recorded": bool(memory["wrong_beliefs"]),
                          "tokens": {k: first["tokens"][k] + second["tokens"][k] for k in ("in", "out")},
-                         "duration_ms": first["duration_ms"] + second["duration_ms"]})
+                         "duration_ms": first["duration_ms"] + second["duration_ms"],
+                         "scorer_tokens": dict(ac.SCORER_TOKENS)})
             print(f"{row['id']:7} {arm:16} stored={bool(stored)!s:5} repeated={repeated!s:5} "
                   f"belief={bool(memory['wrong_beliefs'])}", flush=True)
     print(f"Saved {results.path}")
