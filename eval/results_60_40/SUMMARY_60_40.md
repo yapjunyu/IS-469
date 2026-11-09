@@ -220,7 +220,30 @@ The final pipeline answered the 75 `llm_eval` questions, and RAGAS scored the an
   - **The answer read the caption but not the diagram:** in `cl-87` (0.25), the right slide and its picture were retrieved, but the answer repeats the caption ("CSP or 3rd party network provider") and leaves out what the diagram shows (colocation facility, Zone 1). The prompt's "if they are brief, keep the answer brief" may cut answers short when a slide's text is only a caption.
 - **The judge is not perfect:** `ai-103` scores 0.0 factual correctness although its token counts (6, 8 and 25) match the reference. One judge model scoring 75 questions has some noise, so read single question scores with care.
 
-**Picture prompt experiment (not kept):** we added a line to the prompt that is used only when a picture is attached: "When a picture helps answer the question, describe what it shows (labels, steps, values, positions), not only its caption, and cite it." Text-only prompts stayed the same. The same rule as in the retrieval stages decided: keep it only if dev image factual correctness rises while faithfulness stays near 1. 27 answers changed, all of them questions with a retrieved picture.
+### Baseline vs final setup (text questions)
+
+Does better retrieval give better answers? The same generator and prompt answered the 55 text questions twice: once with the Stage 1 baseline (MiniLM, fixed chunking for slides and documents, dense search) and once with the final setup. Image questions are left out, because MiniLM cannot embed pictures. The table shows the gain from baseline to final, paired by question, with 95% bootstrap intervals. Nothing was chosen from this comparison, so dev and test are both reported.
+
+| Metric | Group | Baseline | Final | Gain (95% CI) | Better / worse |
+|---|---|---|---|---|---|
+| **Factual correctness** | All (55) | 0.657 | 0.759 | **+0.102** (+0.042 to +0.165) | 33 / 15 |
+| | Dev (34) | 0.641 | 0.737 | **+0.096** (+0.021 to +0.176) | 20 / 9 |
+| | Test (21) | 0.684 | 0.795 | **+0.111** (+0.027 to +0.222) | 13 / 6 |
+| **Context recall** | All | 0.815 | 0.896 | **+0.081** (+0.008 to +0.159) | 16 / 9 |
+| | Dev | 0.782 | 0.890 | **+0.109** (+0.022 to +0.207) | 11 / 4 |
+| | Test | 0.869 | 0.906 | +0.037 (-0.074 to +0.166) | 5 / 5 |
+| **Context precision** | All | 0.888 | 0.953 | +0.065 (-0.003 to +0.141) | 11 / 6 |
+| | Dev | 0.882 | 0.941 | +0.059 (-0.029 to +0.167) | 6 / 5 |
+| | Test | 0.897 | 0.972 | +0.075 (-0.024 to +0.198) | 5 / 1 |
+| **Faithfulness** | All | 0.982 | 1.000 | +0.018 (0.000 to +0.055) | 1 / 0 |
+
+- **Better retrieval gives more correct answers:** factual correctness rises by about 0.10, and the gain is clear on dev and on test separately. The gains in the retrieval evaluation reach the answers.
+- **Better retrieval finds more of what the reference needs:** context recall rises by 0.081 overall. The gain is clear on dev but within noise on test, where the baseline already scored 0.869. Context precision rises too, but within noise.
+- **The tutor fails safely with weak retrieval:** the baseline's answers are just as grounded. Its one faithfulness score below 1 is `cl-75`, where it replied "I can't find this in your notes". RAGAS finds no supported claim in that reply and scores it 0. The baseline gave that reply 3 times (`cl-75`, `ai-20`, `ds-12`), and the final setup never did. So weaker retrieval leads to missing answers, not made-up ones.
+
+### Picture prompt experiment (not kept)
+
+We added a line to the prompt that is used only when a picture is attached: "When a picture helps answer the question, describe what it shows (labels, steps, values, positions), not only its caption, and cite it." Text-only prompts stayed the same. The same rule as in the retrieval stages decided: keep it only if dev image factual correctness rises while faithfulness stays near 1. 27 answers changed, all of them questions with a retrieved picture.
 
 | Group | Metric | Before | After |
 |---|---|---|---|
@@ -232,7 +255,9 @@ The final pipeline answered the 75 `llm_eval` questions, and RAGAS scored the an
 
 Dev image factual correctness did not move, so the line was removed and the results above are from the original prompt. Single questions swung both ways (`ai-103` 0.00 to 0.89, `ds-24` 0.57 to 0.14), and faithfulness swapped between `sd-36` and `pm-49`. The generator has no temperature setting and the judge has some noise, so a change in one question's score means little. **The model already uses pictures:** it cites the attached picture in 13 of the 15 image answers that had one. So the image gap comes mostly from retrieval: no picture reached the generator on 5 of the 20, and those score 0.360. The prompt is not the main cause. **A next step:** look up a slide's PNG whenever its text is retrieved. Slide merging attaches the PNG only when the PNG chunk is also among the search candidates. In `ai-101` and `ai-104`, the gold slide's PNG is stored but was not a candidate, so the generator got the text only.
 
-**Cost:** about 92k generator tokens and 1.33M judge tokens, under $0.30. The prompt experiment added about 0.5M judge tokens. Answers and judge replies are cached, so rerunning unchanged questions is free.
+### Cost
+
+About 92k generator tokens and 1.33M judge tokens, under $0.30. The prompt experiment added about 0.5M judge tokens, and the baseline comparison 1.07M. Answers and judge replies are cached, so rerunning unchanged questions is free.
 
 ## Limits
 
@@ -254,6 +279,7 @@ Everything is in `eval/results_60_40/`.
 | `*_questions.csv` and the other stage CSVs | Results saved by each stage |
 | `generation_sample.json` | The 75 answers, with retrieved passages and pictures |
 | `ragas_sample.json`, `ragas_sample.csv`, `ragas_sample_questions.csv` | RAGAS scores: raw, by group, and per question |
+| `generation_baseline.json`, `ragas_baseline.json`, `ragas_baseline.csv`, `ragas_baseline_questions.csv` | The 55 text answers and their RAGAS scores, with the baseline retrieval |
 
 ## Reproduce
 
@@ -269,4 +295,6 @@ Everything is in `eval/results_60_40/`.
 .venv/bin/python eval/summarise_split.py
 .venv/bin/python eval/run_generation.py      # needs OPENCODE_API_KEY
 .venv/bin/python eval/ragas_eval.py sample
+.venv/bin/python eval/run_generation.py --baseline
+.venv/bin/python eval/ragas_eval.py baseline
 ```
