@@ -22,6 +22,7 @@ tutor (DeepSeek) and its faithfulness judge (GPT).
 """
 import argparse
 import asyncio
+import csv
 import json
 import os
 import uuid
@@ -39,6 +40,8 @@ RESULTS = ROOT / "eval" / "results_60_40"
 JUDGE_MODEL = "claude-haiku-5-5"  # reads pictures; a different model from generator.py (gpt-6-luna)
 JUDGE_MAX_TOKENS = 8192  # room for the longest RAGAS reply (claim lists); unused tokens cost nothing
 AGENT_RESULTS = ROOT / "eval" / "results_agent"
+GOLD = ROOT / "eval" / "gold" / "gold_60_40.csv"
+METRICS = ("faithfulness", "factual_correctness", "context_precision", "context_recall")
 SCORER_MODEL = "claude-haiku-5-5"  # eval/agent_common.py SCORER, without the opencode-go/ routing prefix
 # OpenCode Go's OpenAI-compatible endpoint, which RAGAS expects. Go also serves Claude through it, with the
 # image_url parts MultiModalFaithfulness sends. As agent/s1_llm.py, Go rejects requests without a session id
@@ -52,6 +55,28 @@ async def _count_tokens(response: httpx.Response):
     if response.url.path.endswith("/chat/completions") and response.status_code == 200:
         await response.aread()
         tokens_used += response.json().get("usage", {}).get("total_tokens", 0)
+
+
+def write_csvs(results_dir: Path, run: str, results: list[dict]) -> None:
+    """Pipeline runs only. ragas_<run>_questions.csv: one row per question with its split, format and four scores.
+    ragas_<run>.csv: the mean and count of each metric, overall and by split and evidence type."""
+    gold = {g["id"]: g for g in csv.DictReader(GOLD.open(newline=""))}
+    rows = [{"id": r["id"], **{k: gold.get(r["id"], {}).get(k, "") for k in ("split", "evidence_type", "corpus", "collection")},
+             **{m: r[m] for m in METRICS}, "errors": "; ".join(f"{k}: {v}" for k, v in r["errors"].items())}
+            for r in results]
+    with (results_dir / f"ragas_{run}_questions.csv").open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
+    groups = [("all", "all"), ("dev", "all"), ("test", "all")] + [(s, e) for s in ("all", "dev", "test") for e in ("text", "image")]
+    with (results_dir / f"ragas_{run}.csv").open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["split", "evidence_type", "questions"] + [c for m in METRICS for c in (m, f"{m}_n")])
+        for split, kind in groups:
+            part = [r for r in rows if split in ("all", r["split"]) and kind in ("all", r["evidence_type"])]
+            line = [split, kind, len(part)]
+            for m in METRICS:
+                vals = [r[m] for r in part if r[m] is not None]  # a skipped or failed metric is left out
+                line += [round(sum(vals) / len(vals), 3) if vals else "", len(vals)]
+            w.writerow(line)
 
 
 def make_judge(agent=False):
@@ -119,6 +144,8 @@ async def main():
     means = {k: round(sum(v) / len(v), 3) if v else None for k, v in scored.items()}  # None: no question scored
     out = results_dir / f"ragas_{args.run}.json"
     out.write_text(json.dumps({"judge": SCORER_MODEL if args.agent else JUDGE_MODEL, "means": means, "scored": {k: len(v) for k, v in scored.items()}, "tokens": tokens_used, "rows": results}, indent=1))
+    if not args.agent and results:
+        write_csvs(results_dir, args.run, results)
     print("\nmean  " + "  ".join(f"{k} {'-' if v is None else f'{v:.2f}'} (n={len(scored[k])})" for k, v in means.items()))
     print(f"{len(results)} questions, {tokens_used} judge tokens this run "
           f"(cached replies cost nothing), saved {out}")
