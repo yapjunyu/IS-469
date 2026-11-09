@@ -14,7 +14,7 @@ from pptx import Presentation
 
 from agent import s1_llm
 from agent.memory import learner
-from agent.tests.test_loop import SEARCH_CALL, reply, turn
+from tests.agent.test_loop import SEARCH_CALL, reply, turn
 from tutor import notebook
 from tutor.pipeline import EMBEDDER, STORE_TAG
 from tutor.retrieval import embed, extract, search

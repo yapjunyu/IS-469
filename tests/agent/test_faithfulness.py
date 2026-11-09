@@ -5,7 +5,7 @@ import re
 from agent import s1_llm
 from agent.memory import learner
 from agent.s7_faithfulness import JUDGE_MODEL
-from agent.tests.test_loop import SEARCH_CALL, read_trace, reply, turn
+from tests.agent.test_loop import SEARCH_CALL, read_trace, reply, turn
 
 PASSAGES = [{"id": "p1", "file": "lec3.pdf", "page": 12, "text": "LoRA adds low-rank matrices."}]
 

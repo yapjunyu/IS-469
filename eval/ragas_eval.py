@@ -44,7 +44,7 @@ GOLD = ROOT / "eval" / "gold" / "gold_60_40.csv"
 METRICS = ("faithfulness", "factual_correctness", "context_precision", "context_recall")
 SCORER_MODEL = "claude-haiku-5-5"  # eval/agent_common.py SCORER, without the opencode-go/ routing prefix
 # OpenCode Go's OpenAI-compatible endpoint, which RAGAS expects. Go also serves Claude through it, with the
-# image_url parts MultiModalFaithfulness sends. As agent/s1_llm.py, Go rejects requests without a session id
+# image_url parts MultiModalFaithfulness sends. As src/agent/s1_llm.py, Go rejects requests without a session id
 OPENCODE_URL = "https://opencode.ai/inference/go/openai/v1"
 
 tokens_used = 0  # counted from every judge reply, to see what a run costs

@@ -3,7 +3,7 @@ import json
 
 from agent import ingest, s1_llm
 from agent.memory import learner
-from agent.tests.test_loop import reply
+from tests.agent.test_loop import reply
 
 
 def fake_chat(content, sent):

@@ -10,8 +10,8 @@ from streamlit.testing.v1 import AppTest
 
 from agent import s1_llm, s3_loop
 from agent.memory import learner, reflection
-from agent.tests.test_loop import SEARCH_CALL, read_trace, reply
-from test_notebook import fake_models, figure_pdf, make_pdf  # noqa: F401  (fake_models is autouse: importing it keeps real models out of this file)
+from tests.agent.test_loop import SEARCH_CALL, read_trace, reply
+from tests.test_notebook import fake_models, figure_pdf, make_pdf  # noqa: F401  (fake_models is autouse: importing it keeps real models out of this file)
 from tutor import notebook
 
 ROOT = Path(__file__).resolve().parents[1]

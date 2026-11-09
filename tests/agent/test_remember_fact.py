@@ -4,9 +4,9 @@ import json
 from agent import s1_llm
 from agent.memory import learner
 from agent.s2_tools import run_tool
-from agent.tests.test_loop import tool_ctx, turn
-from agent.tests.test_quiz import answer, call, fake_chat, lookup
-from agent.tests.test_search import fake_search
+from tests.agent.test_loop import tool_ctx, turn
+from tests.agent.test_quiz import answer, call, fake_chat, lookup
+from tests.agent.test_search import fake_search
 
 FACT = {"concept": "LoRA", "fact": "LoRA adds low-rank matrices.", "passage_id": "p1"}
 

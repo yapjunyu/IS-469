@@ -179,7 +179,7 @@ __pycache__/
 .DS_Store
 
 # personal progress notes
-agent/PROGRESS.md
+src/agent/PROGRESS.md
 
 # local issue tracker (specs and tickets)
 .scratch/

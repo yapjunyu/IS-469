@@ -45,7 +45,7 @@ def content_requests():
 
 def quiz_history(row):
     """The two messages before a quiz answer: the request and the tutor's quiz, with its passage ids in square
-    brackets in the text, as the app keeps the tutor's answer in history for grade_answer (agent/prompts.py)."""
+    brackets in the text, as the app keeps the tutor's answer in history for grade_answer (src/agent/prompts.py)."""
     ids = [p["id"] for p in ac.passages_at(row["quiz_file"], int(row["quiz_page"]))]
     assert ids, f"{row['id']}: no passage at {row['quiz_file']} page {row['quiz_page']}"
     return ids, [{"role": "user", "content": f"Quiz me on {row['expected_concept']}."},

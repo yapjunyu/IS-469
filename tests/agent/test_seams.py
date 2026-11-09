@@ -1,7 +1,7 @@
 """Every LLM call goes through s4_trace.traced_chat, so each one writes an llm row and counts toward the turn."""
 from pathlib import Path
 
-SOURCES = [p for p in Path(__file__).resolve().parents[1].rglob("*.py") if "tests" not in p.parts]
+SOURCES = [p for p in (Path(__file__).resolve().parents[2] / "src" / "agent").rglob("*.py") if "tests" not in p.parts]
 
 
 def test_no_module_holds_its_own_copy_of_chat():

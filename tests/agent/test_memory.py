@@ -5,7 +5,7 @@ import pytest
 from agent import s1_llm
 from agent.memory import learner, reflection
 from agent.s2_tools import TOOL_SCHEMAS, run_tool
-from agent.tests.test_loop import read_trace, tool_ctx, turn
+from tests.agent.test_loop import read_trace, tool_ctx, turn
 
 def test_score_moves_with_answers():
     assert learner.update_mastery("alice", "LoRA", True) == 0.65      # 0.5 + 0.3 * (1 - 0.5)

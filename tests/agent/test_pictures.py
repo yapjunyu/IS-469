@@ -7,8 +7,8 @@ import pytest
 from agent import s1_llm
 from agent.memory import learner
 from agent.s2_tools import run_tool
-from agent.tests.test_llm_client import fakes
-from agent.tests.test_loop import SEARCH_CALL, read_trace, reply, tool_ctx, turn
+from tests.agent.test_llm_client import fakes
+from tests.agent.test_loop import SEARCH_CALL, read_trace, reply, tool_ctx, turn
 
 ANSWER = {"role": "assistant", "content": "The figure shows a cat [p1]."}
 
