@@ -3,7 +3,7 @@ from pathlib import Path
 
 from agent import s1_llm
 from agent.memory import learner
-from agent.tests.test_loop import SEARCH_CALL, reply, turn
+from tests.agent.test_loop import SEARCH_CALL, reply, turn
 
 REAL_ID = "a1b2c3d4e5f6:0007"
 PASSAGES = [{"id": "p1", "file": "lec3.pdf", "page": 12, "text": "LoRA adds low-rank matrices."},
@@ -109,7 +109,7 @@ def test_a_bare_real_format_id_followed_by_a_colon_is_cited(monkeypatch):
 
 
 def test_the_walkthrough_notebook_keeps_no_output_in_the_old_shape():
-    notebook = (Path(__file__).parents[1] / "agent_walkthrough.ipynb").read_text(encoding="utf-8")
+    notebook = (Path(__file__).parents[2] / "notebooks" / "agent_walkthrough.ipynb").read_text(encoding="utf-8")
     assert 'result[\\"citations\\"]' in notebook
     assert "CITATIONS: [{" not in notebook
 

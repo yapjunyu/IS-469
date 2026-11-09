@@ -6,6 +6,73 @@ It is similar in spirit to Google's NotebookLM, which answers questions from a u
 
 > **Status:** in development for the IS469 group project. Due G1 Tue 10 Nov / G2 Fri 13 Nov 2026. See [`docs/IS469_Project_Plan_Study_Tutor_General.docx`](docs/IS469_Project_Plan_Study_Tutor_General.docx) for the full project plan, and [`docs/build_and_test_steps.md`](docs/build_and_test_steps.md) for the step-by-step build and test guide.
 
+## Getting started
+
+### 1. Install Python 3.12
+
+The project needs Python 3.12 (`requires-python = ">=3.12"` in `pyproject.toml`). Download it from [python.org](https://www.python.org/downloads/) and check it:
+
+```bash
+python3.12 --version     # macOS / Linux
+py -3.12 --version       # Windows
+```
+
+### 2. Create a virtual environment and install the requirements
+
+Run these from the repo root.
+
+macOS / Linux:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Windows (PowerShell):
+
+```powershell
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+The commands below assume the environment is active. Jina CLIP v2 needs its own environment, used only by the embedder evaluation; see [Rerun the evaluation](#rerun-the-evaluation).
+
+### 3. Add your API keys
+
+Copy `.env.example` to `.env` and fill in the OpenCode and OpenAI API keys (Groq only for a Groq model, such as the one the agent walkthrough notebook pins). A workspace owner or admin must also select **Global** under Settings › Privacy › Regions on OpenCode, because DeepSeek V4.1 Flash is blocked in Go's default regions.
+
+`.env` is ignored by git. Never commit your keys.
+
+### 4. Start the app
+
+```bash
+streamlit run app.py
+```
+
+Enter your name, then upload your .pptx or PDF files into your notebook. The same name reopens the same notebook next time. AI responses are cached to disk, so reruns of the evaluation are free, repeatable and don't hit API rate limits.
+
+### 5. Run the tests (optional)
+
+```bash
+python -m pytest
+```
+
+### Project layout
+
+```
+app.py                 Streamlit app (start here)
+src/tutor/             RAG pipeline: extraction, chunking, embedding, search, answering
+src/agent/             Tutor agent: LLM client, tools, loop, trace, guardrails, memory
+tests/                 All tests (tests/agent/ for the agent, tests/retrieval/ for retrieval)
+eval/                  Evaluation scripts, gold data and saved results
+notebooks/             Agent walkthrough notebook
+corpora/               Course files used for evaluation
+docs/                  Project plan, build guide and agent docs
+data/                  Per-student notebooks, indexes and memory (created at runtime, not committed)
+```
+
 ## Features
 
 - **Upload your own material:** PowerPoint (.pptx) files and readable PDFs (selectable text, not scans), several per notebook. Anything else is rejected with a clear message. Each file is indexed once, with a progress bar.
@@ -70,19 +137,6 @@ The RAGAS judge is `claude-haiku-5-5` through OpenCode Go, set in `eval/ragas_ev
 
 Results and reasons are in [`SUMMARY_60_40.md`](eval/results_60_40/SUMMARY_60_40.md).
 
-### Set up
-
-You need Python 3.11 and an [OpenCode Go](https://opencode.ai/docs/go/) API key. The corpus is in the repository under `corpora/`.
-
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-echo 'OPENCODE_API_KEY=your-key-here' > .env
-.venv/bin/python -m pytest tests
-```
-
-`.env` is ignored by git. Never commit your key.
-
 ### Ask the tutor
 
 ```bash
@@ -145,20 +199,6 @@ This needs your OpenCode key. The default set is the 75 questions marked `llm_ev
 ```
 
 A text question takes about 9 API calls and an image question about 6, so all 75 take about 630. Scoring one question takes about 14,000 judge tokens, so all 75 cost well under $1. Answers and judge replies are cached, so rerunning continues where it stopped and costs nothing for replies already cached. Check the `scored` counts in `eval/results_60_40/ragas_sample.json`, because a metric that fails is left out of its mean.
-
-## Getting started
-
-1. Install the requirements: `python -m pip install -r requirements.txt`.
-2. Copy `.env.example` to `.env` and fill in the OpenCode and OpenAI API keys (Groq only for a Groq model, such as the one the agent walkthrough notebook pins). A workspace owner or admin must also select **Global** under Settings › Privacy › Regions on OpenCode, because DeepSeek V4.1 Flash is blocked in Go's default regions.
-3. Launch the app from the repo root, with your environment active:
-
-   ```bash
-   streamlit run app.py
-   ```
-
-4. Enter your name, then upload your .pptx or PDF files into your notebook. The same name reopens the same notebook next time.
-
-AI responses are cached to disk, so reruns of the evaluation are free, repeatable and don't hit API rate limits.
 
 ## Evaluation
 

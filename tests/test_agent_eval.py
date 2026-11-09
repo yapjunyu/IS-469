@@ -22,7 +22,7 @@ import run_poisoning as poi  # noqa: E402
 import summarise_agent as sa  # noqa: E402
 from agent import s1_llm, s2_tools, s3_loop  # noqa: E402
 from agent.memory import learner  # noqa: E402
-from agent.tests.test_loop import EXTRA_CALLS_OFF  # noqa: E402
+from tests.agent.test_loop import EXTRA_CALLS_OFF  # noqa: E402
 from tutor import notebook  # noqa: E402
 from tutor.retrieval.clean import clean_pages  # noqa: E402
 from tutor.retrieval.extract import extract  # noqa: E402
@@ -299,7 +299,7 @@ def test_a_quiz_answer_turn_has_the_quiz_in_history_as_the_app_keeps_it(monkeypa
     scorecard(monkeypatch, eval_dirs, quiz_answer_row())
     request, quiz = requests[0]["messages"][1:3]  # history, between the system prompt and the student's answer
     assert request["role"] == "user" and "invest criteria" in request["content"]
-    # the tutor's whole-set quiz format (agent/prompts.py), its passage ids in square brackets
+    # the tutor's whole-set quiz format (src/agent/prompts.py), its passage ids in square brackets
     assert quiz["role"] == "assistant" and "What does INVEST stand for? [notes-p3]" in quiz["content"]
     # and the quiz is open, as the app passes it: listed in the system prompt with its passage ids
     assert "Open quiz" in requests[0]["messages"][0]["content"]

@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "src"), str(ROOT), str(ROOT / "eval")]
+sys.path[:0] = [str(ROOT / "src"), str(ROOT / "eval")]
 os.chdir(ROOT)  # learner DB and trace paths are relative to the repo root
 
 from agent import s1_llm, s2_tools, s3_loop, s4_trace  # noqa: E402

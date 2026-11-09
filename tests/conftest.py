@@ -1,17 +1,33 @@
-"""Tests outside agent/ get the same temp folders and real-LLM guard as the agent tests, and the agent eval's
-LLM cache and results go to the temp folder too. fake_models puts the notebook on fake models."""
+"""Shared fixtures: every test writes student databases, the trace, the LLM cache and notebook files to a temp folder,
+and any LLM call a test forgot to fake fails instead of reaching the provider. The agent eval's LLM cache and results
+go to the temp folder too. fake_models puts the notebook on fake models."""
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from agent.tests.conftest import tmp_data  # noqa: F401  (autouse: importing it applies it here)
+from agent import s1_llm, s4_trace
+from agent.memory import learner
+from tutor import notebook
+from tutor.retrieval import extract
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "eval"))
 import agent_common as ac  # noqa: E402
-from test_notebook import FakeCrossEncoder, FakeSentenceTransformer  # noqa: E402
+from tests.test_notebook import FakeCrossEncoder, FakeSentenceTransformer  # noqa: E402
 from tutor.retrieval import embed, search  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def tmp_data(monkeypatch, tmp_path):
+    monkeypatch.setattr(learner, "DB_DIR", tmp_path / "students")
+    monkeypatch.setattr(s4_trace, "TRACE_PATH", tmp_path / "trace.jsonl")
+    monkeypatch.setattr(s1_llm, "CACHE_DIR", tmp_path / "llm_cache")
+    monkeypatch.setattr(s1_llm, "_get_client", lambda provider: pytest.fail("real LLM call: fake s1_llm.chat in this test"))
+    monkeypatch.setattr(notebook, "UPLOADS_DIR", tmp_path / "uploads")
+    monkeypatch.setattr(notebook, "CHROMA_DIR", tmp_path / "chroma")
+    monkeypatch.setattr(extract, "IMAGE_DIR", tmp_path / "images")
+    return tmp_path
 
 
 @pytest.fixture(autouse=True)

@@ -5,8 +5,8 @@ import pytest
 
 from agent import s1_llm
 from agent.s2_tools import run_tool
-from agent.tests.test_loop import read_trace, reply, scripted, tool_ctx, turn
-from agent.tests.test_search import PASSAGES, fake_search
+from tests.agent.test_loop import read_trace, reply, scripted, tool_ctx, turn
+from tests.agent.test_search import PASSAGES, fake_search
 from agent.prompts import WRONG_ANSWER_PROMPT
 
 

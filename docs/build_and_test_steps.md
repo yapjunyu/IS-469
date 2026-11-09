@@ -193,7 +193,7 @@ The plan requires model ID, temperature, search mode, chunk size, the search-aga
 
 ### Step 10. The tutor's notes on each student (SQLite)
 
-One SQLite database per student. Session notes live in it too; the vector memory variant embeds them each turn (`agent/memory/vector.py`).
+One SQLite database per student. Session notes live in it too; the vector memory variant embeds them each turn (`src/agent/memory/vector.py`).
 
 | Store | Holds | Example |
 |---|---|---|
@@ -228,7 +228,7 @@ The memory-write check (a `run_turn` switch, on by default) lets `remember_fact`
 
 Read the student's notes, pick a tool, run it, look at the result, then pick again, until there is an answer.
 
-The loop's steps are in the docstring of `agent/s3_loop.py`.
+The loop's steps are in the docstring of `src/agent/s3_loop.py`.
 
 The step cap means "give up after a set number of tries", so the loop can never go round forever. Tool errors are caught and returned to the LLM as results rather than crashing the turn.
 
@@ -269,7 +269,7 @@ A search-then-answer turn:
  "faithfulness": {"supported": true, "reason": "..."}, "message_preview": "...", "answer_preview": "..."}
 ```
 
-The full row format is in the docstring of `agent/s4_trace.py`.
+The full row format is in the docstring of `src/agent/s4_trace.py`.
 
 **Done when** every metric in step 22 can be computed from the trace alone.
 

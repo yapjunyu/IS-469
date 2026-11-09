@@ -7,7 +7,7 @@ import pytest
 from agent import ingest, s1_llm
 from agent.memory import learner, reflection
 from agent.s2_tools import run_tool
-from agent.tests.test_loop import SEARCH_CALL, always_search, read_trace, reply, tool_ctx, turn
+from tests.agent.test_loop import SEARCH_CALL, always_search, read_trace, reply, tool_ctx, turn
 
 PASSAGES = [{"id": "p1", "file": "lec3.pdf", "page": 12, "text": "LoRA adds low-rank matrices."}]
 REAL_GET_CLIENT = s1_llm._get_client  # taken at import: the shared fixture replaces it for each test

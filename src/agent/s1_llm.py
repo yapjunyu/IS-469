@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 load_dotenv()
 # same gitignored folder as src/tutor/llm.py; keys hash the full request, so no collisions
 # shortcut: path copied from src/tutor/llm.py, import it once `tutor` is installed as a package
-CACHE_DIR = Path(__file__).resolve().parents[1] / "data" / "llm_cache"
+CACHE_DIR = Path(__file__).resolve().parents[2] / "data" / "llm_cache"
 _clients = {}
 OPENCODE_PREFIX = "opencode-go/"
 
